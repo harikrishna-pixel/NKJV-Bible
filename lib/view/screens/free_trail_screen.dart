@@ -1,6 +1,6 @@
 import 'package:biblebookapp/view/screens/intro_subcribtion_screen.dart';
 
-import 'package:biblebookapp/view/screens/multi_select_paywall.dart';
+import 'package:biblebookapp/view/screens/multi_select_paywallscreen.dart';
 
 import 'package:flutter/material.dart';
 

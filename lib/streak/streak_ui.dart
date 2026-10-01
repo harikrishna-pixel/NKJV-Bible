@@ -127,8 +127,6 @@ class StreakIconButton extends StatelessWidget {
         // Has streak but not done today: gray outlined badge + red dart.
         // Completed today: full orange filled badge, no dart.
         final showOutlinedPending = showCountBadge && !todayComplete;
-        const pendingGray = Color(0xFF9E9E9E);
-
         return InkWell(
           onTap: () => Get.to(() => const DailyJourneyScreen()),
           borderRadius: BorderRadius.circular(20),
@@ -150,7 +148,8 @@ class StreakIconButton extends StatelessWidget {
                           borderRadius: BorderRadius.circular(20),
                           border: showOutlinedPending
                               ? Border.all(
-                                  color: pendingGray.withOpacity(0.65),
+                                  color: const Color(0xFFE65100)
+                                      .withOpacity(0.55),
                                   width: 1.4,
                                 )
                               : null,
@@ -172,7 +171,7 @@ class StreakIconButton extends StatelessWidget {
                               Icons.local_fire_department_rounded,
                               size: iconSize * 0.85,
                               color: showOutlinedPending
-                                  ? pendingGray
+                                  ? const Color(0xFFE65100)
                                   : Colors.white,
                             ),
                             SizedBox(width: iconSize * 0.15),
@@ -182,7 +181,7 @@ class StreakIconButton extends StatelessWidget {
                                 fontSize: iconSize * 0.7,
                                 fontWeight: FontWeight.w700,
                                 color: showOutlinedPending
-                                    ? pendingGray
+                                    ? const Color(0xFFE65100)
                                     : Colors.white,
                                 height: 1,
                               ),

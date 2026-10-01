@@ -25,7 +25,7 @@ import 'package:biblebookapp/view/constants/theme_provider.dart';
 import 'package:biblebookapp/view/screens/auth/splash.dart';
 import 'package:biblebookapp/view/widget/bible_upgrade_alert.dart';
 import 'package:biblebookapp/view/screens/bible_select_screen.dart';
-import 'package:biblebookapp/view/screens/multi_select_paywall.dart';
+import 'package:biblebookapp/view/screens/multi_select_paywallscreen.dart';
 import 'package:biblebookapp/view/screens/books/books_screen.dart';
 import 'package:biblebookapp/view/screens/calendar_screen/view/calendar_screen.dart';
 import 'package:biblebookapp/view/screens/category_detail_screen/view/image_detail_screen.dart';
@@ -4147,29 +4147,6 @@ class _HomeScreenState extends State<HomeScreen>
                       ],
                     ),
                     actions: [
-                      BibleInfo.folders.length != 1
-                          ? Padding(
-                                    padding: const EdgeInsets.symmetric(
-                                        horizontal: 4),
-                              child: InkWell(
-                                  onTap: () {
-                                          if (controller.adFree.value ==
-                                              false) {
-                                      controller.bannerAd?.dispose();
-                                      controller.bannerAd?.load();
-                                    }
-                                    Get.to(() => BibleVersionsScreen(
-                                          from: 'home',
-                                        ));
-                                  },
-                                  child: Image.asset(
-                                    "assets/biblebook.png",
-                                    height: screenWidth > 450 ? 30 : 24,
-                                    width: screenWidth > 450 ? 30 : 24,
-                                          color: readerFg,
-                                  )),
-                            )
-                          : SizedBox(),
                       Padding(
                         padding: const EdgeInsets.only(right: 4),
                         child: Row(
@@ -4195,7 +4172,7 @@ class _HomeScreenState extends State<HomeScreen>
                             "assets/home icons/search.png",
                             height: screenWidth > 450 ? 30 : 22,
                             width: screenWidth > 450 ? 30 : 22,
-                            color: readerFg,
+                            color: CommanColor.whiteBlack(context),
                                 ),
                               ),
                             ),

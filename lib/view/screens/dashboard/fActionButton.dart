@@ -2493,22 +2493,6 @@ class floatingButtonState extends State<floatingButton>
                   children: [
                     SizedBox(
                       width: 60,
-                      child: InkWell(
-                        onTap: () {
-                          _mp3Chosen = true;
-                          _readerUseTts = false;
-                          _fullScreenTts = false;
-                          Navigator.of(context).pop();
-                          if (!_fullPlayerOpen) {
-                            _openReaderFullPlayer(tts: false);
-                          }
-                        },
-                        child: Icon(
-                          Icons.keyboard_arrow_up,
-                          color: CommanColor.lightDarkPrimary(context),
-                          size: 28,
-                        ),
-                      ),
                     ),
                     Expanded(
                       child: Builder(
@@ -2556,14 +2540,6 @@ class floatingButtonState extends State<floatingButton>
                     ),
                     Row(
                       children: [
-                        InkWell(
-                          onTap: _showCombinedVoiceSettingsSheet,
-                          child: _voiceMicIcon(
-                            CommanColor.lightDarkPrimary(context),
-                            size: 22,
-                          ),
-                        ),
-                        const SizedBox(width: 10),
                         InkWell(
                           onTap: () async {
                             setState(() => isAudioPlaying = false);
@@ -3424,8 +3400,7 @@ class floatingButtonState extends State<floatingButton>
                       builder: (context, snapshot) {
                         final bibleLabel = _recordedAudioVoiceLabel();
                         final englishUrl = BibleInfo.englishBibleAudio.trim();
-                        final showEnglish = snapshot.data == true &&
-                            englishUrl.isNotEmpty;
+                        final showEnglish = false;
                         if (!showEnglish) {
                           return Container(
                             width: double.infinity,
@@ -3439,7 +3414,7 @@ class floatingButtonState extends State<floatingButton>
                               borderRadius: BorderRadius.circular(8),
                             ),
                             child: Text(
-                              bibleLabel,
+                              'Default',
                               style: TextStyle(
                                 color: CommanColor.lightDarkPrimary(context),
                                 letterSpacing: BibleInfo.letterSpacing,
@@ -4124,31 +4099,6 @@ class floatingButtonState extends State<floatingButton>
                         children: [
                           SizedBox(
                             width: 80,
-                            child: Align(
-                              alignment: Alignment.centerLeft,
-                              child: InkWell(
-                                onTap: () {
-                                  _readerUseTts = true;
-                                  _mp3Chosen = false;
-                                  _fullScreenTts = true;
-                                  if (isSpeech ||
-                                      ttsState == TtsState.playing) {
-                                    isSpeech = true;
-                                    ttsState = TtsState.playing;
-                                  }
-                                  _closeTtsSheetUi();
-                                  Navigator.of(context).pop();
-                                  if (!_fullPlayerOpen) {
-                                    _openReaderFullPlayer(tts: true);
-                                  }
-                                },
-                                child: Icon(
-                                  Icons.keyboard_arrow_up,
-                                  color: CommanColor.lightDarkPrimary(context),
-                                  size: 28,
-                                ),
-                              ),
-                            ),
                           ),
                           Expanded(
                             child: Builder(
