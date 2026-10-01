@@ -24,6 +24,7 @@ import 'package:biblebookapp/view/constants/theme_provider.dart';
 import 'package:biblebookapp/view/screens/auth/splash.dart';
 import 'package:biblebookapp/view/widget/bible_upgrade_alert.dart';
 import 'package:biblebookapp/view/screens/bible_select_screen.dart';
+import 'package:biblebookapp/view/screens/multi_select_paywall.dart';
 import 'package:biblebookapp/view/screens/books/books_screen.dart';
 import 'package:biblebookapp/view/screens/calendar_screen/view/calendar_screen.dart';
 import 'package:biblebookapp/view/screens/category_detail_screen/view/image_detail_screen.dart';
@@ -6027,12 +6028,25 @@ class _HomeScreenState extends State<HomeScreen>
           BibleInfo.oneYearPlanid;
       final lifeTimePlan = await SharPreferences.getString('lifeTimePlan') ??
           BibleInfo.lifeTimePlanid;
-      await SubscriptionScreen.openPaywallStacked(
-        sixMonthPlan: sixMonthPlan,
-        oneYearPlan: oneYearPlan,
-        lifeTimePlan: lifeTimePlan,
-        checkad: 'theme',
-      );
+      if (BibleInfo.folders.length > 1) {
+        await Get.to(
+          () => MultiSelectPaywall(
+            sixMonthPlan: sixMonthPlan,
+            oneYearPlan: oneYearPlan,
+            lifeTimePlan: lifeTimePlan,
+            checkad: 'theme',
+          ),
+          transition: SubscriptionScreen.paywallRouteTransition,
+          duration: SubscriptionScreen.paywallRouteDuration,
+        );
+      } else {
+        await SubscriptionScreen.openPaywallStacked(
+          sixMonthPlan: sixMonthPlan,
+          oneYearPlan: oneYearPlan,
+          lifeTimePlan: lifeTimePlan,
+          checkad: 'theme',
+        );
+      }
       // Paywall may pop back onto this Home — refresh so Free Plan / banner update.
       await controller.refreshPremiumStatusFromPrefs();
       try {
@@ -6134,6 +6148,14 @@ class _HomeScreenState extends State<HomeScreen>
         isPremium: isPremium,
         showPremiumBanner: showPremiumBanner,
         showAskAnything: BibleInfo.chat == 1,
+        showBibleVersion: BibleInfo.folders.length > 1,
+        onBibleVersionTap: () {
+          Get.to(
+            () => const BibleVersionsScreen(from: 'home'),
+            transition: Transition.cupertinoDialog,
+            duration: const Duration(milliseconds: 300),
+          );
+        },
         showBooks: controller.bookAdsStatus.value == 1,
         showEProducts: BibleInfo.enableEShop == true,
         onAccountTap: () {

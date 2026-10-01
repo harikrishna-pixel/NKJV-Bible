@@ -62,6 +62,12 @@ class _BookListScreenState extends State<BookListScreen> {
   }
 
   void _splitTestaments() {
+    const ntBookCount = 27;
+    if (bookList.length >= BibleInfo.old_testament_count + ntBookCount) {
+      testament_num = bookList.length - ntBookCount;
+    } else {
+      testament_num = BibleInfo.old_testament_count;
+    }
     newTestmentBookList.clear();
     for (final book in bookList) {
       if ((book.bookNum ?? 0) >= testament_num) {

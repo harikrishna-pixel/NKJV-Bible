@@ -238,7 +238,8 @@ class BibleInfo {
 
 // add folder names here  assets/zipped/
   static List<String> folders = [
-    "NLT Bible"
+    "NLT Bible",
+    "TAMIL_Bible",
   ];
 
   static String emailVerify = "0";

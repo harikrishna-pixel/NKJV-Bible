@@ -36,6 +36,8 @@ class IosStyleAppDrawer extends StatefulWidget {
     required this.onMoreAppsTap,
     required this.onContactUsTap,
     required this.onEProductsTap,
+    this.showBibleVersion = false,
+    this.onBibleVersionTap,
     this.showAskAnything = true,
     this.showBooks = false,
     this.showEProducts = false,
@@ -52,6 +54,8 @@ class IosStyleAppDrawer extends StatefulWidget {
   final String crownAsset;
   final bool isPremium;
   final bool showPremiumBanner;
+  final bool showBibleVersion;
+  final VoidCallback? onBibleVersionTap;
   final bool showAskAnything;
   final bool showBooks;
   final bool showEProducts;
@@ -462,6 +466,13 @@ class _IosStyleAppDrawerState extends State<IosStyleAppDrawer>
             useIconRail: false,
           ),
           _sectionDivider(),
+          if (widget.showBibleVersion && widget.onBibleVersionTap != null)
+            _NavLinkRow(
+              icon: Icons.menu_book_outlined,
+              asset: 'assets/home icons/setting.png',
+              label: 'Bible Version',
+              onTap: () => _closeDrawerThen(widget.onBibleVersionTap!),
+            ),
           _NavLinkRow(
             icon: Icons.settings_outlined,
             asset: 'assets/home icons/setting.png',

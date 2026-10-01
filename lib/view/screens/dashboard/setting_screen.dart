@@ -4,6 +4,7 @@ import 'package:biblebookapp/view/constants/constant.dart';
 import 'package:biblebookapp/view/constants/theme_provider.dart';
 import 'package:biblebookapp/streak_flow/streak_saved_list_screen.dart';
 import 'package:biblebookapp/view/screens/dashboard/about.dart';
+import 'package:biblebookapp/view/screens/bible_select_screen.dart';
 import 'package:biblebookapp/view/screens/dashboard/constants.dart';
 import 'package:biblebookapp/view/screens/dashboard/home_screen.dart';
 import 'package:biblebookapp/view/screens/dashboard/preference_selection_screen.dart';
@@ -1292,6 +1293,27 @@ class _SettingScreenState extends State<SettingScreen>
                 const SizedBox(
                   height: 5,
                 ),
+                if (BibleInfo.folders.length > 1)
+                  Padding(
+                    padding: EdgeInsets.symmetric(
+                        horizontal: 20, vertical: screenWidth < 380 ? 7 : 10),
+                    child: InkWell(
+                      onTap: () => Get.to(
+                        () => const BibleVersionsScreen(from: 'home'),
+                        transition: Transition.cupertinoDialog,
+                        duration: const Duration(milliseconds: 300),
+                      ),
+                      child: Row(
+                        children: [
+                          Text(
+                            'Bible Version',
+                            style: CommanStyle.bw16500(context)
+                                .copyWith(color: _settingsRowInk(context)),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
                 _buildSettingsSectionHeader('Appearance', screenWidth),
                 const SizedBox(
                   height: 5,

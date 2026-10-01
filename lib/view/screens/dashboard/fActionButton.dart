@@ -7,6 +7,7 @@ import 'package:biblebookapp/utils/internet_speed_checker.dart';
 import 'package:biblebookapp/view/constants/constant.dart';
 import 'package:internet_connection_checker_plus/internet_connection_checker_plus.dart';
 import 'package:biblebookapp/view/constants/share_preferences.dart';
+import 'package:biblebookapp/utils/bible_version_config.dart';
 import 'package:biblebookapp/view/screens/dashboard/constants.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/foundation.dart';
@@ -914,8 +915,10 @@ class floatingButtonState extends State<floatingButton>
     }
 
     // Set release mode based on repeat flag - default to release (no loop)
+    final cfg = await BibleVersionConfig.active();
+    final fromCfg = (cfg?.audioBasePath ?? '').trim();
     String? audioBasePath =
-        _recordedAudioBase();
+        fromCfg.isNotEmpty ? fromCfg : _recordedAudioBase();
     audioBaseUrl = "$audioBasePath/$audioBookNum/$audioChapterNum.mp3";
     log('Audio Base Url:$audioBaseUrl');
 
@@ -1013,6 +1016,7 @@ class floatingButtonState extends State<floatingButton>
   initTts() async {
     flutterTts = FlutterTts();
     _isTtsInitialized = true;
+    await _applyTtsLanguageForActiveBible();
 
     _setAwaitOptions();
     _attachTtsProgressHandler();
@@ -1484,8 +1488,21 @@ class floatingButtonState extends State<floatingButton>
     if (voice != null) {}
   }
 
+  Future<void> _applyTtsLanguageForActiveBible() async {
+    if (!_isTtsInitialized) return;
+    final cfg = await BibleVersionConfig.active();
+    final lang = (cfg?.ttsLanguage ??
+            widget.audioData?.data?.bibleAudioInfo?.textToSpeechLanguageCodeIos ??
+            BibleInfo.textToSpeechLanguageCodeIos)
+        .trim();
+    if (lang.isEmpty) return;
+    language = lang;
+    await flutterTts.setLanguage(lang);
+  }
+
   Future _speak() async {
     try {
+      await _applyTtsLanguageForActiveBible();
       // Reset manual pause flag when TTS is manually started
       isManuallyPaused = false;
       shouldAutoAdvance = true; // Re-enable auto-advance when manually started

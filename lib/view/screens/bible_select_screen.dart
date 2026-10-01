@@ -9,6 +9,7 @@ import 'package:biblebookapp/controller/dpProvider.dart';
 import 'package:biblebookapp/core/bible_extract_paths.dart';
 import 'package:biblebookapp/core/notifiers/download.notifier.dart';
 import 'package:biblebookapp/main.dart';
+import 'package:biblebookapp/utils/bible_version_config.dart';
 import 'package:biblebookapp/utils/emoji_text_style.dart';
 import 'package:biblebookapp/view/widget/thanks_for_love_rating_dialog_content.dart';
 import 'package:biblebookapp/view/constants/assets_constants.dart';
@@ -601,14 +602,7 @@ class BibleVersionsScreenState extends State<BibleVersionsScreen> {
   }
 
   String _bibleDisplayName(String folder) {
-    switch (folder) {
-      case 'NKJV':
-        return 'NKJV Bible';
-      case 'catholic':
-        return 'Catholic Bible';
-      default:
-        return folder;
-    }
+    return BibleVersionConfig.forFolder(folder)?.displayName ?? folder;
   }
 
   void showMainFeedbackDialog(BuildContext context) {
