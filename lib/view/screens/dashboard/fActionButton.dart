@@ -760,6 +760,7 @@ class floatingButtonState extends State<floatingButton>
 
   void _notifyTtsPlayer({bool throttle = false}) {
     _releaseStuckSliderDrag();
+    _publishReaderSpokenWord();
     if (throttle) {
       final now = DateTime.now();
       if (_ttsUiNotifyAt != null &&
@@ -770,6 +771,97 @@ class floatingButtonState extends State<floatingButton>
     }
     _safeCallSetter(_ttsSheetSetState);
     _safeCallSetter(_fullPlayerSetState);
+    _syncReaderWordTimer();
+  }
+
+  /// Display-only range for the chapter verse currently being spoken.
+  static int readerSpokenChapter = -1;
+  static int readerSpokenVerse = -1;
+  static int readerSpokenStart = 0;
+  static int readerSpokenEnd = 0;
+  static String readerSpokenPlain = '';
+
+  Timer? _readerWordTimer;
+  int _readerWordIndex = 0;
+  int _readerClockVerse = -1;
+  DateTime? _readerVerseStartedAt;
+
+  bool get _readerSpeechActive =>
+      isSpeech ||
+      ttsState == TtsState.playing ||
+      ttsState == TtsState.continued;
+
+  void _syncReaderWordTimer() {
+    if (!_readerSpeechActive) {
+      _readerWordTimer?.cancel();
+      _readerWordTimer = null;
+      return;
+    }
+    _readerWordTimer ??= Timer.periodic(const Duration(milliseconds: 80), (_) {
+      if (!mounted || !_readerSpeechActive) {
+        _readerWordTimer?.cancel();
+        _readerWordTimer = null;
+        return;
+      }
+      _publishReaderSpokenWord();
+      _safeCallSetter(_ttsSheetSetState);
+    });
+  }
+
+  void _publishReaderSpokenWord() {
+    final paused = ttsState == TtsState.paused;
+    if ((!_readerSpeechActive && !paused) ||
+        curretNo < 0 ||
+        curretNo >= selectedChapterContent.length) {
+      readerSpokenChapter = -1;
+      readerSpokenVerse = -1;
+      readerSpokenStart = 0;
+      readerSpokenEnd = 0;
+      readerSpokenPlain = '';
+      _readerWordIndex = 0;
+      _readerClockVerse = -1;
+      _readerVerseStartedAt = null;
+      return;
+    }
+    final verse = selectedChapterContent[curretNo];
+    final plain = parse(verse.content?.toString() ?? '').body?.text ??
+        (verse.content?.toString() ?? '');
+    if (plain.isEmpty) return;
+    if (curretNo != _readerClockVerse) {
+      _readerClockVerse = curretNo;
+      _readerWordIndex = 0;
+      // Small lead so the mark is not still on the previous word.
+      _readerVerseStartedAt =
+          DateTime.now().subtract(const Duration(milliseconds: 180));
+    }
+    final words = RegExp(r'\S+').allMatches(plain).toList();
+    if (words.isEmpty) return;
+    final started = _readerVerseStartedAt ?? DateTime.now();
+    final elapsed = DateTime.now().difference(started).inMilliseconds / 1000.0;
+    // Display pace only. The 2.5 estimate used by the player bar runs behind speech.
+    final wordsPerSecond = 3.3 * _ttsSpeedFactor();
+    var index = wordsPerSecond <= 0 ? 0 : (elapsed * wordsPerSecond).floor();
+    if (allText.isNotEmpty && end > start) {
+      var engineIndex = 0;
+      for (var i = 0; i < words.length; i++) {
+        if (start < words[i].end) {
+          engineIndex = i;
+          break;
+        }
+      }
+      if (engineIndex > index) index = engineIndex;
+    }
+    _readerWordIndex = index;
+    if (_readerWordIndex < 0) _readerWordIndex = 0;
+    if (_readerWordIndex >= words.length) {
+      _readerWordIndex = words.length - 1;
+    }
+    final word = words[_readerWordIndex];
+    readerSpokenChapter = verse.chapterNum?.toInt() ?? -1;
+    readerSpokenVerse = verse.verseNum?.toInt() ?? -1;
+    readerSpokenPlain = plain;
+    readerSpokenStart = word.start;
+    readerSpokenEnd = word.end;
   }
 
   DateTime? _ttsUiNotifyAt;
@@ -2079,6 +2171,8 @@ class floatingButtonState extends State<floatingButton>
     _positionSubscription?.cancel();
     _completeSubscription?.cancel();
     _sleepTimer?.cancel();
+    _readerWordTimer?.cancel();
+    _readerWordTimer = null;
     _playerStateSubscription = null;
     _durationSubscription = null;
     _positionSubscription = null;
@@ -2092,6 +2186,11 @@ class floatingButtonState extends State<floatingButton>
     // Playback stop is handled by HomeScreen.dispose via stopPlaybackOnLeave().
 
     WidgetsBinding.instance.removeObserver(this);
+    readerSpokenChapter = -1;
+    readerSpokenVerse = -1;
+    readerSpokenStart = 0;
+    readerSpokenEnd = 0;
+    readerSpokenPlain = '';
     // audioPlayer.dispose();
     super.dispose();
   }
@@ -4202,7 +4301,14 @@ class floatingButtonState extends State<floatingButton>
                       const SizedBox(height: 25),
                       SizedBox(
                           width: MediaQuery.of(context).size.width * 0.86,
-                          child: _showTtsWordHighlight
+                          child: readerSpokenPlain.isNotEmpty &&
+                                  readerSpokenEnd > readerSpokenStart
+                              ? _textFromInput(
+                                  readerSpokenStart,
+                                  readerSpokenEnd,
+                                  readerSpokenPlain,
+                                )
+                              : _showTtsWordHighlight
                               ? _textFromInput(start, end, allText)
                               : Text(
                                   selectedChapterContent.length > curretNo
