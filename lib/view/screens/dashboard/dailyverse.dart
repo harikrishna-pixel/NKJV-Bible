@@ -85,6 +85,7 @@ class _DailyVerseState extends State<DailyVerse> {
   List<DailyVerseList> dailyVerseList = [];
   OverlayEntry? _overlayEntry;
   late List<GlobalKey> itemKeys;
+  final Map<int, String> _bookTitleByNum = {};
 
   // @override
   // void initState() {
@@ -141,11 +142,43 @@ class _DailyVerseState extends State<DailyVerse> {
     }
   }
 
+  /// Book name shown under the verse. Uses the open Bible's `book.title`
+  /// (Tamil title when that Bible is selected). Chapter and verse stay as stored.
+  String _bookLabel(DailyVerseList data) {
+    final bookId = int.tryParse('${data.bookId}') ?? 0;
+    final bookNum = bookId > 0 ? bookId - 1 : bookId;
+    final fromTable = _bookTitleByNum[bookNum] ?? _bookTitleByNum[bookId];
+    if (fromTable != null && fromTable.isNotEmpty) return fromTable;
+    return (data.book ?? '').trim();
+  }
+
+  Future<void> _loadBookTitles() async {
+    try {
+      final db = await DBHelper().db;
+      if (db == null) return;
+      final rows = await db.rawQuery('SELECT book_num, title FROM book');
+      final map = <int, String>{};
+      for (final row in rows) {
+        final bookNum = int.tryParse('${row['book_num']}');
+        final title = row['title']?.toString().trim() ?? '';
+        if (bookNum == null || title.isEmpty) continue;
+        map[bookNum] = title;
+      }
+      if (!mounted) return;
+      setState(() {
+        _bookTitleByNum
+          ..clear()
+          ..addAll(map);
+      });
+    } catch (_) {}
+  }
+
   @override
   void initState() {
     super.initState();
     final provider = Provider.of<DownloadProvider>(context, listen: false);
     _showCachedDailyVersesImmediately(provider);
+    _loadBookTitles();
     loaddata();
     getFont();
     // Track Daily Verses event
@@ -410,7 +443,7 @@ class _DailyVerseState extends State<DailyVerse> {
                     mainAxisAlignment: MainAxisAlignment.end,
                     children: [
                       Text(
-                          "${data.book} ${dailyVerseUiChapter(data.chapter)}: ${dailyVerseUiVerse(data.verseNum)}",
+                          "${_bookLabel(data)} ${dailyVerseUiChapter(data.chapter)}: ${dailyVerseUiVerse(data.verseNum)}",
                           textAlign: TextAlign.right,
                           style: CommanStyle.black15400),
                     ],
@@ -425,7 +458,7 @@ class _DailyVerseState extends State<DailyVerse> {
                         onTap: () async {
                           await Clipboard.setData(ClipboardData(
                               text:
-                                  "${parse(data.verse).body?.text} \n${data.book} ${dailyVerseUiChapter(data.chapter)}:${dailyVerseUiVerse(data.verseNum)}"));
+                                  "${parse(data.verse).body?.text} \n${_bookLabel(data)} ${dailyVerseUiChapter(data.chapter)}:${dailyVerseUiVerse(data.verseNum)}"));
                           Constants.showToast("Copied");
                         },
                         child: Column(
@@ -611,7 +644,7 @@ class _DailyVerseState extends State<DailyVerse> {
                             context: context,
                             builder: (context) => ShareAlertBox(
                               verseTitle:
-                                  " ${data.book} ${dailyVerseUiChapter(data.chapter)}:${dailyVerseUiVerse(data.verseNum)}",
+                                  " ${_bookLabel(data)} ${dailyVerseUiChapter(data.chapter)}:${dailyVerseUiVerse(data.verseNum)}",
                               onShareAsText: () async {
                                 Navigator.of(context).pop();
                                 // Your logic here
@@ -627,7 +660,7 @@ class _DailyVerseState extends State<DailyVerse> {
                                       "${html.parse("${data.verse}").body?.text ?? ''}.\n\nYou can read more at:\nhttps://play.google.com/store/apps/details?id=$appPackageName";
                                 } else if (Platform.isIOS) {
                                   message =
-                                      '${html.parse("${data.verse}").body?.text ?? ''}.\n${data.book} ${dailyVerseUiChapter(data.chapter)}:${dailyVerseUiVerse(data.verseNum)}\n\nYou can read more at:\nhttps://itunes.apple.com/app/id$appid'; // Example iTunes URL
+                                      '${html.parse("${data.verse}").body?.text ?? ''}.\n${_bookLabel(data)} ${dailyVerseUiChapter(data.chapter)}:${dailyVerseUiVerse(data.verseNum)}\n\nYou can read more at:\nhttps://itunes.apple.com/app/id$appid'; // Example iTunes URL
                                 }
 
                                 if (message.isNotEmpty) {
@@ -657,7 +690,7 @@ class _DailyVerseState extends State<DailyVerse> {
                                     return ImageBottomSheets.dailyVerse(
                                       controller: controller,
                                       content: data.verse.toString(),
-                                      selectedBook: data.book.toString(),
+                                      selectedBook: _bookLabel(data),
                                       selectedChapter:
                                           "${dailyVerseUiChapter(data.chapter)}",
                                       selectedVerseView:
@@ -696,7 +729,7 @@ class _DailyVerseState extends State<DailyVerse> {
                                 'verseText':
                                     parse(data.verse).body?.text.toString() ??
                                         '',
-                                'book': data.book.toString(),
+                                'book': _bookLabel(data),
                                 'chapter':
                                     '${dailyVerseUiChapter(data.chapter)}',
                                 'verse':
@@ -1024,7 +1057,7 @@ class _DailyVerseState extends State<DailyVerse> {
                                           children: [
                                             Expanded(
                                               child: Text(
-                                                "${data.book} ${dailyVerseUiChapter(data.chapter)}:${dailyVerseUiVerse(data.verseNum)}",
+                                                "${_bookLabel(data)} ${dailyVerseUiChapter(data.chapter)}:${dailyVerseUiVerse(data.verseNum)}",
                                                 style: CommanStyle
                                                     .bwWithChangeFont(
                                                         context,

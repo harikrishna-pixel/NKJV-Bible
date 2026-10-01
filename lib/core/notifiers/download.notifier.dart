@@ -952,10 +952,14 @@ class DownloadProvider with ChangeNotifier {
         await dbClient.rawQuery('SELECT book_num, title FROM book');
     if (bookRows.isEmpty) return;
 
-    final bookTitleByNum = <int, String>{
-      for (final row in bookRows)
-        int.parse(row['book_num'].toString()): row['title'] as String,
-    };
+    final bookTitleByNum = <int, String>{};
+    for (final row in bookRows) {
+      final bookNum = int.tryParse('${row['book_num']}');
+      final title = row['title']?.toString().trim() ?? '';
+      if (bookNum == null || title.isEmpty) continue;
+      bookTitleByNum[bookNum] = title;
+    }
+    if (bookTitleByNum.isEmpty) return;
 
     var changed = false;
     final updated = <DailyVerseList>[];
@@ -1103,10 +1107,13 @@ class DownloadProvider with ChangeNotifier {
 
     // Fetch book names (single query — same titles as per-verse lookups).
     final bookRows = await dbClient.rawQuery("SELECT book_num, title FROM book");
-    final bookTitleByNum = <int, String>{
-      for (final row in bookRows)
-        int.parse(row['book_num'].toString()): row['title'] as String,
-    };
+    final bookTitleByNum = <int, String>{};
+    for (final row in bookRows) {
+      final bookNum = int.tryParse('${row['book_num']}');
+      final title = row['title']?.toString().trim() ?? '';
+      if (bookNum == null || title.isEmpty) continue;
+      bookTitleByNum[bookNum] = title;
+    }
 
     final List<DailyVerseList> enrichedList = [];
 
@@ -1329,7 +1336,10 @@ class DownloadProvider with ChangeNotifier {
 
   /// Reads [cachedDailyVerseList_v2] prefs only — for instant Daily Verse UI.
   Future<bool> tryHydrateDailyVersesFromLocalCache() async {
-    if (dailyVerseList.isNotEmpty) return true;
+    if (dailyVerseList.isNotEmpty) {
+      await _ensureDailyVerseBookNamesMatchBookId();
+      return true;
+    }
 
     final prefs = await SharedPreferences.getInstance();
     final dataIsChanged = prefs.getBool('dataIsChanged') ?? true;
@@ -1338,7 +1348,9 @@ class DownloadProvider with ChangeNotifier {
     final cachedJson = prefs.getString('cachedDailyVerseList_v2');
     if (cachedJson == null || cachedJson.isEmpty) return false;
 
-    return _hydrateDailyVersesFromPrefsJson(cachedJson);
+    final loaded = await _hydrateDailyVersesFromPrefsJson(cachedJson);
+    if (loaded) await _ensureDailyVerseBookNamesMatchBookId();
+    return loaded;
   }
 
   Future<bool> _hydrateDailyVersesFromPrefsJson(String cachedJson) async {

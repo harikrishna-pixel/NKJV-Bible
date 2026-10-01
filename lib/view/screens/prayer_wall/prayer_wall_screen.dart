@@ -717,7 +717,11 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
     if (totalSec <= 0) return 'Soon';
     final mins = (totalSec / 60).ceil();
     if (mins <= 1) return 'STARTS IN 1 MIN';
-    return 'STARTS IN $mins MIN';
+    final hours = mins ~/ 60;
+    final rem = mins % 60;
+    if (hours <= 0) return 'STARTS IN $mins MIN';
+    if (rem == 0) return 'STARTS IN $hours HR';
+    return 'STARTS IN $hours HR $rem MIN';
   }
 
   /// Waiting slots after current, wrapping when `loops` (excludes next/hotspot).
@@ -2420,13 +2424,39 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
     return 'Just now';
   }
 
+  /// Display only: same login email or same account id, including older posts.
+  bool _sameViewerAccount(PrayerWallItem item) {
+    if (_isMyPrayer(item)) return true;
+    final myEmail = (_userEmail ?? '').trim().toLowerCase();
+    final prayerEmail = (item.email ?? '').trim().toLowerCase();
+    if (myEmail.isNotEmpty &&
+        prayerEmail.isNotEmpty &&
+        myEmail == prayerEmail) {
+      return true;
+    }
+    final mine = <String>{
+      (_userId ?? '').trim(),
+      (_resolveUserId ?? '').trim(),
+    }..removeWhere((id) => id.isEmpty);
+    if (mine.isEmpty) return false;
+    for (final raw in [
+      item.identityUserId,
+      item.authorUserId,
+      _prayerAuthorUserIdMap[item.id],
+    ]) {
+      final id = (raw ?? '').trim();
+      if (id.isNotEmpty && mine.contains(id)) return true;
+    }
+    return false;
+  }
+
   /// Own prayers (same email) show the current profile name.
   /// Other people still see the name saved on the prayer.
   String _cardDisplayName(PrayerWallItem item) {
     final fromApi = (item.authorName ?? '').trim();
     final fromMap = (_prayerAuthorMap[item.id] ?? '').trim();
 
-    if (_isMyPrayer(item)) {
+    if (_sameViewerAccount(item)) {
       if (item.isAnonymous) return 'Anonymous';
       if (_viewerDisplayName.isNotEmpty) return _viewerDisplayName;
       if (fromApi.isNotEmpty) return fromApi;
@@ -2451,7 +2481,7 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
 
   /// You chip on every prayer that belongs to this email.
   bool _showsYouForCurrentName(PrayerWallItem item) {
-    if (!_isMyPrayer(item) || item.isAnonymous) return false;
+    if (!_sameViewerAccount(item) || item.isAnonymous) return false;
     return _viewerDisplayName.trim().isNotEmpty;
   }
 

@@ -216,12 +216,10 @@ class floatingButtonState extends State<floatingButton>
     if (state == AppLifecycleState.inactive ||
         state == AppLifecycleState.paused ||
         state == AppLifecycleState.hidden) {
+      // Screen off uses this same lifecycle. Do not pause MP3 here;
+      // a real interrupt still pauses the player and is resumed on return.
       _audioPlayingBeforeInterrupt = isAudioPlaying ||
           audioPlayer.state == PlayerState.playing;
-      if (_audioPlayingBeforeInterrupt) {
-        _pausedForPhoneCall = true;
-        audioPlayer.pause();
-      }
       final ttsPlaying = isSpeech || ttsState == TtsState.playing;
       if (ttsPlaying && _isTtsInitialized) {
         _ttsPausedForCall = true;
@@ -2181,19 +2179,6 @@ class floatingButtonState extends State<floatingButton>
                           )),
             onTap: () async {
               log('On Tap');
-              if (isMp3Enabled &&
-                  isTTSEnabled &&
-                  !_isAudioSheetOpen &&
-                  !isOpenAudio &&
-                  !isSpeech &&
-                  !isPlaying &&
-                  ttsState != TtsState.playing &&
-                  !isAudioPlaying &&
-                  audioPlayer.state != PlayerState.playing) {
-                await _showAudioTtsPopover();
-                await checknetwork();
-                return;
-              }
               final isTTSActive =
                   isSpeech || isPlaying || ttsState == TtsState.playing;
 
@@ -2239,9 +2224,7 @@ class floatingButtonState extends State<floatingButton>
                     }
                   });
                 }
-              } else if (_readerUseTts) {
-                textToSpeechBottomSheet();
-              } else if (_mp3Chosen || (isMp3Enabled && !isTTSEnabled)) {
+              } else {
                 _mp3Chosen = true;
                 _readerUseTts = false;
                 await setAudio();
@@ -2254,11 +2237,6 @@ class floatingButtonState extends State<floatingButton>
                     setState(() {});
                   }
                 });
-              } else if (isTTSEnabled && !isMp3Enabled) {
-                _readerUseTts = true;
-                textToSpeechBottomSheet();
-              } else {
-                await _showAudioTtsPopover();
               }
 
               await checknetwork();

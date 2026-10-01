@@ -121,6 +121,9 @@ class _VerseItemWidgetState extends State<VerseItemWidget> {
       bool isHighlighted,
       bool isUnderlined,
       ) {
+    final isDark =
+        Provider.of<ThemeProvider>(context, listen: false).themeMode ==
+            ThemeMode.dark;
     final baseStyle = TextStyle(
       letterSpacing: BibleInfo.letterSpacing,
       wordSpacing: 1.2,
@@ -130,6 +133,10 @@ class _VerseItemWidgetState extends State<VerseItemWidget> {
           : BibleInfo.fontSizeScale * widget.controller.fontSize.value,
       fontFamily: widget.controller.selectedFontFamily.value,
       decoration: isUnderlined ? TextDecoration.underline : TextDecoration.none,
+      decorationThickness: (isUnderlined && isDark) ? 0.55 : null,
+      decorationColor: (isUnderlined && isDark) ? Colors.white70 : null,
+      decorationStyle:
+          (isUnderlined && isDark) ? TextDecorationStyle.solid : null,
     );
 
     if (isTempSelected) {
@@ -140,9 +147,6 @@ class _VerseItemWidgetState extends State<VerseItemWidget> {
       return baseStyle.copyWith(color: CommanColor.black);
     }
 
-    final isDark =
-        Provider.of<ThemeProvider>(context, listen: false).themeMode ==
-            ThemeMode.dark;
     return baseStyle.copyWith(
       color: isDark ? Colors.white : CommanColor.whiteBlack(context),
       backgroundColor: Colors.transparent,

@@ -1,4 +1,5 @@
 import 'package:biblebookapp/services/reading_activity_service.dart';
+import 'package:biblebookapp/view/constants/colors.dart';
 import 'package:biblebookapp/view/screens/journey/journey_parchment.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
@@ -19,6 +20,8 @@ class ReadingActivityListScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final ordered = List<ReadingActivity>.from(items)
       ..sort(ReadingActivity.compareNewestCompletedFirst);
+    final isDark = CommanColor.isDarkTheme(context);
+    final barColor = isDark ? const Color(0xFFF7F2EA) : const Color(0xFF3D2E24);
     return Container(
       decoration: journeyParchmentDecoration(context),
       child: Scaffold(
@@ -27,13 +30,13 @@ class ReadingActivityListScreen extends StatelessWidget {
           backgroundColor: Colors.transparent,
           elevation: 0,
           leading: IconButton(
-            icon: const Icon(Icons.arrow_back_ios_new, size: 20, color: Color(0xFF3D2E24)),
+            icon: Icon(Icons.arrow_back_ios_new, size: 20, color: barColor),
             onPressed: () => Get.back(),
           ),
-          title: const Text(
+          title: Text(
             'Recent Activity',
             style: TextStyle(
-              color: Color(0xFF3D2E24),
+              color: barColor,
               fontSize: 18,
               fontWeight: FontWeight.w600,
             ),

@@ -203,7 +203,7 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
     }
 
     return Scaffold(
-        resizeToAvoidBottomInset: false,
+        resizeToAvoidBottomInset: true,
         backgroundColor: p.Provider.of<ThemeProvider>(context).backgroundColor,
         body: GestureDetector(
           onTap: () {

@@ -342,7 +342,9 @@ class BibleVersionsScreenState extends State<BibleVersionsScreen> {
                           fontFamily: 'Georgia',
                           fontSize: isTablet ? 30 : 24,
                           fontWeight: FontWeight.w700,
-                          color: ink,
+                          color: CommanColor.isDarkTheme(context)
+                              ? const Color(0xFFF7F2EA)
+                              : ink,
                         ),
                       ),
                       const SizedBox(height: 6),
@@ -353,7 +355,9 @@ class BibleVersionsScreenState extends State<BibleVersionsScreen> {
                           fontFamily: 'Georgia',
                           fontSize: isTablet ? 16 : 14,
                           fontWeight: FontWeight.w500,
-                          color: brown.withOpacity(0.9),
+                          color: CommanColor.isDarkTheme(context)
+                              ? const Color(0xFFE4D5C0)
+                              : brown.withOpacity(0.9),
                         ),
                       ),
                       SizedBox(height: isTablet ? 22 : 16),
@@ -661,6 +665,40 @@ class BibleVersionsScreenState extends State<BibleVersionsScreen> {
     );
   }
 
+  /// After a version switch, keep the open book number and chapter.
+  /// Replace only the saved book title with that book's title in the new Bible.
+  Future<void> _saveOpenBookTitleForNewVersion() async {
+    final db = await DBHelper().db;
+    if (db == null) {
+      debugPrint("testapp Database instance is null");
+      return;
+    }
+    final saved =
+        await SharPreferences.getString(SharPreferences.selectedBookNum);
+    var bookNum = int.tryParse(saved ?? '') ?? 0;
+    if (bookNum < 0) bookNum = 0;
+    var result = await db.rawQuery(
+      "SELECT title FROM book WHERE book_num = ? LIMIT 1",
+      [bookNum],
+    );
+    if ((result.isEmpty || result[0]["title"] == null) && bookNum != 0) {
+      bookNum = 0;
+      result = await db.rawQuery(
+        "SELECT title FROM book WHERE book_num = ? LIMIT 1",
+        [bookNum],
+      );
+    }
+    final title = result.isNotEmpty ? result[0]["title"]?.toString().trim() : null;
+    if (title == null || title.isEmpty) {
+      debugPrint("testapp No book found with book_num = $bookNum");
+      return;
+    }
+    await SharPreferences.setString(SharPreferences.selectedBook, title);
+    if (Get.isRegistered<DashBoardController>()) {
+      Get.find<DashBoardController>().selectedBook.value = title;
+    }
+  }
+
   Future<void> _runHomeBibleSwitchFlow() async {
     if (!mounted) return;
     setState(() {
@@ -700,20 +738,7 @@ class BibleVersionsScreenState extends State<BibleVersionsScreen> {
     setState(() {
       _progress = 67;
     });
-    await DBHelper().db.then((db) async {
-      if (db != null) {
-        final result = await db.rawQuery(
-          "SELECT * FROM book WHERE book_num = ?",
-          [int.parse("0")],
-        );
-        if (result.isNotEmpty && result[0]["title"] != null) {
-          await SharPreferences.setString(
-            SharPreferences.selectedBook,
-            result[0]["title"].toString(),
-          );
-        }
-      }
-    });
+    await _saveOpenBookTitleForNewVersion();
 
     if (!mounted) return;
     setState(() {
@@ -1143,33 +1168,7 @@ class BibleVersionsScreenState extends State<BibleVersionsScreen> {
                       setState(() {
                         _progress = 67;
                       });
-                      await DBHelper().db.then((db) async {
-                        if (db != null) {
-                          final result = await db.rawQuery(
-                            "SELECT * FROM book WHERE book_num = ?",
-                            [int.parse("0")],
-                          );
-
-                          if (result.isNotEmpty && result[0]["title"] != null) {
-                            final title = result[0]["title"].toString();
-                            // final data = await SharPreferences.getString(
-                            //       SharPreferences.selectedBook,
-                            //     ) ??
-                            //     "";
-                            // if (data.isEmpty) {
-                            await SharPreferences.setString(
-                              SharPreferences.selectedBook,
-                              title,
-                            );
-                            // }
-                          } else {
-                            debugPrint(
-                                "testapp No book found with book_num = 0");
-                          }
-                        } else {
-                          debugPrint("testapp Database instance is null");
-                        }
-                      });
+                      await _saveOpenBookTitleForNewVersion();
 
                       setState(() {
                         _progress = 73;
