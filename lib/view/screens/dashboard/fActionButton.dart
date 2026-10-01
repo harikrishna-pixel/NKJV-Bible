@@ -5255,14 +5255,6 @@ class floatingButtonState extends State<floatingButton>
                             fontWeight: FontWeight.w700,
                           ),
                         ),
-                        const SizedBox(height: 2),
-                        Text(
-                          ttsUi ? 'Read Aloud' : 'NLT Audio',
-                          style: TextStyle(
-                            color: ink.withValues(alpha: 0.55),
-                            fontSize: 13,
-                          ),
-                        ),
                       ],
                     ),
                   ),
