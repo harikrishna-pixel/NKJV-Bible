@@ -277,9 +277,15 @@ class BibleInfo {
   static String audioBasePathType = "3";
   
   static String isShowMp3Audio = "1";
-  // Sample English chapter. Shown in MP3 Audio Settings only when this file loads.
-  static const String englishBibleAudio =
-      "https://bibleoffice.com/BibleReplications/dev/v1/uploads/bible_audio/English/1/1.mp3";
+  // Comment or delete the address below to show only the app name.
+   static const List<String> _englishBibleAudioUrls = <String>[
+  "https://bibleoffice.com/BibleReplications/dev/v1/uploads/bible_audio/English/1/1.mp3",
+  ];  
+  
+
+  static String get englishBibleAudio => _englishBibleAudioUrls.isEmpty
+      ? ''
+      : _englishBibleAudioUrls.first;
 
   // Text to Speech Settings - iOS
   static String isTextToSpeechAvailableIos = "1";

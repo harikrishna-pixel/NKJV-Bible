@@ -250,7 +250,11 @@ class _BookMarkScreenState extends State<BookMarkScreen> {
                                                 const SizedBox(
                                                   height: 25,
                                                 ),
-                                                SingleChildScrollView(
+                                                Align(
+                                                  alignment: screenWidth > 450
+                                                      ? Alignment.center
+                                                      : Alignment.centerLeft,
+                                                  child: SingleChildScrollView(
                                                   scrollDirection:
                                                       Axis.horizontal,
                                                   child: Row(
@@ -865,6 +869,7 @@ class _BookMarkScreenState extends State<BookMarkScreen> {
                                                   ],
                                                 ),
                                                 ),
+                                                ),
                                               ],
                                             ),
                                           );
@@ -964,7 +969,11 @@ class _BookMarkScreenState extends State<BookMarkScreen> {
                                             const SizedBox(
                                               height: 35,
                                             ),
-                                            SingleChildScrollView(
+                                            Align(
+                                              alignment: screenWidth > 450
+                                                  ? Alignment.center
+                                                  : Alignment.centerLeft,
+                                              child: SingleChildScrollView(
                                               scrollDirection:
                                                   Axis.horizontal,
                                               child: Row(
@@ -1574,6 +1583,7 @@ class _BookMarkScreenState extends State<BookMarkScreen> {
                                               ],
                                             ),
                                           ),
+                                            ),
                                         ],
                                       ),
                                     );

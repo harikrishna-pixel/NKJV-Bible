@@ -261,7 +261,11 @@ class _HighLightScreenState extends State<HighLightScreen> {
                                                   const SizedBox(
                                                     height: 35,
                                                   ),
-                                                  SingleChildScrollView(
+                                                  Align(
+                                                    alignment: screenWidth > 450
+                                                        ? Alignment.center
+                                                        : Alignment.centerLeft,
+                                                    child: SingleChildScrollView(
                                                     scrollDirection:
                                                         Axis.horizontal,
                                                     child: Row(
@@ -792,8 +796,9 @@ class _HighLightScreenState extends State<HighLightScreen> {
                                                     ],
                                                   ),
                                                 ),
-                                                ],
                                               ),
+                                                ],
+                                                  ),
                                             );
                                           },
                                         );
@@ -896,7 +901,11 @@ class _HighLightScreenState extends State<HighLightScreen> {
                                             const SizedBox(
                                               height: 35,
                                             ),
-                                            SingleChildScrollView(
+                                            Align(
+                                              alignment: screenWidth > 450
+                                                  ? Alignment.center
+                                                  : Alignment.centerLeft,
+                                              child: SingleChildScrollView(
                                               scrollDirection:
                                                   Axis.horizontal,
                                               child: Row(
@@ -1451,6 +1460,7 @@ class _HighLightScreenState extends State<HighLightScreen> {
                                               ],
                                             ),
                                           ),
+                                            ),
                                         ],
                                       ),
                                     );

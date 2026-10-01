@@ -106,6 +106,9 @@ class floatingButtonState extends State<floatingButton>
   void Function(void Function())? _audioSheetSetState;
   void Function(void Function())? _fullPlayerSetState;
   void Function(void Function())? _ttsSheetSetState;
+  bool _audioSheetUiAlive = false;
+  bool _fullPlayerUiAlive = false;
+  bool _ttsSheetUiAlive = false;
   bool _ttsVolumeRestarting = false;
   double _playbackSpeed = 1.0;
   Timer? _sleepTimer;
@@ -114,8 +117,19 @@ class floatingButtonState extends State<floatingButton>
   bool _readerUseTts = false;
   bool _mp3Chosen = false;
   bool? _fullScreenTts;
+  bool _fullPlayerOpen = false;
+  double? _playerSliderDrag;
+  DateTime? _playerSliderDragAt;
+  int _ttsProgressEnd = 0;
+  int _ttsSpokenEnd = 0;
+  int _ttsProgressVerse = -1;
+  int _ttsPosSecondsShown = 0;
+  DateTime? _ttsPosAheadAt;
+  bool _ttsProgressHandlerReady = false;
+  DateTime? _ttsIgnoreUntil;
   bool _pausedForPhoneCall = false;
   bool _audioPlayingBeforeInterrupt = false;
+  bool _ttsPausedForCall = false;
 
   checkTTS() async {
     final ttsStatus =
@@ -183,6 +197,7 @@ class floatingButtonState extends State<floatingButton>
     _positionSubscription = audioPlayer.onPositionChanged.listen((p) {
       if (!mounted) return;
       position = p;
+      _releaseStuckSliderDrag();
       setState(() {});
       _fullPlayerSetState?.call(() {});
     });
@@ -202,6 +217,15 @@ class floatingButtonState extends State<floatingButton>
         state == AppLifecycleState.hidden) {
       _audioPlayingBeforeInterrupt = isAudioPlaying ||
           audioPlayer.state == PlayerState.playing;
+      if (_audioPlayingBeforeInterrupt) {
+        _pausedForPhoneCall = true;
+        audioPlayer.pause();
+      }
+      final ttsPlaying = isSpeech || ttsState == TtsState.playing;
+      if (ttsPlaying && _isTtsInitialized) {
+        _ttsPausedForCall = true;
+        _pauseTts();
+      }
       Future.delayed(const Duration(milliseconds: 400), () {
         if (!mounted || !_audioPlayingBeforeInterrupt) return;
         if (audioPlayer.state != PlayerState.playing) {
@@ -214,6 +238,7 @@ class floatingButtonState extends State<floatingButton>
       });
     } else if (state == AppLifecycleState.resumed) {
       _resumeAudioAfterPhoneCall();
+      _resumeTtsAfterCall();
     }
   }
 
@@ -241,6 +266,22 @@ class floatingButtonState extends State<floatingButton>
         setState(() => isAudioPlaying = true);
       }
       _fullPlayerSetState?.call(() {});
+    } catch (_) {}
+  }
+
+  Future<void> _resumeTtsAfterCall() async {
+    if (!_ttsPausedForCall) return;
+    await Future.delayed(const Duration(milliseconds: 450));
+    if (!mounted || !_ttsPausedForCall) return;
+    _ttsPausedForCall = false;
+    try {
+      isManuallyPaused = false;
+      isSpeech = true;
+      shouldAutoAdvance = true;
+      ttsState = TtsState.playing;
+      if (mounted) setState(() {});
+      _notifyTtsPlayer();
+      await _speak();
     } catch (_) {}
   }
 
@@ -415,6 +456,10 @@ class floatingButtonState extends State<floatingButton>
               await audioPlayer.setVolume(volume);
             } catch (_) {}
             await audioPlayer.resume();
+            if (audioPlayer.state != PlayerState.playing) {
+              await Future.delayed(const Duration(milliseconds: 80));
+              await audioPlayer.resume();
+            }
             loadSuccess = true;
             if (mounted) {
               _mp3UiSetState(() {
@@ -517,6 +562,10 @@ class floatingButtonState extends State<floatingButton>
                 await audioPlayer.setVolume(volume);
               } catch (_) {}
               await audioPlayer.resume();
+              if (audioPlayer.state != PlayerState.playing) {
+                await Future.delayed(const Duration(milliseconds: 80));
+                await audioPlayer.resume();
+              }
               loadSuccess = true;
               if (mounted) {
                 _mp3UiSetState(() {
@@ -701,20 +750,117 @@ class floatingButtonState extends State<floatingButton>
     return widget.audioData?.data?.bibleAudioInfo?.audioBasepath;
   }
 
-  void _notifyTtsPlayer() {
-    _ttsSheetSetState?.call(() {});
-    _fullPlayerSetState?.call(() {});
+  void _releaseStuckSliderDrag() {
+    final at = _playerSliderDragAt;
+    if (_playerSliderDrag == null || at == null) return;
+    if (DateTime.now().difference(at) < const Duration(seconds: 1)) return;
+    _playerSliderDrag = null;
+    _playerSliderDragAt = null;
   }
 
+  void _notifyTtsPlayer({bool throttle = false}) {
+    _releaseStuckSliderDrag();
+    if (throttle) {
+      final now = DateTime.now();
+      if (_ttsUiNotifyAt != null &&
+          now.difference(_ttsUiNotifyAt!) < const Duration(milliseconds: 220)) {
+        return;
+      }
+      _ttsUiNotifyAt = now;
+    }
+    _safeCallSetter(_ttsSheetSetState);
+    _safeCallSetter(_fullPlayerSetState);
+  }
+
+  DateTime? _ttsUiNotifyAt;
+
+  void _ignoreTtsEngineEvents({int ms = 700}) {
+    _ttsIgnoreUntil = DateTime.now().add(Duration(milliseconds: ms));
+  }
+
+  bool _ttsEngineEventIgnored() {
+    final until = _ttsIgnoreUntil;
+    return until != null && DateTime.now().isBefore(until);
+  }
+
+  void _resetTtsProgressClock() {
+    _ttsProgressEnd = 0;
+    _ttsSpokenEnd = 0;
+    _ttsProgressVerse = -1;
+    _ttsPosSecondsShown = 0;
+    _ttsPosAheadAt = null;
+    _ttsProgressAt = DateTime.now();
+  }
+
+  void _safeCallSetter(void Function(void Function())? setter) {
+    if (setter == null) return;
+    setter(() {});
+  }
+
+  void _closeAudioSheetUi() {
+    _audioSheetUiAlive = false;
+    _audioSheetSetState = null;
+  }
+
+  void _closeTtsSheetUi() {
+    _ttsSheetUiAlive = false;
+    _ttsSheetSetState = null;
+  }
+
+  void _closeFullPlayerUi() {
+    _fullPlayerUiAlive = false;
+    _fullPlayerSetState = null;
+    _playerSliderDrag = null;
+    _playerSliderDragAt = null;
+  }
+
+  DateTime? _ttsProgressAt;
+
   void _attachTtsProgressHandler() {
+    if (_ttsProgressHandlerReady) return;
+    _ttsProgressHandlerReady = true;
     flutterTts.setProgressHandler(
         (String text, int startOffset, int endOffset, String word) {
       allText = text;
       final len = text.length;
+      if (len <= 0) return;
+      if (curretNo != _ttsProgressVerse) {
+        _ttsProgressVerse = curretNo;
+        _ttsProgressEnd = 0;
+        _ttsSpokenEnd = 0;
+        _ttsProgressAt = DateTime.now();
+      }
+      var wordCount = 1;
+      if (curretNo >= 0 && curretNo < selectedChapterContent.length) {
+        final n = _spokenWordCount(selectedChapterContent[curretNo].content);
+        if (n > 0) wordCount = n;
+      } else {
+        final n = _spokenWordCount(text);
+        if (n > 0) wordCount = n;
+      }
+      final now = DateTime.now();
+      final dt = _ttsProgressAt == null
+          ? 0.22
+          : now.difference(_ttsProgressAt!).inMilliseconds / 1000.0;
+      _ttsProgressAt = now;
+      var maxDelta = ((len * (dt.clamp(0.0, 0.5) * 2.5 * _ttsSpeedFactor()) /
+                  wordCount)
+              .round())
+          .clamp(0, len);
+      final engineEnd = endOffset.clamp(0, len);
+      // A rounded step of 0 freezes the bar while speech continues.
+      if (engineEnd > _ttsProgressEnd && maxDelta < 1) maxDelta = 1;
+      _ttsSpokenEnd = engineEnd;
+      var nextEnd = engineEnd;
+      if (nextEnd < _ttsProgressEnd) nextEnd = _ttsProgressEnd;
+      if (nextEnd > _ttsProgressEnd + maxDelta) {
+        nextEnd = _ttsProgressEnd + maxDelta;
+      }
+      _ttsProgressEnd = nextEnd;
       start = startOffset.clamp(0, len);
-      end = endOffset.clamp(0, len);
+      end = nextEnd;
       if (end < start) end = start;
-      _notifyTtsPlayer();
+      _notifyTtsPlayer(throttle: true);
     });
   }
 
@@ -880,6 +1026,7 @@ class floatingButtonState extends State<floatingButton>
 
     flutterTts.setStartHandler(() {
       if (mounted) {
+        isManualNavigation = false;
         setState(() {
           ttsState = TtsState.playing;
           isSpeech = true; // Sync isSpeech with TTS state
@@ -890,6 +1037,11 @@ class floatingButtonState extends State<floatingButton>
 
     flutterTts.setCancelHandler(() {
       if (_ttsVolumeRestarting) return;
+      if (_ttsEngineEventIgnored() || _ttsAdvancingChapter) return;
+      if (isManualNavigation) {
+        isManualNavigation = false;
+        return;
+      }
       if (mounted) {
         setState(() {
           ttsState = TtsState.stopped;
@@ -919,6 +1071,9 @@ class floatingButtonState extends State<floatingButton>
       if (_ttsVolumeRestarting) {
         return;
       }
+      if (_ttsEngineEventIgnored()) {
+        return;
+      }
       // Don't auto-advance if manually paused
       if (isManuallyPaused) {
         debugPrint(
@@ -941,7 +1096,7 @@ class floatingButtonState extends State<floatingButton>
         }
         await Future.delayed(const Duration(milliseconds: 80));
         if (mounted && !isManuallyPaused && isSpeech) {
-          await _speak();
+          _speak();
         }
         return;
       }
@@ -950,19 +1105,16 @@ class floatingButtonState extends State<floatingButton>
       if (!shouldAutoAdvance) {
         return;
       }
-      // If we just manually navigated, skip incrementing and reset the flag
+      // Stop() after skip must not eat the verse that then plays.
       if (isManualNavigation) {
-        if (mounted) {
-          setState(() {
-            isManualNavigation =
-                false; // Reset flag and allow future auto-advancement
-          });
-        }
+        isManualNavigation = false;
         return;
       }
       if (isTTSLoop == false) {
-        if (selectedChapter == int.parse(widget.chapterCount.toString()) &&
-            selectedChapterContent.length == curretNo + 1) {
+        final lastChapter = _chapterTotal();
+        final onLastVerse = selectedChapterContent.isNotEmpty &&
+            curretNo + 1 >= selectedChapterContent.length;
+        if (selectedChapter >= lastChapter && onLastVerse) {
           // Last chapter, last verse - stop
           await _stop();
           if (mounted) {
@@ -972,9 +1124,7 @@ class floatingButtonState extends State<floatingButton>
             _notifyTtsPlayer();
           }
         } else {
-          if (_sleepEndOfChapter &&
-              selectedChapterContent.isNotEmpty &&
-              selectedChapterContent.length == curretNo + 1) {
+          if (_sleepEndOfChapter && onLastVerse) {
             _sleepEndOfChapter = false;
             _sleepChoiceMinutes = null;
             _sleepTimer?.cancel();
@@ -987,33 +1137,23 @@ class floatingButtonState extends State<floatingButton>
             }
             return;
           }
-          if (selectedChapter != int.parse(widget.chapterCount.toString()) &&
-              selectedChapterContent.length == curretNo + 1) {
+          if (onLastVerse && selectedChapter < lastChapter) {
             // End of current chapter, move to next chapter
             if (mounted) {
               _ttsAdvancingChapter = true;
+              _ignoreTtsEngineEvents(ms: 250);
               bool shouldSpeakNext = false;
               try {
-                // Remember we were in an active TTS session before stop-for-reload.
-                final wasSpeaking = isSpeech || ttsState == TtsState.playing;
-                await _stop();
-                // Clear old voice text to prevent speaking old verse
                 _newVoiceText = null;
                 setState(() {
                   selectedChapter++;
-                  curretNo = 0; // Reset to first verse of new chapter
-                  // _stop() clears isSpeech; restore so the intended auto-continue runs.
-                  if (wasSpeaking && !isManuallyPaused) {
-                    isSpeech = true;
-                    shouldAutoAdvance = true;
-                  }
+                  curretNo = 0;
+                  isSpeech = true;
+                  shouldAutoAdvance = true;
                 });
+                _resetTtsProgressClock();
                 _notifyTtsPlayer();
-                // Wait for setState to complete
-                await Future.delayed(const Duration(milliseconds: 50));
-                // Load chapter content and wait for it to complete
                 await setChapterContent();
-                // Keep reading screen chapter aligned with TTS (same helper as audio).
                 await updateReadingScreenChapter(selectedChapter);
                 if (mounted &&
                     selectedChapterContent.isNotEmpty &&
@@ -1022,9 +1162,6 @@ class floatingButtonState extends State<floatingButton>
                   setState(() {
                     _newVoiceText = selectedChapterContent[curretNo].content;
                   });
-                  // Wait for UI to update before speaking
-                  await Future.delayed(const Duration(milliseconds: 50));
-                  // Don't auto-speak if manually paused
                   shouldSpeakNext = mounted &&
                       !isManuallyPaused &&
                       shouldAutoAdvance &&
@@ -1035,17 +1172,18 @@ class floatingButtonState extends State<floatingButton>
                   }
                 }
               } finally {
-                // Release before speak so verse completions can advance normally,
-                // while still ignoring completion events from _stop() above.
-                _ttsAdvancingChapter = false;
+                Future.delayed(const Duration(milliseconds: 400), () {
+                  _ttsAdvancingChapter = false;
+                });
               }
               if (shouldSpeakNext) {
-                await _speak();
+                _speak();
               }
             }
           } else {
             // Move to next verse in current chapter
             if (mounted && curretNo + 1 < selectedChapterContent.length) {
+              _ignoreTtsEngineEvents(ms: 250);
               setState(() {
                 curretNo = curretNo + 1;
                 if (curretNo >= 0 && curretNo < selectedChapterContent.length) {
@@ -1053,9 +1191,6 @@ class floatingButtonState extends State<floatingButton>
                 }
               });
               _notifyTtsPlayer();
-              // Wait for UI to update before speaking
-              await Future.delayed(const Duration(milliseconds: 50));
-              // Don't auto-speak if manually paused
               if (mounted &&
                   !isManuallyPaused &&
                   shouldAutoAdvance &&
@@ -1064,7 +1199,7 @@ class floatingButtonState extends State<floatingButton>
                 if (!isSpeech) {
                   setState(() => isSpeech = true);
                 }
-                await _speak();
+                _speak();
               }
             }
           }
@@ -1096,6 +1231,49 @@ class floatingButtonState extends State<floatingButton>
       debugPrint("Error getting voices: $e");
       return [];
     }
+  }
+
+  String? _audioSettingsChoice;
+  Future<bool>? _englishAudioLoads;
+
+  Future<bool> _englishBibleAudioLoads() async {
+    final url = BibleInfo.englishBibleAudio.trim();
+    if (url.isEmpty) return false;
+    final client = HttpClient();
+    try {
+      final request = await client
+          .headUrl(Uri.parse(url))
+          .timeout(const Duration(seconds: 5));
+      final response =
+          await request.close().timeout(const Duration(seconds: 5));
+      return response.statusCode >= 200 && response.statusCode < 400;
+    } catch (_) {
+      return false;
+    } finally {
+      client.close(force: true);
+    }
+  }
+
+  String _fallbackAudioLanguageLabel(String url) {
+    final parts = Uri.tryParse(url)?.pathSegments ?? const <String>[];
+    final audioIndex = parts.indexOf('bible_audio');
+    if (audioIndex >= 0 && audioIndex + 1 < parts.length) {
+      final name = Uri.decodeComponent(parts[audioIndex + 1]).trim();
+      if (name.isNotEmpty) {
+        if (name.toLowerCase().endsWith('audio')) return name;
+        return '$name Audio';
+      }
+    }
+    return 'English Audio';
+  }
+
+  String _recordedAudioVoiceLabel() {
+    final name = BibleInfo.bible_shortName.trim();
+    if (name.isEmpty) return 'Audio';
+    final withoutBible =
+        name.replaceAll(RegExp(r'\s+Bible$', caseSensitive: false), '').trim();
+    if (withoutBible.toLowerCase().endsWith('audio')) return withoutBible;
+    return '$withoutBible Audio';
   }
 
   String _getVoiceDisplayName(dynamic voice) {
@@ -1905,8 +2083,9 @@ class floatingButtonState extends State<floatingButton>
     _durationSubscription = null;
     _positionSubscription = null;
     _completeSubscription = null;
-    _audioSheetSetState = null;
-    _fullPlayerSetState = null;
+    _closeAudioSheetUi();
+    _closeTtsSheetUi();
+    _closeFullPlayerUi();
 
     // Stop TTS if running - safely check if flutterTts is initialized
     // Note: TTS handlers already check 'mounted' before calling setState, so they're safe
@@ -2242,6 +2421,7 @@ class floatingButtonState extends State<floatingButton>
     // Additive: completion listener lives on State so minimize keeps auto-next.
     _ensureMp3CompletionListener();
     _isAudioSheetOpen = true;
+    _audioSheetUiAlive = true;
 
     return showModalBottomSheet(
       backgroundColor: Colors.black12,
@@ -2249,7 +2429,10 @@ class floatingButtonState extends State<floatingButton>
       builder: (context) {
         return StatefulBuilder(builder: (context, setState) {
           // Let State completion handler refresh this sheet UI when open.
-          _audioSheetSetState = setState;
+          _audioSheetSetState = (fn) {
+            if (!_audioSheetUiAlive) return;
+            setState(fn);
+          };
 
           // Attach listeners only once for this sheet
           if (!listenersAttached) {
@@ -2257,7 +2440,7 @@ class floatingButtonState extends State<floatingButton>
 
             // Position updates
             positionSub = audioPlayer.onPositionChanged.listen((p) {
-              if (!context.mounted) return;
+              if (!_audioSheetUiAlive) return;
               setState(() {
                 position = p;
               });
@@ -2265,7 +2448,7 @@ class floatingButtonState extends State<floatingButton>
 
             // Duration updates (when a new source loads this will fire)
             durationSub = audioPlayer.onDurationChanged.listen((d) {
-              if (!context.mounted) return;
+              if (!_audioSheetUiAlive) return;
               setState(() {
                 duration = d;
               });
@@ -2273,7 +2456,11 @@ class floatingButtonState extends State<floatingButton>
           } // end attach listeners
 
           // Build UI
-          return Container(
+          return PopScope(
+            onPopInvokedWithResult: (didPop, _) {
+              if (didPop) _closeAudioSheetUi();
+            },
+            child: Container(
             height: 148,
             decoration: const BoxDecoration(
               borderRadius: BorderRadius.only(
@@ -2295,7 +2482,9 @@ class floatingButtonState extends State<floatingButton>
                           _readerUseTts = false;
                           _fullScreenTts = false;
                           Navigator.of(context).pop();
-                          _openReaderFullPlayer(tts: false);
+                          if (!_fullPlayerOpen) {
+                            _openReaderFullPlayer(tts: false);
+                          }
                         },
                         child: Icon(
                           Icons.keyboard_arrow_up,
@@ -2767,7 +2956,7 @@ class floatingButtonState extends State<floatingButton>
                           await audioPlayer.stop();
                           _audioResumePosition = Duration.zero;
                           position = Duration.zero;
-                          if (context.mounted) {
+                          if (_audioSheetUiAlive) {
                             setState(() => isAudioPlaying = false);
                           }
                         },
@@ -2783,13 +2972,14 @@ class floatingButtonState extends State<floatingButton>
                 ),
               ],
             ),
+          ),
           );
         });
       },
     ).then((value) {
       // sheet closed: cancel sheet-local listeners only (keep completion for auto-next).
       _isAudioSheetOpen = false;
-      _audioSheetSetState = null;
+      _closeAudioSheetUi();
       if (positionSub != null) {
         positionSub!.cancel();
         positionSub = null;
@@ -3212,26 +3402,88 @@ class floatingButtonState extends State<floatingButton>
                   const SizedBox(height: 10),
 
                   if (!_showTtsUi())
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 12, vertical: 14),
-                      decoration: BoxDecoration(
-                        border: Border.all(
-                          color: CommanColor.lightGrey,
-                          width: 1,
-                        ),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Text(
-                        'Default',
-                        style: TextStyle(
-                          color: CommanColor.lightDarkPrimary(context),
-                          letterSpacing: BibleInfo.letterSpacing,
-                          fontSize: BibleInfo.fontSizeScale * 16,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
+                    FutureBuilder<bool>(
+                      future: _englishAudioLoads ??= _englishBibleAudioLoads(),
+                      builder: (context, snapshot) {
+                        final bibleLabel = _recordedAudioVoiceLabel();
+                        final englishUrl = BibleInfo.englishBibleAudio.trim();
+                        final showEnglish = snapshot.data == true &&
+                            englishUrl.isNotEmpty;
+                        if (!showEnglish) {
+                          return Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 12, vertical: 14),
+                            decoration: BoxDecoration(
+                              border: Border.all(
+                                color: CommanColor.lightGrey,
+                                width: 1,
+                              ),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Text(
+                              bibleLabel,
+                              style: TextStyle(
+                                color: CommanColor.lightDarkPrimary(context),
+                                letterSpacing: BibleInfo.letterSpacing,
+                                fontSize: BibleInfo.fontSizeScale * 16,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          );
+                        }
+                        final choices = <String>[
+                          bibleLabel,
+                          _fallbackAudioLanguageLabel(englishUrl),
+                        ];
+                        final selected = choices.contains(_audioSettingsChoice)
+                            ? _audioSettingsChoice!
+                            : bibleLabel;
+                        return Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.symmetric(horizontal: 12),
+                          decoration: BoxDecoration(
+                            border: Border.all(
+                              color: CommanColor.lightGrey,
+                              width: 1,
+                            ),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: DropdownButton<String>(
+                            isExpanded: true,
+                            value: selected,
+                            underline: const SizedBox(),
+                            dropdownColor: Colors.white,
+                            icon: Icon(
+                              Icons.keyboard_arrow_down,
+                              color: CommanColor.lightDarkPrimary(context),
+                            ),
+                            items: choices
+                                .map(
+                                  (choice) => DropdownMenuItem<String>(
+                                    value: choice,
+                                    child: Text(
+                                      choice,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: TextStyle(
+                                        color: Colors.black,
+                                        letterSpacing: BibleInfo.letterSpacing,
+                                        fontSize: BibleInfo.fontSizeScale * 16,
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                    ),
+                                  ),
+                                )
+                                .toList(),
+                            onChanged: (value) {
+                              if (value == null) return;
+                              setModalState(() {
+                                _audioSettingsChoice = value;
+                              });
+                            },
+                          ),
+                        );
+                      },
                     )
                   else
                   FutureBuilder<List<dynamic>>(
@@ -3816,14 +4068,30 @@ class floatingButtonState extends State<floatingButton>
     }
 
     if (widget.textToSpeechLoad == false) {
+      _ttsSheetUiAlive = true;
       return showModalBottomSheet(
         backgroundColor: Colors.black12,
         context: context,
         builder: (context) {
           return StatefulBuilder(
-            builder: (BuildContext context, StateSetter setState) {
-              _ttsSheetSetState = setState;
-              return Container(
+            builder: (BuildContext context, StateSetter setModalState) {
+              void setState(VoidCallback fn) {
+                if (!context.mounted) {
+                  fn();
+                  return;
+                }
+                setModalState(fn);
+              }
+
+              _ttsSheetSetState = (fn) {
+                if (!_ttsSheetUiAlive) return;
+                setState(fn);
+              };
+              return PopScope(
+                onPopInvokedWithResult: (didPop, _) {
+                  if (didPop) _closeTtsSheetUi();
+                },
+                child: Container(
                   decoration: const BoxDecoration(
                       borderRadius: BorderRadius.only(
                           topLeft: Radius.circular(20),
@@ -3851,8 +4119,11 @@ class floatingButtonState extends State<floatingButton>
                                     isSpeech = true;
                                     ttsState = TtsState.playing;
                                   }
+                                  _closeTtsSheetUi();
                                   Navigator.of(context).pop();
-                                  _openReaderFullPlayer(tts: true);
+                                  if (!_fullPlayerOpen) {
+                                    _openReaderFullPlayer(tts: true);
+                                  }
                                 },
                                 child: Icon(
                                   Icons.keyboard_arrow_up,
@@ -3909,6 +4180,7 @@ class floatingButtonState extends State<floatingButton>
                               ),
                               InkWell(
                                   onTap: () {
+                                    _closeTtsSheetUi();
                                     _stop();
                                     setState(() {
                                       isSpeech = false;
@@ -4210,6 +4482,7 @@ class floatingButtonState extends State<floatingButton>
 
                               // Stop current TTS without resetting isSpeech state (for next verse continuation)
                               if (_isTtsInitialized && wasTTSPlaying) {
+                                _ignoreTtsEngineEvents();
                                 try {
                                   await flutterTts.stop();
                                   debugPrint(
@@ -4296,6 +4569,7 @@ class floatingButtonState extends State<floatingButton>
                                   if (context.mounted) {
                                     final wasSpeaking =
                                         isSpeech || ttsState == TtsState.playing;
+                                    _ignoreTtsEngineEvents();
                                     await _stop();
                                     // Clear old voice text to prevent speaking old verse
                                     _newVoiceText = null;
@@ -4375,14 +4649,13 @@ class floatingButtonState extends State<floatingButton>
                             padding: const EdgeInsets.only(right: 10.0),
                             child: InkWell(
                               onTap: () {
-                                if (context.mounted) {
-                                  setState(() {
-                                    isSpeech = false;
-                                    shouldAutoAdvance =
-                                        false; // Prevent auto-advancement when stopped
-                                  });
-                                  _stop();
-                                }
+                                if (!_ttsSheetUiAlive) return;
+                                setState(() {
+                                  isSpeech = false;
+                                  shouldAutoAdvance =
+                                      false; // Prevent auto-advancement when stopped
+                                });
+                                _stop();
                               },
                               child: Image.asset(
                                 "assets/stop.png",
@@ -4395,12 +4668,14 @@ class floatingButtonState extends State<floatingButton>
                         ],
                       ),
                     ],
-                  ));
+                  ),
+                ),
+              );
             },
           );
         },
       ).then((value) {
-        _ttsSheetSetState = null;
+        _closeTtsSheetUi();
         if (mounted && context.mounted) {
           setState(() {});
         }
@@ -4639,6 +4914,15 @@ class floatingButtonState extends State<floatingButton>
     return Duration(seconds: secs < 1 ? 1 : secs);
   }
 
+  int _ttsSecondsForCompletedVerses() {
+    var words = 0;
+    for (var i = 0; i < curretNo && i < selectedChapterContent.length; i++) {
+      words += _spokenWordCount(selectedChapterContent[i].content);
+    }
+    final secs = (words / (2.5 * _ttsSpeedFactor())).round();
+    return secs < 0 ? 0 : secs;
+  }
+
   Duration _ttsEstimatedPosition() {
     var words = 0;
     for (var i = 0; i < curretNo && i < selectedChapterContent.length; i++) {
@@ -4648,12 +4932,28 @@ class floatingButtonState extends State<floatingButton>
       final currentWords =
           _spokenWordCount(selectedChapterContent[curretNo].content);
       if (currentWords > 0 && allText.isNotEmpty) {
-        final frac = (end.clamp(0, allText.length)) / allText.length;
+        final spoken = _ttsSpokenEnd.clamp(0, allText.length);
+        final frac = spoken / allText.length;
         words += (currentWords * frac).round();
       }
     }
     final secs = (words / (2.5 * _ttsSpeedFactor())).round();
-    return Duration(seconds: secs < 0 ? 0 : secs);
+    final clamped = secs < 0 ? 0 : secs;
+    // Hide a one-frame spike. If the later time stays, it is real playback
+    // and the bar must move. Leaving it rejected freezes the bar.
+    if (_ttsPosSecondsShown > 0 && clamped > _ttsPosSecondsShown + 2) {
+      _ttsPosAheadAt ??= DateTime.now();
+      if (DateTime.now().difference(_ttsPosAheadAt!) <
+          const Duration(milliseconds: 350)) {
+        return Duration(seconds: _ttsPosSecondsShown);
+      }
+    } else {
+      _ttsPosAheadAt = null;
+    }
+    if (clamped < _ttsPosSecondsShown) return Duration(seconds: _ttsPosSecondsShown);
+    _ttsPosAheadAt = null;
+    _ttsPosSecondsShown = clamped;
+    return Duration(seconds: clamped);
   }
 
   int _ttsVerseAtSeconds(int seconds) {
@@ -4688,6 +4988,7 @@ class floatingButtonState extends State<floatingButton>
     if (selectedChapterContent.isEmpty) return;
     final was = isSpeech || ttsState == TtsState.playing;
     if (was && _isTtsInitialized) {
+      _ignoreTtsEngineEvents();
       try {
         await flutterTts.stop();
       } catch (_) {}
@@ -4721,6 +5022,12 @@ class floatingButtonState extends State<floatingButton>
     if (curretNo >= 0 && curretNo < selectedChapterContent.length) {
       _newVoiceText = selectedChapterContent[curretNo].content;
     }
+    _ttsProgressEnd = 0;
+    _ttsSpokenEnd = 0;
+    _ttsProgressVerse = curretNo;
+    _ttsProgressAt = DateTime.now();
+    _ttsPosAheadAt = null;
+    _ttsPosSecondsShown = _ttsSecondsForCompletedVerses();
     if (was && _newVoiceText != null && _newVoiceText!.isNotEmpty) {
       isSpeech = true;
       isManuallyPaused = false;
@@ -4732,10 +5039,16 @@ class floatingButtonState extends State<floatingButton>
   }
 
   Future<void> _jumpToChapter(int chapter) async {
-    if (chapter < 1 || chapter > _chapterTotal()) return;
+    if (chapter < 1) return;
+    if (chapter > _chapterTotal()) {
+      Constants.showToast(
+          _showTtsUi() ? "Reached End" : "Already at last chapter");
+      return;
+    }
     if (_showTtsUi()) {
       final was = isSpeech || ttsState == TtsState.playing;
       if (_isTtsInitialized) {
+        _ignoreTtsEngineEvents();
         try {
           await flutterTts.stop();
         } catch (_) {}
@@ -4743,6 +5056,12 @@ class floatingButtonState extends State<floatingButton>
       isManualNavigation = true;
       selectedChapter = chapter;
       curretNo = 0;
+      _ttsProgressEnd = 0;
+      _ttsSpokenEnd = 0;
+      _ttsPosSecondsShown = 0;
+      _ttsPosAheadAt = null;
+      _ttsProgressVerse = -1;
+      _ttsProgressAt = DateTime.now();
       await setChapterContent();
       await updateReadingScreenChapter(chapter);
       if (selectedChapterContent.isNotEmpty) {
@@ -4823,38 +5142,48 @@ class floatingButtonState extends State<floatingButton>
 
   Future<void> _openReaderFullPlayer({required bool tts}) async {
     if (!mounted) return;
+    if (_fullPlayerOpen) return;
+    _fullPlayerOpen = true;
+    _fullPlayerUiAlive = true;
     _reopenOldSheet = false;
     _fullScreenTts = tts;
     _readerUseTts = tts;
     if (tts) {
       _attachTtsProgressHandler();
     }
-    await Navigator.of(context).push(
-      PageRouteBuilder<void>(
-        transitionDuration: const Duration(milliseconds: 320),
-        reverseTransitionDuration: const Duration(milliseconds: 280),
-        pageBuilder: (routeContext, animation, secondaryAnimation) {
-          return StatefulBuilder(
-            builder: (ctx, setModal) {
-              _fullPlayerSetState = setModal;
-              return _readerFullPlayer(ctx);
-            },
-          );
-        },
-        transitionsBuilder: (context, animation, secondaryAnimation, child) {
-          final slide = Tween<Offset>(
-            begin: const Offset(0, 1),
-            end: Offset.zero,
-          ).animate(CurvedAnimation(
-            parent: animation,
-            curve: Curves.easeOutCubic,
-          ));
-          return SlideTransition(position: slide, child: child);
-        },
-      ),
-    );
-    _fullScreenTts = null;
-    _fullPlayerSetState = null;
+    try {
+      await Navigator.of(context).push(
+        PageRouteBuilder<void>(
+          transitionDuration: const Duration(milliseconds: 320),
+          reverseTransitionDuration: const Duration(milliseconds: 280),
+          pageBuilder: (routeContext, animation, secondaryAnimation) {
+            return StatefulBuilder(
+              builder: (ctx, setModal) {
+                _fullPlayerSetState = (fn) {
+                  if (!_fullPlayerUiAlive || !ctx.mounted) return;
+                  setModal(fn);
+                };
+                return _readerFullPlayer(ctx);
+              },
+            );
+          },
+          transitionsBuilder: (context, animation, secondaryAnimation, child) {
+            final slide = Tween<Offset>(
+              begin: const Offset(0, 1),
+              end: Offset.zero,
+            ).animate(CurvedAnimation(
+              parent: animation,
+              curve: Curves.easeOutCubic,
+            ));
+            return SlideTransition(position: slide, child: child);
+          },
+        ),
+      );
+    } finally {
+      _fullScreenTts = null;
+      _closeFullPlayerUi();
+      _fullPlayerOpen = false;
+    }
     if (!_reopenOldSheet || !mounted) return;
     _reopenOldSheet = false;
     if (tts) {
@@ -4884,7 +5213,19 @@ class floatingButtonState extends State<floatingButton>
     final ttsPosSeconds =
         ttsPosition.inSeconds.clamp(0, ttsMaxSeconds);
     final maxSeconds = duration.inSeconds > 0 ? duration.inSeconds : 1;
-    return Scaffold(
+    final sliderMax = (ttsUi ? ttsMaxSeconds : maxSeconds).toDouble();
+    final liveSeconds =
+        (ttsUi ? ttsPosSeconds : position.inSeconds.clamp(0, maxSeconds))
+            .toDouble();
+    final sliderValue = (_playerSliderDrag ?? liveSeconds).clamp(0.0, sliderMax);
+    final shownPosition = _playerSliderDrag == null
+        ? (ttsUi ? ttsPosition : position)
+        : Duration(seconds: sliderValue.round());
+    return PopScope(
+      onPopInvokedWithResult: (didPop, _) {
+        if (didPop) _closeFullPlayerUi();
+      },
+      child: Scaffold(
       backgroundColor: card,
       body: SafeArea(
         child: Padding(
@@ -4896,6 +5237,7 @@ class floatingButtonState extends State<floatingButton>
                   IconButton(
                     onPressed: () {
                       _reopenOldSheet = true;
+                      _closeFullPlayerUi();
                       Navigator.of(ctx).pop();
                     },
                     icon: Icon(Icons.keyboard_arrow_down, color: ink, size: 28),
@@ -4925,7 +5267,10 @@ class floatingButtonState extends State<floatingButton>
                     ),
                   ),
                   IconButton(
-                    onPressed: () => Navigator.of(ctx).pop(),
+                    onPressed: () {
+                      _closeFullPlayerUi();
+                      Navigator.of(ctx).pop();
+                    },
                     icon: Icon(Icons.close, color: ink, size: 22),
                   ),
                 ],
@@ -5003,7 +5348,7 @@ class floatingButtonState extends State<floatingButton>
                   SizedBox(
                     width: 44,
                     child: Text(
-                      formatTime(ttsUi ? ttsPosition : position),
+                      formatTime(shownPosition),
                       style: TextStyle(color: ink.withValues(alpha: 0.7), fontSize: 12),
                     ),
                   ),
@@ -5020,14 +5365,31 @@ class floatingButtonState extends State<floatingButton>
                       ),
                       child: Slider(
                         min: 0,
-                        max: (ttsUi ? ttsMaxSeconds : maxSeconds).toDouble(),
-                        value: (ttsUi ? ttsPosSeconds : position.inSeconds.clamp(0, maxSeconds))
-                            .toDouble(),
-                        onChanged: (v) async {
-                          if (ttsUi) {
-                            await _ttsGoToVerse(_ttsVerseAtSeconds(v.round()));
-                          } else {
-                            await audioPlayer.seek(Duration(seconds: v.toInt()));
+                        max: sliderMax,
+                        value: sliderValue,
+                        onChanged: (v) {
+                          _playerSliderDrag = v;
+                          _playerSliderDragAt = DateTime.now();
+                          _fullPlayerSetState?.call(() {});
+                        },
+                        onChangeEnd: (v) async {
+                          _playerSliderDrag = v;
+                          _playerSliderDragAt = DateTime.now();
+                          try {
+                            if (ttsUi) {
+                              await _ttsGoToVerse(_ttsVerseAtSeconds(v.round()));
+                            } else {
+                              position = Duration(seconds: v.toInt());
+                              await audioPlayer.seek(position);
+                            }
+                          } finally {
+                            if (_playerSliderDrag == v) {
+                              _playerSliderDrag = null;
+                              _playerSliderDragAt = null;
+                            }
+                            if (_fullPlayerUiAlive) {
+                              _fullPlayerSetState?.call(() {});
+                            }
                           }
                         },
                       ),
@@ -5105,11 +5467,12 @@ class floatingButtonState extends State<floatingButton>
               Padding(
                 padding: const EdgeInsets.only(bottom: 4),
                 child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Expanded(
                       child: _playerAction(
                         ctx,
-                        iconWidget: _voiceMicIcon(_playerInk(ctx), size: 32),
+                        iconWidget: _voiceMicIcon(_playerInk(ctx), size: 24),
                         label: 'Voice',
                         onTap: _showCombinedVoiceSettingsSheet,
                       ),
@@ -5126,7 +5489,7 @@ class floatingButtonState extends State<floatingButton>
                               : _playerInk(ctx).withValues(alpha: 0.38),
                           size: 24,
                         ),
-                        label: 'Sleep\nTimer',
+                        label: 'Sleep Timer',
                         onTap: _showSleepSheet,
                       ),
                     ),
@@ -5145,6 +5508,7 @@ class floatingButtonState extends State<floatingButton>
           ),
         ),
       ),
+    ),
     );
   }
 
@@ -5210,18 +5574,22 @@ class floatingButtonState extends State<floatingButton>
         padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
         child: Column(
           mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            iconWidget ?? Icon(icon!, color: ink, size: 24),
-            const SizedBox(height: 6),
             SizedBox(
-              height: 30,
-              child: Text(
-                label,
-                textAlign: TextAlign.center,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(color: ink, fontSize: 12, height: 1.15),
+              height: 24,
+              width: 24,
+              child: Center(
+                child: iconWidget ?? Icon(icon!, color: ink, size: 24),
               ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              label,
+              textAlign: TextAlign.center,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(color: ink, fontSize: 12, height: 1.15),
             ),
           ],
         ),

@@ -236,7 +236,11 @@ class _UnderLineScreenState extends State<UnderLineScreen> {
                                                 const SizedBox(
                                                   height: 35,
                                                 ),
-                                                SingleChildScrollView(
+                                                Align(
+                                                  alignment: screenWidth > 450
+                                                      ? Alignment.center
+                                                      : Alignment.centerLeft,
+                                                  child: SingleChildScrollView(
                                                   scrollDirection:
                                                       Axis.horizontal,
                                                   child: Row(
@@ -773,8 +777,9 @@ class _UnderLineScreenState extends State<UnderLineScreen> {
                                                   ],
                                                 ),
                                                 ),
-                                              ],
                                             ),
+                                              ],
+                                                ),
                                           );
                                         },
                                       );
@@ -872,7 +877,11 @@ class _UnderLineScreenState extends State<UnderLineScreen> {
                                             const SizedBox(
                                               height: 35,
                                             ),
-                                            SingleChildScrollView(
+                                            Align(
+                                              alignment: screenWidth > 450
+                                                  ? Alignment.center
+                                                  : Alignment.centerLeft,
+                                              child: SingleChildScrollView(
                                               scrollDirection:
                                                   Axis.horizontal,
                                               child: Row(
@@ -1431,6 +1440,7 @@ class _UnderLineScreenState extends State<UnderLineScreen> {
                                               ],
                                             ),
                                           ),
+                                            ),
                                         ],
                                       ),
                                     );

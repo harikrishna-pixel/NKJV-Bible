@@ -14,6 +14,7 @@ class MainBookListModel {
     String? readPer,
     String? shortTitle,
     String? title,
+    String? titleEn,
   }) {
     _id = id;
     _bookNum = bookNum;
@@ -21,6 +22,7 @@ class MainBookListModel {
     _readPer = readPer;
     _shortTitle = shortTitle;
     _title = title;
+    _titleEn = titleEn;
   }
 
   MainBookListModel.fromJson(dynamic json) {
@@ -30,6 +32,8 @@ class MainBookListModel {
     _readPer = json['read_per']?.toString();
     _shortTitle = json['short_title'];
     _title = json['title'];
+    final english = json['title_en']?.toString().trim();
+    _titleEn = (english == null || english.isEmpty) ? null : english;
   }
   int? _id;
   num? _bookNum;
@@ -37,6 +41,7 @@ class MainBookListModel {
   String? _readPer;
   String? _shortTitle;
   String? _title;
+  String? _titleEn;
   MainBookListModel copyWith({
     int? id,
     num? bookNum,
@@ -44,6 +49,7 @@ class MainBookListModel {
     String? readPer,
     String? shortTitle,
     String? title,
+    String? titleEn,
   }) =>
       MainBookListModel(
         id: id ?? _id,
@@ -52,6 +58,7 @@ class MainBookListModel {
         readPer: readPer ?? _readPer,
         shortTitle: shortTitle ?? _shortTitle,
         title: title ?? _title,
+        titleEn: titleEn ?? _titleEn,
       );
   int? get id => _id;
   num? get bookNum => _bookNum;
@@ -59,6 +66,7 @@ class MainBookListModel {
   String? get readPer => _readPer;
   String? get shortTitle => _shortTitle;
   String? get title => _title;
+  String? get titleEn => _titleEn;
 
   Map<String, dynamic> toJson() {
     final map = <String, dynamic>{};
@@ -68,6 +76,7 @@ class MainBookListModel {
     map['read_per'] = _readPer;
     map['short_title'] = _shortTitle;
     map['title'] = _title;
+    map['title_en'] = _titleEn;
     return map;
   }
 }

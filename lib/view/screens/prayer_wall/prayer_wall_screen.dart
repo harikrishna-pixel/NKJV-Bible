@@ -226,16 +226,22 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
     _hydrateMyPrayerIdsFromDisk();
     _hydrateReportedPrayerIdsFromDisk();
     _hydrateBlockedUserIdsFromDisk();
-    _loadAuthAndLocalName();
-    // Load queue immediately so Hotspot UI is not blocked on wall GET.
-    unawaited(_refreshQueue());
-    _refresh();
+    // Resolve viewer user_id first so wall/queue GET sends
+    // excludeBlockedForUserId (two-way block) instead of a plain list.
+    unawaited(_bootstrapWallLoads());
     final posted = widget.openPostedPrayer;
     if (posted != null && posted.id.trim().isNotEmpty) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         unawaited(_openPostedPrayerDetail());
       });
     }
+  }
+
+  Future<void> _bootstrapWallLoads() async {
+    await _loadAuthAndLocalName();
+    if (!mounted) return;
+    unawaited(_refreshQueue());
+    await _refresh();
   }
 
   Future<void> _openPostedPrayerDetail() async {
@@ -945,7 +951,12 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
       ReferralCodeBottomSheet.resetPresentationLock();
       FocusManager.instance.primaryFocus?.unfocus();
       await _loadAuthAndLocalName();
-      return _isLoggedIn || result == true;
+      final loggedInNow = _isLoggedIn || result == true;
+      if (loggedInNow && mounted) {
+        unawaited(_refreshQueue());
+        unawaited(_refresh());
+      }
+      return loggedInNow;
     } finally {
       _suspendFocusFabListener = false;
       _frozenMediaQueryDuringAuth = null;
@@ -1061,8 +1072,8 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
 
   String? _blockPrayerId(PrayerWallItem item) => _mongoPrayerId(item.id);
 
-  /// Block target = poster's resolve user id only (two-way excludeBlocked).
-  /// Never send prayer `_id` as blocked_user_id.
+  /// Block target = poster's resolve user_id only (same id B sends as
+  /// excludeBlockedForUserId). Never send a prayer `_id`.
   String? _blockTargetId(PrayerWallItem item) {
     return _mongoPrayerId(item.identityUserId) ??
         _mongoPrayerId(item.authorUserId) ??
@@ -2437,6 +2448,19 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
     return 'Community member';
   }
 
+  /// You label only when this prayer's saved name is the current username.
+  /// An older post keeps the name it was saved with.
+  bool _showsYouForCurrentName(PrayerWallItem item) {
+    if (!_isMyPrayer(item)) return false;
+    final fromApi = (item.authorName ?? '').trim().toLowerCase();
+    final fromMap = (_prayerAuthorMap[item.id] ?? '').trim().toLowerCase();
+    final saved = fromApi.isNotEmpty ? fromApi : fromMap;
+    if (saved.isEmpty) return true;
+    final current = _viewerDisplayName.trim().toLowerCase();
+    if (current.isEmpty) return false;
+    return saved == current;
+  }
+
   /// Additive: open Prayer Wall profile for this prayer's author.
   Future<void> _openUserProfile(PrayerWallItem item) async {
     if (item.isAnonymous) {
@@ -2880,7 +2904,9 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
           builder: (_) => _QueuePrayerDetailScreen(
             item: item,
             fromHotspot: fromHotspot,
-            displayName: _cardDisplayName(item),
+            displayName: _showsYouForCurrentName(item)
+                ? 'You'
+                : _cardDisplayName(item),
             timeLabel: _timeLabel(item),
             profileImageUrl: () {
               final fromApi = item.profileImage?.trim() ?? '';
@@ -3690,7 +3716,7 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
                                 ),
                               ),
                             ),
-                            if (isMine) ...[
+                            if (_showsYouForCurrentName(item)) ...[
                               const SizedBox(width: 6),
                               _metaChip(
                                 label: 'You',
@@ -5953,7 +5979,7 @@ class _QueuePrayerDetailScreenState extends State<_QueuePrayerDetailScreen>
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
-                                  widget.isMine ? 'You' : name,
+                                  name,
                                   style: TextStyle(
                                     fontFamily: 'Georgia',
                                     fontSize: 16,
@@ -5964,12 +5990,12 @@ class _QueuePrayerDetailScreenState extends State<_QueuePrayerDetailScreen>
                                 const SizedBox(height: 2),
                                 Row(
                                   children: [
-                                    Flexible(
-                                      child: Text(
+                              Flexible(
+                                child: Text(
                                         widget.timeLabel,
                                         maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                        style: TextStyle(
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
                                           fontSize: 13,
                                           color: onBgMuted,
                                         ),
@@ -5999,11 +6025,11 @@ class _QueuePrayerDetailScreenState extends State<_QueuePrayerDetailScreen>
                                           category,
                                           style: TextStyle(
                                             color: onBgBrown,
-                                            fontWeight: FontWeight.w600,
+                                    fontWeight: FontWeight.w600,
                                             fontSize: 12,
-                                          ),
-                                        ),
-                                      ),
+                                  ),
+                                ),
+                              ),
                                     ],
                                   ],
                                 ),
@@ -6063,10 +6089,10 @@ class _QueuePrayerDetailScreenState extends State<_QueuePrayerDetailScreen>
                                     style: TextStyle(
                                       fontSize: 13,
                                       color: onBgMuted,
-                                    ),
-                                  ),
-                                ],
-                              ),
+                    ),
+                  ),
+                ],
+              ),
                               const SizedBox(height: 14),
                               Text(
                                 '"$myWords"',
@@ -6190,10 +6216,10 @@ class _QueuePrayerDetailScreenState extends State<_QueuePrayerDetailScreen>
                                       child: Transform.scale(
                                         scale: 1 + (0.4 * travel),
                                         child: _prayIconImage(filled: true),
-                                      ),
-                                    ),
-                                  ),
-                                );
+          ),
+        ),
+      ),
+        );
                               },
                             ),
                           ],

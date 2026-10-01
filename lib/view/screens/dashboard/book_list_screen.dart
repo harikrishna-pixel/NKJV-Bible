@@ -1,5 +1,7 @@
 import 'dart:convert';
 import 'package:biblebookapp/core/notifiers/download.notifier.dart';
+import 'package:biblebookapp/core/extract_zip_json.dart';
+import 'package:biblebookapp/view/constants/assets_constants.dart';
 import 'package:biblebookapp/view/constants/colors.dart';
 import 'package:biblebookapp/view/constants/constant.dart';
 import 'package:biblebookapp/view/constants/theme_provider.dart';
@@ -72,6 +74,35 @@ class _BookListScreenState extends State<BookListScreen> {
       .where((book) => (book.bookNum ?? 0) < testament_num)
       .toList();
 
+  Widget _bookTitleBlock(MainBookListModel data, double screenWidth) {
+    final english = (data.titleEn ?? '').trim();
+    final titleStyle = CommanStyle.bw16500(context).copyWith(
+      fontSize: screenWidth > 450
+          ? BibleInfo.fontSizeScale * 23
+          : BibleInfo.fontSizeScale * 16,
+    );
+    if (english.isEmpty) {
+      return Text("${data.title}", style: titleStyle);
+    }
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text("${data.title}", style: titleStyle),
+        const SizedBox(height: 2),
+        Text(
+          english,
+          style: titleStyle.copyWith(
+            fontSize: screenWidth > 450
+                ? BibleInfo.fontSizeScale * 16
+                : BibleInfo.fontSizeScale * 13,
+            fontWeight: FontWeight.w400,
+            color: CommanColor.whiteBlack(context).withValues(alpha: 0.55),
+          ),
+        ),
+      ],
+    );
+  }
+
   String _chapterCountLabel(MainBookListModel data) {
     final total = (data.chapterCount ?? 0).round();
     if (total <= 0) return '';
@@ -94,7 +125,42 @@ class _BookListScreenState extends State<BookListScreen> {
     bookList = bookResponse
         .map<MainBookListModel>((e) => MainBookListModel.fromJson(e))
         .toList();
+    await _applyEnglishBookNames();
     _splitTestaments();
+  }
+
+  /// Optional: English name from book.json `title_en`. Hidden when absent.
+  Future<void> _applyEnglishBookNames() async {
+    if (bookList.isEmpty) return;
+    if (bookList.every((book) => (book.titleEn ?? '').trim().isNotEmpty)) {
+      return;
+    }
+    try {
+      final response = await ExtractZipJson.extractFile(
+        AssetsConstants.booksJSONPath,
+        AssetsConstants.holybibleKey,
+      );
+      final decoded = jsonDecode(response);
+      if (decoded is! List) return;
+      final englishByNum = <num, String>{};
+      for (final item in decoded) {
+        if (item is! Map) continue;
+        final english = item['title_en']?.toString().trim() ?? '';
+        final bookNum = item['book_num'];
+        if (english.isEmpty || bookNum is! num) continue;
+        englishByNum[bookNum] = english;
+      }
+      if (englishByNum.isEmpty) return;
+      bookList = bookList
+          .map((book) {
+            final english = englishByNum[book.bookNum];
+            if (english == null || english.isEmpty) return book;
+            return book.copyWith(titleEn: english);
+          })
+          .toList();
+    } catch (e) {
+      debugPrint('BookListScreen title_en skipped: $e');
+    }
   }
 
   Future<void> _loadBooksFromCache() async {
@@ -130,6 +196,10 @@ class _BookListScreenState extends State<BookListScreen> {
       }
       if (bookList.isEmpty) {
         await _loadBooksFromCache();
+      }
+      if (bookList.isNotEmpty) {
+        await _applyEnglishBookNames();
+        _splitTestaments();
       }
     } catch (e) {
       debugPrint('BookListScreen load error: $e');
@@ -333,20 +403,7 @@ class _BookListScreenState extends State<BookListScreen> {
                                     crossAxisAlignment:
                                     CrossAxisAlignment.center,
                                     children: [
-                                      Text(
-                                        "${data.title}",
-                                        style: CommanStyle.bw16500(
-                                            context)
-                                            .copyWith(
-                                            fontSize: screenWidth >
-                                                450
-                                                ? BibleInfo
-                                                .fontSizeScale *
-                                                23
-                                                : BibleInfo
-                                                .fontSizeScale *
-                                                16),
-                                      ),
+                                      _bookTitleBlock(data, screenWidth),
                                       Spacer(),
                                       SizedBox(
                                         width:
@@ -407,20 +464,7 @@ class _BookListScreenState extends State<BookListScreen> {
                                     crossAxisAlignment:
                                     CrossAxisAlignment.center,
                                     children: [
-                                      Text(
-                                        "${data.title}",
-                                        style: CommanStyle.bw16500(
-                                            context)
-                                            .copyWith(
-                                            fontSize: screenWidth >
-                                                450
-                                                ? BibleInfo
-                                                .fontSizeScale *
-                                                23
-                                                : BibleInfo
-                                                .fontSizeScale *
-                                                16),
-                                      ),
+                                      _bookTitleBlock(data, screenWidth),
                                       Spacer(),
                                       SizedBox(
                                         width:

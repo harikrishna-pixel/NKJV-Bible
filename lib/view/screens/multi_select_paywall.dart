@@ -1517,8 +1517,8 @@ class _MultiSelectPaywallState extends State<MultiSelectPaywall> {
     if (product != null && product.rawPrice > 0) {
       final sym =
           product.currencySymbol.isNotEmpty ? product.currencySymbol : '\$';
-      final perMonth = product.rawPrice / 12;
-      return '$sym${perMonth.toStringAsFixed(2)} per month';
+      final perMonth = (product.rawPrice / 12).round();
+      return '$sym$perMonth per month';
     }
     return 'per month';
   }

@@ -57,6 +57,8 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   final TextEditingController _messageController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   final FocusNode _messageFocusNode = FocusNode();
+  /// Screen height while the keyboard is closed, so the background stays put.
+  double? _chatLayoutHeight;
   final List<ChatMessage> _messages = [];
   bool _isLoading = false;
   String? _currentConversationId;
@@ -2225,6 +2227,16 @@ Remember: You are assisting users with the ${BibleInfo.bible_shortName}, so prov
     final isVintage =
         themeProvider.currentCustomTheme == AppCustomTheme.vintage;
 
+    final media = MediaQuery.of(context);
+    final keyboardInset = media.viewInsets.bottom;
+    if (keyboardInset == 0) {
+      _chatLayoutHeight = media.size.height;
+    }
+    final layoutHeight = _chatLayoutHeight ?? media.size.height;
+    final windowShrink = layoutHeight - media.size.height;
+    final composerBottom =
+        windowShrink > keyboardInset ? windowShrink : keyboardInset;
+
     return PopScope(
       canPop: false,
       onPopInvokedWithResult: (bool didPop, dynamic result) async {
@@ -2357,7 +2369,11 @@ Remember: You are assisting users with the ${BibleInfo.bible_shortName}, so prov
         //     ),
         //   ],
         // ),
-        body: Container(
+        body: OverflowBox(
+          alignment: Alignment.topCenter,
+          minHeight: layoutHeight,
+          maxHeight: layoutHeight,
+          child: Container(
           decoration: isVintage
               ? BoxDecoration(
                   color: isDark
@@ -2384,7 +2400,9 @@ Remember: You are assisting users with the ${BibleInfo.bible_shortName}, so prov
               behavior: HitTestBehavior.opaque,
               child: Stack(
                 children: [
-                  Column(
+                  MediaQuery(
+                    data: media.removeViewInsets(removeBottom: true),
+                    child: Column(
                 children: [
                   // Top bar with back button and actions
                   Padding(
@@ -3002,16 +3020,18 @@ Remember: You are assisting users with the ${BibleInfo.bible_shortName}, so prov
                   ),
                 ],
               ),
+                  ),
                   Positioned(
                     left: 0,
                     right: 0,
-                    bottom: MediaQuery.viewInsetsOf(context).bottom,
+                    bottom: composerBottom,
                     child: _buildInputArea(screenWidth, isDark),
                   ),
                 ],
               ),
             ),
           ),
+        ),
         ),
       ),
     );
