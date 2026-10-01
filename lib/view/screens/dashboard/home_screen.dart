@@ -1814,7 +1814,7 @@ class _HomeScreenState extends State<HomeScreen>
         break;
     }
   }
-
+ 
   void _navigateForWidgetRoute(BibleWidgetRoute route) {
     if (route == BibleWidgetRoute.none) return;
     if (route == BibleWidgetRoute.verse) {

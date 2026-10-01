@@ -288,7 +288,7 @@ class BibleInfo {
       : _englishBibleAudioUrls.first;
 
   // Text to Speech Settings - iOS
-  static String isTextToSpeechAvailableIos = "1";
+  static String isTextToSpeechAvailableIos  = "1";
   static String textToSpeechLanguageCodeIos = "en-GB";
   static String textToSpeechIdentifierIos =
       "com.apple.ttsbundle.siri_male_en-GB_compact";
