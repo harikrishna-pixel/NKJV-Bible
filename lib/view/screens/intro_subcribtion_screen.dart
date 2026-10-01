@@ -187,6 +187,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen>
   Timer? _loadingTimeoutTimer; // Timer for 6-second loading timeout
   bool _autoPurchaseTriggered = false;
   bool _autoRestoreTriggered = false;
+  bool _restoreSuccessToastShown = false;
   Set<String> _lastQueriedProductIds = {};
   Set<String> _lastStoreNotFoundIds = {};
   /// Additive: highest restore tier applied in the current Restore session
@@ -704,6 +705,16 @@ class _SubscriptionScreenState extends State<SubscriptionScreen>
     return false;
   }
 
+  void _showNoPurchasesToRestoreToast([DashBoardController? controller]) {
+    if (_restoreSuccessToastShown) return;
+    final c = controller ??
+        (Get.isRegistered<DashBoardController>()
+            ? Get.find<DashBoardController>()
+            : null);
+    if (c != null && c.adFree.value == true) return;
+    Constants.showToast('No purchases available to restore.');
+  }
+
   Future<void> _applyBestCollectedRestore(
     DashBoardController controller,
   ) async {
@@ -711,7 +722,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen>
     _restoreCollecting = false;
     if (best == null) {
       EasyLoading.dismiss();
-      Constants.showToast('No active subscription available');
+      _showNoPurchasesToRestoreToast(controller);
       return;
     }
     debugPrint(
@@ -872,6 +883,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen>
   Future<void> _autoStartRestoreIfNeeded() async {
     if (!widget.autoStartRestore || _autoRestoreTriggered) return;
     _autoRestoreTriggered = true;
+    _restoreSuccessToastShown = false;
     await SharPreferences.setBoolean('restorepurches', true);
     await _restorePurchases(controller);
   }
@@ -2162,7 +2174,10 @@ class _SubscriptionScreenState extends State<SubscriptionScreen>
     final data = await SharPreferences.getBoolean('restorepurches');
     final startFlag = await SharPreferences.getBoolean('startpurches');
     final successToastMessage =
-        (startFlag == true) ? 'Purchase Successful' : 'Restore Success';
+        (startFlag == true) ? 'Purchase Successful' : 'Restore Successful';
+    if (successToastMessage == 'Restore Successful') {
+      _restoreSuccessToastShown = true;
+    }
     debugPrint(
       "restore data 1 is $data | startFlag=$startFlag | productId=$productId",
     );
@@ -3527,6 +3542,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen>
     if (!hasInternet) {
       _restoreCollecting = false;
       Constants.showToast("No Internet Connection");
+      if (widget.invisiblePurchaseHost) _popInvisiblePurchaseHost(false);
       return; // Return early - don't show loader or proceed
     }
 
@@ -3563,7 +3579,8 @@ class _SubscriptionScreenState extends State<SubscriptionScreen>
       _restoreCollecting = false;
       EasyLoading.dismiss();
       DebugConsole.log("restore No active subscription available error - $e");
-      Constants.showToast('No active subscription available');
+      _showNoPurchasesToRestoreToast(controller);
+      if (widget.invisiblePurchaseHost) _popInvisiblePurchaseHost(false);
     }
   }
 

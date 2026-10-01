@@ -1,3 +1,4 @@
+import 'package:biblebookapp/utils/library_bible_version_tag.dart';
 import 'dart:io';
 
 import 'package:biblebookapp/constant/size_config.dart';
@@ -225,6 +226,11 @@ class _UnderLineScreenState extends State<UnderLineScreen> {
                                                   mainAxisAlignment:
                                                       MainAxisAlignment.end,
                                                   children: [
+                                                    LibraryBibleVersionChip(
+                                                      bookName: data.bookName,
+                                                      content: data.content,
+                                                    ),
+                                                    const Spacer(),
                                                     Text(
                                                         "${data.bookName} ${data.chapterNum}:${data.verseNum}",
                                                         textAlign:
@@ -798,9 +804,18 @@ class _UnderLineScreenState extends State<UnderLineScreen> {
                                   const SizedBox(
                                     height: 8,
                                   ),
-                                  Text(
-                                      "${data.bookName} ${data.chapterNum}:${data.verseNum}",
-                                      style: CommanStyle.bw14500(context)),
+                                  Row(
+                                    children: [
+                                      LibraryBibleVersionChip(
+                                        bookName: data.bookName,
+                                        content: data.content,
+                                      ),
+                                      const Spacer(),
+                                      Text(
+                                          "${data.bookName} ${data.chapterNum}:${data.verseNum}",
+                                          style: CommanStyle.bw14500(context)),
+                                    ],
+                                  ),
                                   const SizedBox(
                                     height: 8,
                                   ),
@@ -867,6 +882,11 @@ class _UnderLineScreenState extends State<UnderLineScreen> {
                                               mainAxisAlignment:
                                                   MainAxisAlignment.end,
                                               children: [
+                                                LibraryBibleVersionChip(
+                                                  bookName: data.bookName,
+                                                  content: data.content,
+                                                ),
+                                                const Spacer(),
                                                 Text(
                                                     "${data.bookName} ${data.chapterNum}:${data.verseNum}",
                                                     textAlign: TextAlign.right,

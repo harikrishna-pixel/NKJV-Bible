@@ -1,5 +1,6 @@
 import 'dart:math' as math;
 
+import 'package:biblebookapp/utils/bible_ui_labels.dart';
 import 'package:biblebookapp/view/constants/colors.dart';
 import 'package:biblebookapp/view/constants/theme_provider.dart';
 import 'package:biblebookapp/view/screens/dashboard/constants.dart';
@@ -39,6 +40,9 @@ class _ChapterListScreenState extends State<ChapterListScreen> {
   @override
   void initState() {
     super.initState();
+    BibleUiLabels.refreshFromPrefs().then((_) {
+      if (mounted) setState(() {});
+    });
     loadChapter();
     selectedChapter = int.parse(widget.selectedChapter.toString()) - 1;
   }
@@ -163,7 +167,7 @@ class _ChapterListScreenState extends State<ChapterListScreen> {
                         ),
                         Padding(
                           padding: const EdgeInsets.only(right: 20.0),
-                          child: Text("Chapter",
+                          child: Text(BibleUiLabels.chapterWordForDisplay(),
                               style: CommanStyle.appBarStyle(context)
                                   .copyWith(color: ink)),
                         ),

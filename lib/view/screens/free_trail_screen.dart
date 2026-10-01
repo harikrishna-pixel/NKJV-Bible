@@ -1,6 +1,6 @@
 import 'package:biblebookapp/view/screens/intro_subcribtion_screen.dart';
 
-import 'package:biblebookapp/view/screens/paywall_navigation.dart';
+import 'package:biblebookapp/view/screens/multi_select_paywall.dart';
 
 import 'package:flutter/material.dart';
 
@@ -68,7 +68,7 @@ class _FreeTrialIntroScreenState extends State<FreeTrialIntroScreen> {
 
     Get.offAll(
 
-          () => PaywallNavigation.buildVisiblePaywall(
+          () => MultiSelectPaywall(
 
         sixMonthPlan: widget.sixMonthPlan,
 
@@ -664,7 +664,7 @@ class _TimelineSection extends StatelessWidget {
 
                   body:
 
-                  '\$59.99/yr, and only if you keep it. Cancel \ngitanytime in one tap.',
+                  '\$59.99/yr, and only if you keep it. Cancel \nanytime in one tap.',
 
                 ),
 

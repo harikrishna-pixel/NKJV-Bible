@@ -5,11 +5,13 @@ import 'package:archive/archive.dart';
 import 'package:biblebookapp/Model/dailyVersesMainListModel.dart';
 import 'package:biblebookapp/Model/mainBookListModel.dart';
 import 'package:biblebookapp/Model/verseBookContentModel.dart';
+import 'package:biblebookapp/controller/dashboard_controller.dart';
 import 'package:biblebookapp/controller/dpProvider.dart';
 import 'package:biblebookapp/core/bible_extract_paths.dart';
 import 'package:biblebookapp/core/notifiers/download.notifier.dart';
 import 'package:biblebookapp/main.dart';
 import 'package:biblebookapp/utils/bible_version_config.dart';
+import 'package:biblebookapp/utils/library_verse_flags_sync.dart';
 import 'package:biblebookapp/utils/emoji_text_style.dart';
 import 'package:biblebookapp/view/widget/thanks_for_love_rating_dialog_content.dart';
 import 'package:biblebookapp/view/constants/assets_constants.dart';
@@ -467,7 +469,7 @@ class BibleVersionsScreenState extends State<BibleVersionsScreen> {
                                               prefs.getString("appreview1") ??
                                                   "1";
                                           if (data == '1') {
-                                            await _requestReview();
+                                            // Rating prompt removed from Bible Version.
                                           }
                                           setState(() {
                                             // Step 1: Reset all active folders to "open"
@@ -502,95 +504,99 @@ class BibleVersionsScreenState extends State<BibleVersionsScreen> {
                           isTablet ? size.width * 0.14 : 18,
                           isTablet ? 20 : 14,
                         ),
-                        child: SizedBox(
-                          width: double.infinity,
-                          height: isTablet ? 64 : 54,
-                          child: DecoratedBox(
-                            decoration: BoxDecoration(
-                              gradient: const LinearGradient(
-                                colors: [
-                                  Color(0xFF763201),
-                                  Color(0xFFD5821F),
-                                  Color(0xFF763201),
-                                ],
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            if (isloading == true) ...[
+                              _bibleSwitchProgressBar(isTablet),
+                              SizedBox(height: isTablet ? 12 : 8),
+                            ],
+                            SizedBox(
+                              width: double.infinity,
+                              height: isTablet ? 64 : 54,
+                              child: Builder(
+                                builder: (context) {
+                                  final hasPrimarySelected = buttonStates
+                                      .values
+                                      .any((s) =>
+                                          s == DownloadButtonState.active);
+                                  return DecoratedBox(
+                                    decoration: BoxDecoration(
+                                      gradient: hasPrimarySelected
+                                          ? const LinearGradient(
+                                              colors: [
+                                                Color(0xFF763201),
+                                                Color(0xFFD5821F),
+                                                Color(0xFF763201),
+                                              ],
+                                            )
+                                          : null,
+                                      color: hasPrimarySelected
+                                          ? null
+                                          : const Color(0xFFB8B0A6),
+                                      borderRadius: BorderRadius.circular(14),
+                                    ),
+                                    child: ElevatedButton(
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: Colors.transparent,
+                                        shadowColor: Colors.transparent,
+                                        elevation: 0,
+                                        padding: EdgeInsets.symmetric(
+                                          vertical: isTablet ? 18 : 14,
+                                        ),
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius:
+                                              BorderRadius.circular(14),
+                                        ),
+                                      ),
+                                      onPressed: () async {
+                                        if (isloading == true) return;
+                                        setState(() {
+                                          isloading = true;
+                                          _progress = 0;
+                                        });
+                                        if (foldername != null &&
+                                            foldername!.isNotEmpty) {
+                                          if (widget.from == 'onboard') {
+                                            setState(() {
+                                              isloading = false;
+                                            });
+                                            await _saveButtonStates();
+                                            CustomAlertBox.show(context, () {
+                                              Get.to(() =>
+                                                  PreferenceSelectionScreen(
+                                                    isSetting: false,
+                                                    selectedbible: foldername
+                                                        .toString(),
+                                                  ));
+                                            });
+                                          } else {
+                                            await _saveButtonStates();
+                                            await _runHomeBibleSwitchFlow();
+                                          }
+                                        } else {
+                                          setState(() {
+                                            isloading = false;
+                                          });
+                                          Constants.showToast(
+                                              "Click Set as Default");
+                                        }
+                                      },
+                                      child: Text(
+                                        "Continue",
+                                        style: TextStyle(
+                                          fontFamily: 'Georgia',
+                                          fontSize: isTablet ? 20 : 16,
+                                          fontWeight: FontWeight.w700,
+                                          color: Colors.white,
+                                        ),
+                                      ),
+                                    ),
+                                  );
+                                },
                               ),
-                              borderRadius: BorderRadius.circular(14),
                             ),
-                            child: ElevatedButton(
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.transparent,
-                                shadowColor: Colors.transparent,
-                                elevation: 0,
-                                padding: EdgeInsets.symmetric(
-                                  vertical: isTablet ? 18 : 14,
-                                ),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(14),
-                                ),
-                              ),
-                              onPressed: () async {
-                              setState(() {
-                                isloading = true;
-                              });
-                              // await showClearDatabaseDialog(context);
-                              if (foldername != null &&
-                                  foldername!.isNotEmpty) {
-                                // 🔹 Save state after change
-
-                                // Navigate next
-                                if (widget.from == 'onboard') {
-                                  setState(() {
-                                    isloading = false;
-                                  });
-                                  await _saveButtonStates();
-                                  CustomAlertBox.show(context, () {
-                                    Get.to(() => PreferenceSelectionScreen(
-                                          isSetting: false,
-                                          selectedbible: foldername.toString(),
-                                        ));
-                                  });
-                                } else {
-                                  await showClearDatabaseDialog(context);
-                                  // await extractFromFolder(
-                                  //     folderName: foldername.toString(),
-                                  //     password: "Mtech2023",
-                                  //     from: "home");
-                                  // await loadBookContent(foldername);
-                                  // await loadBookList(foldername);
-                                  // await loadDailyVerseData();
-                                  // await loadLocal();
-                                  // await deleteFiles(foldername);
-                                  // // return Get.back();
-                                  // setState(() {
-                                  //   isloading = false;
-                                  // });
-                                  // return Get.offAll(() => HomeScreen(
-                                  //       From: "splash",
-                                  //       selectedVerseNumForRead: "",
-                                  //       selectedBookForRead: "",
-                                  //       selectedChapterForRead: "",
-                                  //       selectedBookNameForRead: "",
-                                  //       selectedVerseForRead: "",
-                                  //     ));
-                                }
-                              } else {
-                                setState(() {
-                                  isloading = false;
-                                });
-                                Constants.showToast("Click Set as Default");
-                              }
-                            },
-                              child: Text(
-                                isloading == false ? "Continue" : "loading...",
-                                style: TextStyle(
-                                  fontFamily: 'Georgia',
-                                  fontSize: isTablet ? 20 : 16,
-                                  fontWeight: FontWeight.w700,
-                                  color: Colors.white,
-                                ),
-                              ),
-                            ),
-                          ),
+                          ],
                         ),
                       ),
                     ],
@@ -599,6 +605,162 @@ class BibleVersionsScreenState extends State<BibleVersionsScreen> {
         ),
       ),
     );
+  }
+
+  Widget _bibleSwitchProgressBar(bool isTablet) {
+    final progress01 = (_progress.clamp(0, 100) / 100.0);
+    final percent = _progress.clamp(0, 100).round();
+    final barHeight = isTablet ? 28.0 : 24.0;
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 12),
+      child: Container(
+        height: barHeight,
+        width: double.infinity,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(barHeight / 2),
+          color: const Color(0xFFE8D9C4).withOpacity(0.88),
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            Align(
+              alignment: Alignment.centerLeft,
+              child: FractionallySizedBox(
+                widthFactor: progress01 <= 0 ? 0.02 : progress01,
+                heightFactor: 1,
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(barHeight / 2),
+                    gradient: const LinearGradient(
+                      begin: Alignment.centerLeft,
+                      end: Alignment.centerRight,
+                      colors: [
+                        Color(0xFFD4A04A),
+                        Color(0xFFC59434),
+                        Color(0xFF9A6B2F),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            Text(
+              '$percent%',
+              style: TextStyle(
+                fontFamily: 'Georgia',
+                fontSize: isTablet ? 13 : 12,
+                fontWeight: FontWeight.w700,
+                color: Colors.white,
+                height: 1,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _runHomeBibleSwitchFlow() async {
+    if (!mounted) return;
+    setState(() {
+      _progress = 5;
+    });
+    await extractFromFolder(
+      folderName: foldername.toString(),
+      password: dotenv.env[AssetsConstants.holybibleKey].toString(),
+      from: "home",
+    );
+
+    if (!mounted) return;
+    setState(() {
+      _progress = 15;
+    });
+    await loadBookContent(foldername);
+
+    if (!mounted) return;
+    setState(() {
+      _progress = 27;
+    });
+    await loadBookList(foldername);
+
+    if (!mounted) return;
+    setState(() {
+      _progress = 43;
+    });
+    _savePreferences();
+
+    if (!mounted) return;
+    setState(() {
+      _progress = 54;
+    });
+    await loadLocal();
+
+    if (!mounted) return;
+    setState(() {
+      _progress = 67;
+    });
+    await DBHelper().db.then((db) async {
+      if (db != null) {
+        final result = await db.rawQuery(
+          "SELECT * FROM book WHERE book_num = ?",
+          [int.parse("0")],
+        );
+        if (result.isNotEmpty && result[0]["title"] != null) {
+          await SharPreferences.setString(
+            SharPreferences.selectedBook,
+            result[0]["title"].toString(),
+          );
+        }
+      }
+    });
+
+    if (!mounted) return;
+    setState(() {
+      _progress = 73;
+    });
+    await deleteFiles(foldername);
+
+    if (!mounted) return;
+    setState(() {
+      _progress = 89;
+    });
+
+    if (!mounted) return;
+    setState(() {
+      _progress = 97;
+    });
+    Constants.showToast("Updated Successfully");
+    setState(() {
+      isloading = false;
+      isbtnloading = false;
+    });
+    await _invalidateHomeBibleMemoryCaches();
+    Get.offAll(() => HomeScreen(
+          From: "splash",
+          selectedVerseNumForRead: "",
+          selectedBookForRead: "",
+          selectedChapterForRead: "",
+          selectedBookNameForRead: "",
+          selectedVerseForRead: "",
+        ));
+  }
+
+  Future<void> _invalidateHomeBibleMemoryCaches() async {
+    try {
+      if (Get.isRegistered<DashBoardController>()) {
+        final c = Get.find<DashBoardController>();
+        c.selectedBookContent.clear();
+        c.selectedVersesContent.clear();
+        c.isFetchContent.value = true;
+        c.loadTextToSpeech.value = true;
+      }
+    } catch (_) {}
+    if (!mounted) return;
+    try {
+      Provider.of<DownloadProvider>(context, listen: false)
+          .clearInMemoryBibleCaches();
+    } catch (_) {}
   }
 
   String _bibleDisplayName(String folder) {
@@ -1018,7 +1180,8 @@ class BibleVersionsScreenState extends State<BibleVersionsScreen> {
                       setState(() {
                         _progress = 89;
                       });
-                      await clearAllData(); // clear DB
+                      // Library rows stay across a Bible switch.
+                      // await clearAllData();
 
                       setState(() {
                         _progress = 97;
@@ -1423,6 +1586,7 @@ class BibleVersionsScreenState extends State<BibleVersionsScreen> {
 
       // Step 6: Save flag in SharedPreferences
       await SharPreferences.setBoolean(SharPreferences.isLoadBookContent, true);
+      await LibraryVerseFlagsSync.reapplyToVerseTable();
     } catch (e, st) {
       debugPrint("testapp: Error loading verse content → $e\n$st");
     }
@@ -1737,6 +1901,8 @@ Future<List<VerseBookContentModel>> _parseVerseContent(
 
 class CustomAlertBox {
   static void show(BuildContext context, onPressed) {
+    onPressed();
+    return;
     final size = MediaQuery.of(context).size;
     final isTablet = size.width > 600; // iPad vs iPhone
     final screenWidth = MediaQuery.of(context).size.width;

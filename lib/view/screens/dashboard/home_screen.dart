@@ -14,6 +14,7 @@ import 'package:biblebookapp/core/notifiers/cache.notifier.dart';
 import 'package:biblebookapp/core/notifiers/download.notifier.dart';
 import 'package:biblebookapp/services/premium_entitlement_label_sync.dart';
 import 'package:biblebookapp/main.dart';
+import 'package:biblebookapp/utils/bible_ui_labels.dart';
 import 'package:biblebookapp/utils/debugprint.dart';
 import 'package:biblebookapp/utils/emoji_text_style.dart';
 import 'package:biblebookapp/utils/internet_speed_checker.dart';
@@ -1489,6 +1490,9 @@ class _HomeScreenState extends State<HomeScreen>
       });
     }
     WidgetsBinding.instance.addObserver(this);
+    BibleUiLabels.refreshFromPrefs().then((_) {
+      if (mounted) setState(() {});
+    });
     _initializeApp();
     // Track Home Screen event
     AnalyticsService.trackHomeScreen();
@@ -4297,7 +4301,10 @@ class _HomeScreenState extends State<HomeScreen>
                                 controller.selectedChapter.value == ""
                                     ? const SizedBox()
                                     : Text(
-                                        "Chapter - ${int.parse(controller.selectedChapter.value)}",
+                                        BibleUiLabels.chapterBarLabel(
+                                          chapterNum:
+                                              '${int.parse(controller.selectedChapter.value)}',
+                                        ),
                                               style: CommanStyle.bw14500(
                                                       context)
                                             .copyWith(

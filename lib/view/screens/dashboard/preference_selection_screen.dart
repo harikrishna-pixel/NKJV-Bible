@@ -15,8 +15,9 @@ import 'package:biblebookapp/view/screens/dashboard/constants.dart';
 import 'package:biblebookapp/view/constants/share_preferences.dart';
 import 'package:biblebookapp/streak_flow/streak_flow_screens.dart' hide SharPreferences;
 import 'package:biblebookapp/view/screens/dashboard/home_screen.dart';
+import 'package:biblebookapp/utils/library_verse_flags_sync.dart';
+import 'package:biblebookapp/view/screens/free_trial_intro_screen.dart';
 import 'package:biblebookapp/view/screens/intro_subcribtion_screen.dart';
-import 'package:biblebookapp/view/screens/paywall_navigation.dart';
 import 'package:biblebookapp/view/screens/onboard_faith_screen.dart';
 import 'package:biblebookapp/services/paywall_preload_service.dart';
 import 'package:flutter/foundation.dart';
@@ -450,6 +451,7 @@ class PreferenceSelectionScreenState extends State<PreferenceSelectionScreen> {
 
       // Step 6: Save flag in SharedPreferences
       await SharPreferences.setBoolean(SharPreferences.isLoadBookContent, true);
+      await LibraryVerseFlagsSync.reapplyToVerseTable();
     } catch (e, st) {
       debugPrint("testapp: Error loading verse content → $e\n$st");
     }
@@ -1637,17 +1639,30 @@ class FaithJourneyDialog {
                               final sixMonthPlan = BibleInfo.sixMonthPlanid;
                               final oneYearPlan = BibleInfo.oneYearPlanid;
                               final lifeTimePlan = BibleInfo.lifeTimePlanid;
-                              Get.offAll(
-                                  () => PaywallNavigation.buildVisiblePaywall(
-                                        sixMonthPlan: sixMonthPlan,
-                                        oneYearPlan: oneYearPlan,
-                                        lifeTimePlan: lifeTimePlan,
-                                        checkad: 'onboard',
-                                      ),
-                                  transition:
-                                      SubscriptionScreen.paywallRouteTransition,
-                                  duration:
-                                      SubscriptionScreen.paywallRouteDuration);
+                              if (BibleInfo.folders.length > 1) {
+                                Get.offAll(
+                                    () => FreeTrialIntroScreen(
+                                          sixMonthPlan: sixMonthPlan,
+                                          oneYearPlan: oneYearPlan,
+                                          lifeTimePlan: lifeTimePlan,
+                                        ),
+                                    transition: SubscriptionScreen
+                                        .paywallRouteTransition,
+                                    duration: SubscriptionScreen
+                                        .paywallRouteDuration);
+                              } else {
+                                Get.offAll(
+                                    () => SubscriptionScreen(
+                                          sixMonthPlan: sixMonthPlan,
+                                          oneYearPlan: oneYearPlan,
+                                          lifeTimePlan: lifeTimePlan,
+                                          checkad: 'onboard',
+                                        ),
+                                    transition: SubscriptionScreen
+                                        .paywallRouteTransition,
+                                    duration: SubscriptionScreen
+                                        .paywallRouteDuration);
+                              }
                             } else if (navContext != null &&
                                 navContext.mounted) {
                               await StreakFlowNavigation

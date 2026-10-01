@@ -7,6 +7,7 @@ import 'package:biblebookapp/Model/verseBookContentModel.dart';
 import 'package:biblebookapp/controller/dashboard_controller.dart';
 import 'package:biblebookapp/controller/dpProvider.dart';
 import 'package:biblebookapp/core/notifiers/cache.notifier.dart';
+import 'package:biblebookapp/utils/bible_book_resolve.dart';
 import 'package:biblebookapp/utils/custom_alert.dart';
 import 'package:biblebookapp/utils/debugprint.dart';
 import 'package:biblebookapp/home_widget/bible_home_widget.dart';
@@ -1362,6 +1363,17 @@ class DownloadProvider with ChangeNotifier {
     if (dailyVerseList.isEmpty) {
       await loadDailyVerses();
     }
+  }
+
+  void clearInMemoryBibleCaches() {
+    verseList = [];
+    otVerseList = [];
+    ntVerseList = [];
+    bookList = [];
+    otBookList = [];
+    ntBookList = [];
+    BibleBookResolve.clearCache();
+    notifyListeners();
   }
 }
 
