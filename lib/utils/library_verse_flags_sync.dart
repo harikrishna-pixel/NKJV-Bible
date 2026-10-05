@@ -30,53 +30,104 @@ class LibraryVerseFlagsSync {
       final List<BookMarkModel> underlines = await dbHelper.getUnderLine();
       final List<SaveNotesModel> notes = await dbHelper.getNotes();
 
-      for (final e in bookmarks) {
-        final plain =
-            _plain(e.content?.toString() ?? e.plaincontent?.toString());
-        if (plain.isEmpty) continue;
-        await DBHelper()
-            .updateVersesDataByContentnew(plain, 'is_bookmarked', 'yes');
-        if (e.content != null && e.content.toString().trim().isNotEmpty) {
-          await DBHelper().updateVersesDataByContent(
-              e.content.toString(), 'is_bookmarked', 'yes');
+      if (bookmarks.isEmpty &&
+          highlights.isEmpty &&
+          underlines.isEmpty &&
+          notes.isEmpty) {
+        debugPrint(
+          'LibraryVerseFlagsSync: reapplied BM=0 HL=0 UL=0 Notes=0',
+        );
+        return;
+      }
+
+      final db = await DBHelper().db;
+      if (db == null) return;
+
+      // One read of the verse table. Same matches as the per-item scans:
+      // first plain-text match, plus every row whose content equals the saved text.
+      final verses = await db.query('verse', columns: ['id', 'content']);
+      final firstIdByPlain = <String, int>{};
+      final idsByExact = <String, List<int>>{};
+      var seen = 0;
+      for (final verse in verses) {
+        final id = int.tryParse('${verse['id']}');
+        if (id == null) continue;
+        final htmlContent = verse['content']?.toString() ?? '';
+        final parsed = _plain(htmlContent);
+        if (parsed.isNotEmpty) {
+          firstIdByPlain.putIfAbsent(parsed, () => id);
         }
+        if (htmlContent.isNotEmpty) {
+          (idsByExact[htmlContent] ??= <int>[]).add(id);
+        }
+        seen++;
+        if (seen % 400 == 0) {
+          await Future<void>.delayed(Duration.zero);
+        }
+      }
+
+      final batch = db.batch();
+      void stamp(int id, String column, String value) {
+        batch.update(
+          'verse',
+          {column: value},
+          where: 'id = ?',
+          whereArgs: [id],
+        );
+      }
+
+      void stampPlainAndExact({
+        required String plain,
+        required String raw,
+        required String column,
+        required String value,
+      }) {
+        if (plain.isEmpty) return;
+        final matched = firstIdByPlain[plain];
+        if (matched != null) stamp(matched, column, value);
+        if (raw.trim().isEmpty) return;
+        for (final id in idsByExact[raw] ?? const <int>[]) {
+          stamp(id, column, value);
+        }
+      }
+
+      for (final e in bookmarks) {
+        stampPlainAndExact(
+          plain: _plain(e.content?.toString() ?? e.plaincontent?.toString()),
+          raw: e.content?.toString() ?? '',
+          column: 'is_bookmarked',
+          value: 'yes',
+        );
       }
 
       for (final e in highlights) {
-        final plain =
-            _plain(e.content?.toString() ?? e.plain_content?.toString());
-        if (plain.isEmpty) continue;
-        await DBHelper().updateVersesDataByContentnewcheck(
-            plain, 'is_highlighted', '${e.color}');
-        if (e.content != null && e.content.toString().trim().isNotEmpty) {
-          await DBHelper().updateVersesDataByContent(
-              e.content.toString(), 'is_highlighted', '${e.color}');
-        }
+        stampPlainAndExact(
+          plain: _plain(e.content?.toString() ?? e.plain_content?.toString()),
+          raw: e.content?.toString() ?? '',
+          column: 'is_highlighted',
+          value: '${e.color}',
+        );
       }
 
       for (final e in underlines) {
-        final plain =
-            _plain(e.content?.toString() ?? e.plaincontent?.toString());
-        if (plain.isEmpty) continue;
-        await DBHelper()
-            .updateVersesDataByContentnew(plain, 'is_underlined', 'yes');
-        if (e.content != null && e.content.toString().trim().isNotEmpty) {
-          await DBHelper().updateVersesDataByContent(
-              e.content.toString(), 'is_underlined', 'yes');
-        }
+        stampPlainAndExact(
+          plain: _plain(e.content?.toString() ?? e.plaincontent?.toString()),
+          raw: e.content?.toString() ?? '',
+          column: 'is_underlined',
+          value: 'yes',
+        );
       }
 
       for (final e in notes) {
-        final plain =
-            _plain(e.content?.toString() ?? e.plaincontent?.toString());
-        if (plain.isEmpty) continue;
-        await DBHelper().updateVersesDataByContentnew(
-            plain, 'is_noted', '${e.notes}');
-        if (e.content != null && e.content.toString().trim().isNotEmpty) {
-          await DBHelper().updateVersesDataByContent(
-              e.content.toString(), 'is_noted', '${e.notes}');
-        }
+        stampPlainAndExact(
+          plain: _plain(e.content?.toString() ?? e.plaincontent?.toString()),
+          raw: e.content?.toString() ?? '',
+          column: 'is_noted',
+          value: '${e.notes}',
+        );
       }
+
+      await batch.commit(noResult: true);
 
       debugPrint(
         'LibraryVerseFlagsSync: reapplied '

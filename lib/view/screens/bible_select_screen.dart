@@ -1,7 +1,10 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
 import 'dart:ui' as ui;
 import 'package:archive/archive.dart';
+import 'package:biblebookapp/Model/dailyVerseList.dart';
 import 'package:biblebookapp/Model/dailyVersesMainListModel.dart';
 import 'package:biblebookapp/Model/mainBookListModel.dart';
 import 'package:biblebookapp/Model/verseBookContentModel.dart';
@@ -305,7 +308,9 @@ class BibleVersionsScreenState extends State<BibleVersionsScreen> {
                               icon: Icon(
                                 Icons.arrow_back_ios,
                                 size: isTablet ? 28 : 20,
-                                color: ink,
+                                color: CommanColor.isDarkTheme(context)
+                                    ? const Color(0xFFF7F2EA)
+                                    : ink,
                               ),
                             ),
                           ),
@@ -711,10 +716,12 @@ class BibleVersionsScreenState extends State<BibleVersionsScreen> {
     );
 
     if (!mounted) return;
-    setState(() {
-      _progress = 15;
-    });
-    await loadBookContent(foldername);
+    final versesLoaded = await _loadVersesWithMovingProgress();
+    if (!mounted) return;
+    if (!versesLoaded) {
+      _stopBibleSwitch('Could not update the Bible. Please try again.');
+      return;
+    }
 
     if (!mounted) return;
     setState(() {
@@ -753,14 +760,13 @@ class BibleVersionsScreenState extends State<BibleVersionsScreen> {
 
     if (!mounted) return;
     setState(() {
-      _progress = 97;
+      _progress = 100;
     });
+    await Future<void>.delayed(const Duration(milliseconds: 350));
+    if (!mounted) return;
     Constants.showToast("Updated Successfully");
-    setState(() {
-      isloading = false;
-      isbtnloading = false;
-    });
     await _invalidateHomeBibleMemoryCaches();
+    if (!mounted) return;
     Get.offAll(() => HomeScreen(
           From: "splash",
           selectedVerseNumForRead: "",
@@ -1143,10 +1149,13 @@ class BibleVersionsScreenState extends State<BibleVersionsScreen> {
                               .toString(),
                           from: "home");
 
-                      setState(() {
-                        _progress = 15;
-                      });
-                      await loadBookContent(foldername);
+                      final versesLoaded = await _loadVersesWithMovingProgress();
+                      if (!versesLoaded) {
+                        _stopBibleSwitch(
+                            'Could not update the Bible. Please try again.');
+                        setState(() {});
+                        return;
+                      }
 
                       setState(() {
                         _progress = 27;
@@ -1183,14 +1192,11 @@ class BibleVersionsScreenState extends State<BibleVersionsScreen> {
                       // await clearAllData();
 
                       setState(() {
-                        _progress = 97;
+                        _progress = 100;
                       });
-                      // close dialog
+                      await Future<void>.delayed(const Duration(milliseconds: 350));
+                      if (!mounted) return;
                       Constants.showToast("Updated Successfully");
-                      setState(() {
-                        isloading = false;
-                        isbtnloading = false;
-                      });
 
                       return Get.offAll(() => HomeScreen(
                             From: "splash",
@@ -1536,59 +1542,246 @@ class BibleVersionsScreenState extends State<BibleVersionsScreen> {
     }
   }
 
-  Future<void> loadBookContent(foldername) async {
+  /// Moves the bar while verses load so it does not stay on one percent.
+  Future<bool> _loadVersesWithMovingProgress() async {
+    _setSwitchProgress(16);
+    final ticker = Timer.periodic(const Duration(milliseconds: 400), (_) {
+      if (!mounted) return;
+      if (_progress >= 26) return;
+      _setSwitchProgress((_progress + 1).clamp(16.0, 26.0));
+    });
+    try {
+      return await loadBookContent(foldername);
+    } finally {
+      ticker.cancel();
+    }
+  }
+
+  void _setSwitchProgress(double value) {
+    if (!mounted) return;
+    setState(() {
+      _progress = value;
+    });
+  }
+
+  void _stopBibleSwitch(String message) {
+    if (mounted) {
+      setState(() {
+        isloading = false;
+        isbtnloading = false;
+        _progress = 0;
+      });
+    }
+    Constants.showToast(message);
+  }
+
+  /// Same verse file text as `readAsString`. The bar moves while the file is read
+  /// so the switch does not stay on 15%.
+  Future<String> _readVerseFileWithProgress(File verseFile) async {
+    final length = await verseFile.length();
+    final reader = await verseFile.open();
+    final bytes = BytesBuilder(copy: false);
+    var read = 0;
+    var lastShown = _progress.round();
+    try {
+      while (true) {
+        final chunk = await reader.read(256 * 1024);
+        if (chunk.isEmpty) break;
+        bytes.add(chunk);
+        read += chunk.length;
+        if (length <= 0) continue;
+        final value = 16 + (4 * (read / length).clamp(0.0, 1.0));
+        final shown = value.round();
+        if (shown != lastShown) {
+          lastShown = shown;
+          _setSwitchProgress(value);
+        }
+      }
+    } finally {
+      await reader.close();
+    }
+    _setSwitchProgress(20);
+    return utf8.decode(bytes.takeBytes());
+  }
+
+  Future<bool> loadBookContent(foldername) async {
+    _setSwitchProgress(16);
     final db = await DBHelper().db;
     if (db == null) {
       debugPrint("testapp: Database is null.");
-      return;
+      return false;
     }
 
     try {
-      // Step 1: Clear existing data
-      await db.delete('verse');
-      debugPrint("testapp: Verse table cleared.");
       final verseFile = await BibleExtractPaths.resolveVerseJsonFile(foldername);
       if (verseFile == null) {
         debugPrint("testapp: verse JSON not found in extracted folder.");
-        return;
+        return false;
       }
-      // Step 2: Read JSON from extracted file
-      final String response = await verseFile.readAsString();
 
-      // Step 3: Parse JSON in background isolate
+      _setSwitchProgress(16);
+      final String response = await _readVerseFileWithProgress(verseFile);
+
+      _setSwitchProgress(21);
       final tempList = await compute(_parseVerseContent, response);
+      if (tempList.isEmpty) {
+        debugPrint("testapp: verse JSON had no verses.");
+        return false;
+      }
+      _setSwitchProgress(22);
 
-      // Step 4: Store in memory
       versesContent = tempList;
 
-      // Step 5: Insert into DB using batch
-      await db.transaction((txn) async {
-        final batch = txn.batch();
-        for (final verse in tempList) {
-          batch.insert('verse', {
-            "book_num": verse.bookNum,
-            "chapter_num": verse.chapterNum,
-            "verse_num": verse.verseNum,
-            "content": verse.content,
-            "is_bookmarked": verse.isBookmarked,
-            "is_highlighted": verse.isHighlighted,
-            "is_noted": verse.isNoted,
-            "is_read": verse.isRead,
-            "is_underlined": verse.isUnderlined,
-          });
-        }
-        final isUpload = await batch.commit();
-        if (isUpload.isNotEmpty) {
-          debugPrint("testapp: Verse content inserted into DB.");
-        }
-      });
+      await db.delete('verse');
+      debugPrint("testapp: Verse table cleared.");
 
-      // Step 6: Save flag in SharedPreferences
+      const chunkSize = 400;
+      final total = tempList.length;
+      for (var start = 0; start < total; start += chunkSize) {
+        final end = start + chunkSize < total ? start + chunkSize : total;
+        await db.transaction((txn) async {
+          final batch = txn.batch();
+          for (var i = start; i < end; i++) {
+            final verse = tempList[i];
+            batch.insert('verse', {
+              "book_num": verse.bookNum,
+              "chapter_num": verse.chapterNum,
+              "verse_num": verse.verseNum,
+              "content": verse.content,
+              "is_bookmarked": verse.isBookmarked,
+              "is_highlighted": verse.isHighlighted,
+              "is_noted": verse.isNoted,
+              "is_read": verse.isRead,
+              "is_underlined": verse.isUnderlined,
+            });
+          }
+          await batch.commit(noResult: true);
+        });
+        _setSwitchProgress(22 + (4 * (end / total)));
+      }
+      debugPrint("testapp: Verse content inserted into DB.");
+
       await SharPreferences.setBoolean(SharPreferences.isLoadBookContent, true);
+      _setSwitchProgress(26);
       await LibraryVerseFlagsSync.reapplyToVerseTable();
+      await _refreshSavedDailyVerseText(tempList);
+      return true;
     } catch (e, st) {
       debugPrint("testapp: Error loading verse content → $e\n$st");
+      return false;
     }
+  }
+
+  /// Rewrites saved daily-verse paragraphs from the Bible just loaded.
+  /// Day, topic, book, chapter, and verse number stay as stored.
+  /// Today and earlier stay as saved. The newly selected Bible applies from tomorrow.
+  bool _dailyVerseDateIsAfterToday(Object? raw) {
+    final text = raw?.toString() ?? '';
+    if (text.isEmpty) return false;
+    try {
+      final day = DateTime.parse(text);
+      final now = DateTime.now();
+      final dayOnly = DateTime(day.year, day.month, day.day);
+      final today = DateTime(now.year, now.month, now.day);
+      return dayOnly.isAfter(today);
+    } catch (_) {
+      return false;
+    }
+  }
+
+  Future<void> _refreshSavedDailyVerseText(
+      List<VerseBookContentModel> verses) async {
+    final db = await DBHelper().db;
+    if (db == null) return;
+
+    final byKey = <String, String>{};
+    for (final verse in verses) {
+      final content = verse.content?.toString() ?? '';
+      if (content.isEmpty) continue;
+      byKey['${verse.bookNum?.toInt()}|${verse.chapterNum?.toInt()}|${verse.verseNum?.toInt()}'] =
+          content;
+    }
+
+    for (final table in ['dailyVersesnew', 'dailyVerses']) {
+      List<Map<String, Object?>> rows;
+      try {
+        rows = await db.query(table);
+      } catch (_) {
+        continue;
+      }
+      final batch = db.batch();
+      var queued = 0;
+      for (final row in rows) {
+        final bookId = int.tryParse('${row['Book_Id']}');
+        final chapter = int.tryParse('${row['Chapter']}');
+        final verseNum = int.tryParse('${row['Verse_Num']}');
+        final id = row['id'];
+        if (bookId == null ||
+            chapter == null ||
+            verseNum == null ||
+            id == null) {
+          continue;
+        }
+        if (!_dailyVerseDateIsAfterToday(row['Date'])) continue;
+        final content = byKey['${bookId - 1}|${chapter - 1}|${verseNum - 1}'];
+        if (content == null || content.isEmpty) continue;
+        if (content == row['Verse']?.toString()) continue;
+        batch.update(
+          table,
+          {'Verse': content},
+          where: 'id = ?',
+          whereArgs: [id],
+        );
+        queued++;
+      }
+      if (queued > 0) {
+        await batch.commit(noResult: true);
+      }
+    }
+
+    List<Map<String, Object?>> displayRows = const [];
+    try {
+      displayRows = await db.query('dailyVersesnew');
+    } catch (_) {}
+    if (displayRows.isEmpty) {
+      try {
+        displayRows = await db.query('dailyVerses');
+      } catch (_) {}
+    }
+
+    final shown = <DailyVerseList>[];
+    for (final row in displayRows) {
+      final verseText = row['Verse']?.toString() ?? '';
+      if (verseText.isEmpty) continue;
+      shown.add(DailyVerseList(
+        categoryName: row['Category_Name']?.toString(),
+        categoryId: int.tryParse('${row['Category_Id']}'),
+        book: row['Book']?.toString(),
+        bookId: int.tryParse('${row['Book_Id']}'),
+        chapter: int.tryParse('${row['Chapter']}'),
+        verse: verseText,
+        date: row['Date']?.toString(),
+        verseNum: int.tryParse('${row['Verse_Num']}'),
+      ));
+    }
+
+    final prefs = await SharedPreferences.getInstance();
+    if (shown.isNotEmpty) {
+      await prefs.setString(
+        'cachedDailyVerseList_v2',
+        jsonEncode(shown.map((e) => e.toJson()).toList()),
+      );
+      await prefs.setBool('dataIsChanged', false);
+    }
+    if (!mounted) return;
+    try {
+      final provider = Provider.of<DownloadProvider>(context, listen: false);
+      if (shown.isNotEmpty) {
+        provider.dailyVerseList = shown;
+      }
+      provider.isLoadingDailyVerse = false;
+      provider.notifyListeners();
+    } catch (_) {}
   }
 
   Future<void> loadBookList(foldername) async {
@@ -1779,28 +1972,20 @@ class DownloadButton extends StatelessWidget {
   Widget build(BuildContext context) {
     switch (state) {
       case DownloadButtonState.download:
-        return OutlinedButton(
-          style: OutlinedButton.styleFrom(
+        return ElevatedButton(
+          style: ElevatedButton.styleFrom(
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(8),
             ),
-            side: BorderSide(
-                color: Provider.of<ThemeProvider>(context, listen: false)
-                            .themeMode ==
-                        ThemeMode.dark
-                    ? CommanColor.white
-                    : Color(0xFF8B5E3C)),
-            foregroundColor:
-                Provider.of<ThemeProvider>(context, listen: false).themeMode ==
-                        ThemeMode.dark
-                    ? CommanColor.white
-                    : const Color(0xFF8B5E3C),
+            backgroundColor: const Color(0xFF8B5E3C),
+            foregroundColor: Colors.white,
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
           ),
           onPressed: onDownload,
           child: const Text(
             "Download",
             style: TextStyle(
+              color: Colors.white,
               fontSize: 12,
             ),
           ),

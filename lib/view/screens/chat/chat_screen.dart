@@ -124,6 +124,247 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   // UI labels that should not follow chat response language.
   String _tUi(String key) => ChatTranslations.get(key, _uiLang);
 
+  /// Existing chat language codes (same set used by Prayer/Chat AI prompts).
+  static const List<Map<String, String>> _chatLanguageOptions = [
+    {'code': 'EN', 'name': 'English'},
+    {'code': 'HI', 'name': 'Hindi'},
+    {'code': 'TN', 'name': 'Tamil'},
+    {'code': 'PT', 'name': 'Portuguese'},
+    {'code': 'SQ', 'name': 'Albanian'},
+    {'code': 'AM', 'name': 'Amharic'},
+    {'code': 'AR', 'name': 'Arabic'},
+    {'code': 'BN', 'name': 'Bengali'},
+    {'code': 'ZH', 'name': 'Chinese'},
+    {'code': 'FR', 'name': 'French'},
+    {'code': 'DE', 'name': 'German'},
+    {'code': 'EL', 'name': 'Greek'},
+    {'code': 'HE', 'name': 'Hebrew'},
+    {'code': 'IG', 'name': 'Igbo'},
+    {'code': 'ID', 'name': 'Indonesian'},
+    {'code': 'IT', 'name': 'Italian'},
+    {'code': 'JA', 'name': 'Japanese'},
+    {'code': 'KI', 'name': 'Kikuyu'},
+    {'code': 'RW', 'name': 'Kinyarwanda'},
+    {'code': 'KO', 'name': 'Korean'},
+    {'code': 'ML', 'name': 'Malayalam'},
+    {'code': 'MY', 'name': 'Burmese'},
+    {'code': 'NE', 'name': 'Nepali'},
+    {'code': 'ES', 'name': 'Spanish'},
+    {'code': 'PA', 'name': 'Punjabi'},
+    {'code': 'RO', 'name': 'Romanian'},
+    {'code': 'RU', 'name': 'Russian'},
+    {'code': 'SW', 'name': 'Swahili'},
+    {'code': 'SV', 'name': 'Swedish'},
+    {'code': 'TL', 'name': 'Tagalog'},
+    {'code': 'TE', 'name': 'Telugu'},
+    {'code': 'TW', 'name': 'Twi'},
+    {'code': 'UK', 'name': 'Ukrainian'},
+    {'code': 'UR', 'name': 'Urdu'},
+    {'code': 'VI', 'name': 'Vietnamese'},
+    {'code': 'YO', 'name': 'Yoruba'},
+    {'code': 'ZU', 'name': 'Zulu'},
+  ];
+
+  String get _selectedChatLanguageCode =>
+      AppApiConstant.chatLanguage.isNotEmpty
+          ? AppApiConstant.chatLanguage
+          : 'EN';
+
+  Future<void> _setChatLanguage(String code) async {
+    AppApiConstant.chatLanguage = code;
+    await SharPreferences.setString(SharPreferences.chatLanguage, code);
+    if (mounted) setState(() {});
+  }
+
+  /// Same language-name mapping as Prayer — prompt text only (no picker/API change).
+  String _chatAiLanguageInstruction() {
+    switch (AppApiConstant.chatLanguage) {
+      case 'HI':
+        return 'IMPORTANT: Respond in HINDI language. Use Hindi script (Devanagari) for your entire response.';
+      case 'TN':
+        return 'IMPORTANT: Respond in TAMIL language. Use Tamil script for your entire response.';
+      case 'PT':
+        return 'IMPORTANT: Respond in PORTUGUESE language. Use Portuguese for your entire response.';
+      case 'SQ':
+        return 'IMPORTANT: Respond in ALBANIAN language. Use Albanian for your entire response.';
+      case 'AM':
+        return 'IMPORTANT: Respond in AMHARIC language. Use Amharic script for your entire response.';
+      case 'AR':
+        return 'IMPORTANT: Respond in ARABIC language. Use Arabic script for your entire response.';
+      case 'BN':
+        return 'IMPORTANT: Respond in BENGALI language. Use Bengali script for your entire response.';
+      case 'ZH':
+        return 'IMPORTANT: Respond in CHINESE language. Use Chinese for your entire response.';
+      case 'FR':
+        return 'IMPORTANT: Respond in FRENCH language. Use French for your entire response.';
+      case 'DE':
+        return 'IMPORTANT: Respond in GERMAN language. Use German for your entire response.';
+      case 'EL':
+        return 'IMPORTANT: Respond in GREEK language. Use Greek for your entire response.';
+      case 'HE':
+        return 'IMPORTANT: Respond in HEBREW language. Use Hebrew script for your entire response.';
+      case 'IG':
+        return 'IMPORTANT: Respond in IGBO language. Use Igbo for your entire response.';
+      case 'ID':
+        return 'IMPORTANT: Respond in INDONESIAN language. Use Indonesian for your entire response.';
+      case 'IT':
+        return 'IMPORTANT: Respond in ITALIAN language. Use Italian for your entire response.';
+      case 'JA':
+        return 'IMPORTANT: Respond in JAPANESE language. Use Japanese for your entire response.';
+      case 'KI':
+        return 'IMPORTANT: Respond in KIKUYU language. Use Kikuyu for your entire response.';
+      case 'RW':
+        return 'IMPORTANT: Respond in KINYARWANDA language. Use Kinyarwanda for your entire response.';
+      case 'KO':
+        return 'IMPORTANT: Respond in KOREAN language. Use Korean for your entire response.';
+      case 'ML':
+        return 'IMPORTANT: Respond in MALAYALAM language. Use Malayalam script for your entire response.';
+      case 'MY':
+        return 'IMPORTANT: Respond in BURMESE language. Use Burmese script for your entire response.';
+      case 'NE':
+        return 'IMPORTANT: Respond in NEPALI language. Use Nepali (Devanagari) for your entire response.';
+      case 'ES':
+        return 'IMPORTANT: Respond in SPANISH language. Use Spanish for your entire response.';
+      case 'PA':
+      case 'PN':
+      case 'PAN':
+      case 'PUN':
+      case 'Punjabi':
+      case 'PUNJABI':
+        return 'IMPORTANT: Respond in PUNJABI language. Use Punjabi (Gurmukhi) for your entire response.';
+      case 'RO':
+      case 'RM':
+      case 'ROM':
+      case 'Roman':
+      case 'ROMAN':
+      case 'Romanian':
+      case 'ROMANIAN':
+        return 'IMPORTANT: Respond in ROMANIAN language. Use Romanian for your entire response.';
+      case 'RU':
+      case 'RUS':
+      case 'Russian':
+      case 'RUSSIAN':
+        return 'IMPORTANT: Respond in RUSSIAN language. Use Russian for your entire response.';
+      case 'SW':
+        return 'IMPORTANT: Respond in SWAHILI language. Use Swahili for your entire response.';
+      case 'SV':
+        return 'IMPORTANT: Respond in SWEDISH language. Use Swedish for your entire response.';
+      case 'TL':
+        return 'IMPORTANT: Respond in TAGALOG language. Use Tagalog for your entire response.';
+      case 'TE':
+        return 'IMPORTANT: Respond in TELUGU language. Use Telugu script for your entire response.';
+      case 'TW':
+        return 'IMPORTANT: Respond in TWI language. Use Twi for your entire response.';
+      case 'UK':
+        return 'IMPORTANT: Respond in UKRAINIAN language. Use Ukrainian for your entire response.';
+      case 'UR':
+        return 'IMPORTANT: Respond in URDU language. Use Urdu script for your entire response.';
+      case 'VI':
+        return 'IMPORTANT: Respond in VIETNAMESE language. Use Vietnamese for your entire response.';
+      case 'YO':
+        return 'IMPORTANT: Respond in YORUBA language. Use Yoruba for your entire response.';
+      case 'ZU':
+        return 'IMPORTANT: Respond in ZULU language. Use Zulu for your entire response.';
+      case 'EN':
+      default:
+        return 'IMPORTANT: Respond in ENGLISH language. Use English for your entire response.';
+    }
+  }
+
+  void _showChangeLanguageSheet() {
+    final themeProvider = Provider.of<ThemeProvider>(context, listen: false);
+    final isDark = themeProvider.themeMode == ThemeMode.dark;
+    final selected = AppApiConstant.chatLanguage;
+    final bg = isDark ? CommanColor.darkPrimaryColor : const Color(0xFFF6F1E9);
+    final ink = isDark ? Colors.white : const Color(0xFF8D6E63);
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (sheetContext) {
+        return SafeArea(
+          child: Container(
+            height: MediaQuery.of(sheetContext).size.height * 0.62,
+            margin: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: bg,
+              borderRadius: BorderRadius.circular(18),
+            ),
+            child: Column(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 14, 8, 8),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          ChatTranslations.get('select_language', _uiLang),
+                          style: TextStyle(
+                            color: ink,
+                            fontSize: 17,
+                            fontWeight: FontWeight.w700,
+                            decoration: TextDecoration.none,
+                          ),
+                        ),
+                      ),
+                      IconButton(
+                        onPressed: () => Navigator.pop(sheetContext),
+                        icon: Icon(Icons.close, color: ink),
+                      ),
+                    ],
+                  ),
+                ),
+                Expanded(
+                  child: ListView.builder(
+                    itemCount: _chatLanguageOptions.length,
+                    itemBuilder: (context, index) {
+                      final opt = _chatLanguageOptions[index];
+                      final code = opt['code']!;
+                      final name = opt['name']!;
+                      final isSelected = code == selected;
+                      return InkWell(
+                        onTap: () async {
+                          Navigator.pop(sheetContext);
+                          await _setChatLanguage(code);
+                        },
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 14,
+                          ),
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  name,
+                                  style: TextStyle(
+                                    color: ink,
+                                    fontSize: 15,
+                                    fontWeight: isSelected
+                                        ? FontWeight.w700
+                                        : FontWeight.w500,
+                                    decoration: TextDecoration.none,
+                                  ),
+                                ),
+                              ),
+                              if (isSelected)
+                                Icon(Icons.check_circle, color: ink, size: 22),
+                            ],
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   @override
   void initState() {
     super.initState();
@@ -1842,7 +2083,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
 12. Each new reply should add fresh detail, a different angle, or a deeper step—do not copy, closely paraphrase, or recycle your previous answer when the user asks a follow-up question.
 
 ${answerLengthInstruction}
-${AppApiConstant.chatLanguage != null ? '\nIMPORTANT: Always respond in ${AppApiConstant.chatLanguage == 'TN' ? 'Tamil' : AppApiConstant.chatLanguage} language. All your responses must be in ${AppApiConstant.chatLanguage == 'TN' ? 'Tamil' : AppApiConstant.chatLanguage}.' : ''}
+${'\n${_chatAiLanguageInstruction()}'}
 
 Remember: You are assisting users with the ${BibleInfo.bible_shortName}, so provide responses that honor the sacred nature of the text while being informative and helpful.
 ''';
@@ -2809,7 +3050,42 @@ Remember: You are assisting users with the ${BibleInfo.bible_shortName}, so prov
                                 ],
                               ),
                             ),
-                            const SizedBox(width: 8),
+                            const SizedBox(width: 4),
+                            // Change language (AI response language only).
+                            Tooltip(
+                              message: ChatTranslations.get(
+                                  'select_language', _uiLang),
+                              child: InkWell(
+                                borderRadius: BorderRadius.circular(18),
+                                onTap: _showChangeLanguageSheet,
+                                child: Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 6, vertical: 4),
+                                  child: Column(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(
+                                        Icons.translate_rounded,
+                                        size: screenWidth > 450 ? 22 : 20,
+                                        color: isDark
+                                            ? Colors.white
+                                            : const Color(0xFF8D6E63),
+                                      ),
+                                      Text(
+                                        _selectedChatLanguageCode,
+                                        style: TextStyle(
+                                          fontSize: 9,
+                                          fontWeight: FontWeight.w700,
+                                          color: isDark
+                                              ? Colors.white
+                                              : const Color(0xFF8D6E63),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ),
                             // IconButton(
                             //   icon: Image.asset(
                             //     "assets/message-time.png",

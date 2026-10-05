@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 import 'package:biblebookapp/constant/size_config.dart';
 import 'package:biblebookapp/controller/dashboard_controller.dart';
@@ -86,6 +87,78 @@ class _DailyVerseState extends State<DailyVerse> {
   OverlayEntry? _overlayEntry;
   late List<GlobalKey> itemKeys;
   final Map<int, String> _bookTitleByNum = {};
+  final Map<int, String> _englishTitleByNum = {};
+
+  /// Tamil book titles by `book_num` (0 = Genesis). Used when today's verse
+  /// text is Tamil and the open Bible is English.
+  static const Map<int, String> _tamilBookTitles = {
+    0: 'ஆதியாகமம்',
+    1: 'யாத்திராகமம்',
+    2: 'லேவியராகமம்',
+    3: 'எண்ணாகமம்',
+    4: 'உபாகமம்',
+    5: 'யோசுவா',
+    6: 'நியாயாதிபதிகள்',
+    7: 'ரூத்',
+    8: '1 சாமுவேல்',
+    9: '2 சாமுவேல்',
+    10: '1 இராஜாக்கள்',
+    11: '2 இராஜாக்கள்',
+    12: '1 நாளாகமம்',
+    13: '2 நாளாகமம்',
+    14: 'எஸ்றா',
+    15: 'நெகேமியா',
+    16: 'எஸ்தர்',
+    17: 'யோபு',
+    18: 'சங்கீதம்',
+    19: 'நீதிமொழிகள்',
+    20: 'பிரசங்கி',
+    21: 'உன்னதப்பாட்டு',
+    22: 'ஏசாயா',
+    23: 'எரேமியா',
+    24: 'புலம்பல்',
+    25: 'எசேக்கியேல்',
+    26: 'தானியேல்',
+    27: 'ஓசியா',
+    28: 'யோவேல்',
+    29: 'ஆமோஸ்',
+    30: 'ஒபதியா',
+    31: 'யோனா',
+    32: 'மீகா',
+    33: 'நாகூம்',
+    34: 'ஆபகூக்',
+    35: 'செப்பனியா',
+    36: 'ஆகாய்',
+    37: 'சகரியா',
+    38: 'மல்கியா',
+    39: 'மத்தேயு',
+    40: 'மாற்கு',
+    41: 'லூக்கா',
+    42: 'யோவான்',
+    43: 'அப்போஸ்தலர்',
+    44: 'ரோமர்',
+    45: '1 கொரி',
+    46: '2 கொரி',
+    47: 'கலாத்தியர்',
+    48: 'எபேசியர்',
+    49: 'பிலிப்பியர்',
+    50: 'கொலோசெயர்',
+    51: '1 தெசலோனிக்கேயர்',
+    52: '2 தெசலோனிக்கேயர்',
+    53: '1 தீமோத்தேயு',
+    54: '2 தீமோத்தேயு',
+    55: 'தீத்து',
+    56: 'பிலேமோன்',
+    57: 'எபிரேயர்',
+    58: 'யாக்கோபு',
+    59: '1 பேதுரு',
+    60: '2 பேதுரு',
+    61: '1 யோவான்',
+    62: '2 யோவான்',
+    63: '3 யோவான்',
+    64: 'யூதா',
+    65: 'வெளிப்படுத்தல்',
+  };
 
   // @override
   // void initState() {
@@ -142,34 +215,57 @@ class _DailyVerseState extends State<DailyVerse> {
     }
   }
 
-  /// Book name shown under the verse. Uses the open Bible's `book.title`
-  /// (Tamil title when that Bible is selected). Chapter and verse stay as stored.
+  /// Book name under the verse, in the same language as the verse text.
   String _bookLabel(DailyVerseList data) {
+    final stored = (data.book ?? '').trim();
     final bookId = int.tryParse('${data.bookId}') ?? 0;
     final bookNum = bookId > 0 ? bookId - 1 : bookId;
-    final fromTable = _bookTitleByNum[bookNum] ?? _bookTitleByNum[bookId];
-    if (fromTable != null && fromTable.isNotEmpty) return fromTable;
-    return (data.book ?? '').trim();
+    final tamil = _titleForBook(_tamilBookTitles, bookNum, bookId);
+    final english = _titleForBook(_englishTitleByNum, bookNum, bookId);
+    final fromTable = _titleForBook(_bookTitleByNum, bookNum, bookId);
+    if (_hasTamil(data.verse ?? '')) {
+      if (tamil.isNotEmpty) return tamil;
+      if (_hasTamil(fromTable)) return fromTable;
+      if (_hasTamil(stored)) return stored;
+    } else {
+      if (english.isNotEmpty) return english;
+      if (fromTable.isNotEmpty && !_hasTamil(fromTable)) return fromTable;
+      if (stored.isNotEmpty && !_hasTamil(stored)) return stored;
+    }
+    if (fromTable.isNotEmpty) return fromTable;
+    return stored;
   }
+
+  String _titleForBook(Map<int, String> titles, int bookNum, int bookId) {
+    return (titles[bookNum] ?? titles[bookId] ?? '').trim();
+  }
+
+  bool _hasTamil(String text) => RegExp(r'[\u0B80-\u0BFF]').hasMatch(text);
 
   Future<void> _loadBookTitles() async {
     try {
       final db = await DBHelper().db;
-      if (db == null) return;
-      final rows = await db.rawQuery('SELECT book_num, title FROM book');
-      final map = <int, String>{};
-      for (final row in rows) {
-        final bookNum = int.tryParse('${row['book_num']}');
-        final title = row['title']?.toString().trim() ?? '';
-        if (bookNum == null || title.isEmpty) continue;
-        map[bookNum] = title;
+      if (db != null) {
+        final rows = await db.rawQuery('SELECT book_num, title FROM book');
+        final map = <int, String>{};
+        for (final row in rows) {
+          final bookNum = int.tryParse('${row['book_num']}');
+          final title = row['title']?.toString().trim() ?? '';
+          if (bookNum == null || title.isEmpty) continue;
+          map[bookNum] = title;
+        }
+        if (!mounted) return;
+        setState(() {
+          _bookTitleByNum
+            ..clear()
+            ..addAll(map);
+          if (!map.values.any(_hasTamil)) {
+            _englishTitleByNum
+              ..clear()
+              ..addAll(map);
+          }
+        });
       }
-      if (!mounted) return;
-      setState(() {
-        _bookTitleByNum
-          ..clear()
-          ..addAll(map);
-      });
     } catch (_) {}
   }
 
@@ -193,11 +289,7 @@ class _DailyVerseState extends State<DailyVerse> {
     }
 
     Future.microtask(() async {
-      final loaded = await provider.tryHydrateDailyVersesFromLocalCache();
-      if (!mounted || !loaded) return;
-      _applyDailyVersesFromAll(provider.dailyVerseList);
-      provider.isLoadingDailyVerse = false;
-      setState(() {});
+      await _showSavedVersesIfWaiting();
     });
   }
 
@@ -263,13 +355,36 @@ class _DailyVerseState extends State<DailyVerse> {
     });
   }
 
+  /// Shows the last saved verses so the screen does not stay on "loading..."
+  /// while a refresh is still reading the database.
+  Future<void> _showSavedVersesIfWaiting() async {
+    if (dailyVerseList.isNotEmpty) return;
+    final prefs = await SharedPreferences.getInstance();
+    final cachedJson = prefs.getString('cachedDailyVerseList_v2');
+    if (cachedJson == null || cachedJson.isEmpty) return;
+    try {
+      final decoded = jsonDecode(cachedJson);
+      if (decoded is! List || decoded.isEmpty) return;
+      final all = decoded
+          .whereType<Map>()
+          .map((e) => DailyVerseList.fromJson(Map<String, dynamic>.from(e)))
+          .toList();
+      if (all.isEmpty) return;
+      _applyDailyVersesFromAll(all);
+      if (!mounted) return;
+      Provider.of<DownloadProvider>(context, listen: false)
+          .isLoadingDailyVerse = false;
+      setState(() {});
+    } catch (_) {}
+  }
+
   void loaddata() async {
     final provider = Provider.of<DownloadProvider>(context, listen: false);
     final hadVisibleContent = dailyVerseList.isNotEmpty;
 
     if (!hadVisibleContent) {
-      await provider.tryHydrateDailyVersesFromLocalCache();
-      if (provider.dailyVerseList.isNotEmpty) {
+      await _showSavedVersesIfWaiting();
+      if (dailyVerseList.isEmpty && provider.dailyVerseList.isNotEmpty) {
         _applyDailyVersesFromAll(provider.dailyVerseList);
         provider.isLoadingDailyVerse = false;
         if (mounted) setState(() {});
@@ -281,26 +396,30 @@ class _DailyVerseState extends State<DailyVerse> {
       return;
     }
 
-    await provider.loadDailyVerses();
+    try {
+      await provider.loadDailyVerses();
 
-    var allVerses = provider.dailyVerseList;
-    if (allVerses.isEmpty) {
-      final prefs = await SharedPreferences.getInstance();
-      final cats = prefs.getStringList('selected_categories') ?? [];
-      if (cats.isNotEmpty) {
-        await prefs.setBool('dataIsChanged', true);
-        await provider.loadDailyVerses();
-        allVerses = provider.dailyVerseList;
-      }
+      var allVerses = provider.dailyVerseList;
       if (allVerses.isEmpty) {
-        await prefs.setBool('dataIsChanged', true);
-        await provider.loadDailyVerses();
-        allVerses = provider.dailyVerseList;
+        final prefs = await SharedPreferences.getInstance();
+        final cats = prefs.getStringList('selected_categories') ?? [];
+        if (cats.isNotEmpty) {
+          await prefs.setBool('dataIsChanged', true);
+          await provider.loadDailyVerses();
+          allVerses = provider.dailyVerseList;
+        }
+        if (allVerses.isEmpty) {
+          await prefs.setBool('dataIsChanged', true);
+          await provider.loadDailyVerses();
+          allVerses = provider.dailyVerseList;
+        }
       }
-    }
 
-    _applyDailyVersesFromAll(allVerses);
-    await _applyWidgetVerseOrderingIfNeeded();
+      _applyDailyVersesFromAll(allVerses);
+      await _applyWidgetVerseOrderingIfNeeded();
+    } catch (_) {
+      provider.isLoadingDailyVerse = false;
+    }
 
     if (mounted) setState(() {});
   }

@@ -96,7 +96,7 @@ class _MultiSelectPaywallState extends State<MultiSelectPaywall> {
   bool _loading = true;
 
   String get _resolvedSixMonth => BibleInfo.isAutoRenewablePaywallMode
-      ? BibleInfo.arOneMonthPlanid
+      ? BibleInfo.arSixMonthPlanid
       : AppApiConstant.resolveSubscriptionProductId(
         widget.sixMonthPlan,
         BibleInfo.sixMonthPlanid,

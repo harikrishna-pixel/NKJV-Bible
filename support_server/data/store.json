@@ -1,0 +1,83 @@
+{
+  "questions": [
+    {
+      "_id": "1a10aa0e9e9ff2ec5f9",
+      "userId": "guest-1791179384203",
+      "appName": "NLT Bible",
+      "bundleId": "com.balaklrapps.newlivingtranslation",
+      "question": "i have sum donuts",
+      "answer": "",
+      "imageUrl": "",
+      "status": "open",
+      "answeredBy": "human",
+      "ticketId": "1a10aa0e9e9527e8f53"
+    },
+    {
+      "_id": "1a10aa1b32a4d8d3bc1",
+      "userId": "guest-1791179384203",
+      "appName": "NLT Bible",
+      "bundleId": "com.balaklrapps.newlivingtranslation",
+      "question": "tell the feature in prayer wall",
+      "answer": "",
+      "imageUrl": "",
+      "status": "open",
+      "answeredBy": "human",
+      "ticketId": "1a10aa1b32a7a8a2cca"
+    },
+    {
+      "_id": "1a10aa28cff4fd05cf1",
+      "userId": "guest-1791179384203",
+      "appName": "NLT Bible",
+      "bundleId": "com.balaklrapps.newlivingtranslation",
+      "question": "what is nlt bible",
+      "answer": "",
+      "imageUrl": "",
+      "status": "open",
+      "answeredBy": "human",
+      "ticketId": "1a10aa28d00e18c87a9"
+    }
+  ],
+  "tickets": [
+    {
+      "_id": "1a10aa0e9e9527e8f53",
+      "userId": "guest-1791179384203",
+      "appName": "NLT Bible",
+      "bundleId": "com.balaklrapps.newlivingtranslation",
+      "userQuestionId": "1a10aa0e9e9ff2ec5f9",
+      "question": "i have sum donuts",
+      "answer": "",
+      "imageUrl": "",
+      "status": "open",
+      "answeredBy": "human",
+      "aiAnswer": ""
+    },
+    {
+      "_id": "1a10aa1b32a7a8a2cca",
+      "userId": "guest-1791179384203",
+      "appName": "NLT Bible",
+      "bundleId": "com.balaklrapps.newlivingtranslation",
+      "userQuestionId": "1a10aa1b32a4d8d3bc1",
+      "question": "tell the feature in prayer wall",
+      "answer": "",
+      "imageUrl": "",
+      "status": "open",
+      "answeredBy": "human",
+      "aiAnswer": ""
+    },
+    {
+      "_id": "1a10aa28d00e18c87a9",
+      "userId": "guest-1791179384203",
+      "appName": "NLT Bible",
+      "bundleId": "com.balaklrapps.newlivingtranslation",
+      "userQuestionId": "1a10aa28cff4fd05cf1",
+      "question": "what is nlt bible",
+      "answer": "",
+      "imageUrl": "",
+      "status": "open",
+      "answeredBy": "human",
+      "aiAnswer": ""
+    }
+  ],
+  "knowledges": [],
+  "applications": []
+}

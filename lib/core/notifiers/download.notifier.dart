@@ -511,6 +511,16 @@ class DownloadProvider with ChangeNotifier {
   DateTime _dailyVerseDateOnly(DateTime value) =>
       DateTime(value.year, value.month, value.day);
 
+  bool _dailyVerseDayIsAfterToday(String? raw) {
+    if (raw == null || raw.isEmpty) return false;
+    try {
+      final day = _dailyVerseDateOnly(DateTime.parse(raw));
+      return day.isAfter(_dailyVerseDateOnly(DateTime.now()));
+    } catch (_) {
+      return false;
+    }
+  }
+
   bool _categoriesMissingFromPastSchedule(
     List<Map<String, dynamic>> rows,
     List<String> categories,
@@ -529,8 +539,7 @@ class DownloadProvider with ChangeNotifier {
     return categories.any((c) => !represented.contains(c));
   }
 
-  /// Rebuilds today-and-future rows so every selected topic (including newly added)
-  /// shares the same round-robin rotation from today onward.
+  /// Rebuilds future rows. Today stays as saved. The new Bible starts tomorrow.
   Future<void> _rebalanceFutureDailyVerseSchedule({
     required dynamic dbClient,
     required List<Map<String, dynamic>> filteredData,
@@ -540,12 +549,14 @@ class DownloadProvider with ChangeNotifier {
     final today = _dailyVerseDateOnly(DateTime.now());
     final idsToDelete = <int>[];
     final pastKeys = <String>{};
+    var hasToday = false;
 
     for (final row in survivingRows) {
       try {
         final day = _dailyVerseDateOnly(DateTime.parse(row['Date'].toString()));
-        if (day.isBefore(today)) {
+        if (!day.isAfter(today)) {
           pastKeys.add(_dailyVerseScheduleKeyFromInserted(row));
+          if (!day.isBefore(today)) hasToday = true;
         } else {
           final id = row['id'];
           if (id is int) idsToDelete.add(id);
@@ -570,7 +581,7 @@ class DownloadProvider with ChangeNotifier {
     await _insertDailyVersesFromMainList(
       dbClient: dbClient,
       data: toSchedule,
-      startDate: today,
+      startDate: hasToday ? today.add(const Duration(days: 1)) : today,
     );
   }
 
@@ -964,6 +975,10 @@ class DownloadProvider with ChangeNotifier {
     var changed = false;
     final updated = <DailyVerseList>[];
     for (final verse in dailyVerseList) {
+      if (!_dailyVerseDayIsAfterToday(verse.date)) {
+        updated.add(verse);
+        continue;
+      }
       final bookIdStored = (verse.bookId ?? 0).toInt();
       final bookNum = bookIdStored > 0 ? bookIdStored - 1 : bookIdStored;
       final localized =
@@ -1018,6 +1033,7 @@ class DownloadProvider with ChangeNotifier {
     isLoadingDailyVerse = true;
     notifyListeners();
 
+    try {
     if (!dataIsChanged && cachedJson != null) {
       final selectedForCache =
           prefs.getStringList('selected_categories') ?? [];
@@ -1121,12 +1137,15 @@ class DownloadProvider with ChangeNotifier {
       final bookIdStored = int.parse(verse['Book_Id'].toString());
       final bookNum = bookIdStored > 0 ? bookIdStored - 1 : bookIdStored;
       final storedBook = verse['Book']?.toString().trim() ?? '';
-      // Prefer selected Bible language title so reference matches verse text
-      // (e.g. Portuguese content → Filipenses, not English Philippians).
-      final bookName =
-          _resolveDailyVerseBookTitle(bookTitleByNum, bookNum) ??
-              _resolveDailyVerseBookTitle(bookTitleByNum, bookIdStored) ??
-              (storedBook.isNotEmpty ? storedBook : 'Unknown');
+      // Today and earlier keep the saved reference. Later days use the
+      // selected Bible title so it matches the verse text.
+      final localized = _dailyVerseDayIsAfterToday(verse['Date']?.toString())
+          ? (_resolveDailyVerseBookTitle(bookTitleByNum, bookNum) ??
+              _resolveDailyVerseBookTitle(bookTitleByNum, bookIdStored))
+          : null;
+      final bookName = (localized != null && localized.isNotEmpty)
+          ? localized
+          : (storedBook.isNotEmpty ? storedBook : 'Unknown');
 
       enrichedList.add(DailyVerseList(
         categoryName: verse['Category_Name'],
@@ -1155,6 +1174,14 @@ class DownloadProvider with ChangeNotifier {
 
     isLoadingDailyVerse = false;
     notifyListeners();
+    } catch (e, st) {
+      debugPrint('loadDailyVerses error: $e\n$st');
+    } finally {
+      if (isLoadingDailyVerse) {
+        isLoadingDailyVerse = false;
+        notifyListeners();
+      }
+    }
 
     // iOS Home Screen Widget: update Verse of the day (same format as Daily Verse screen)
     if (dailyVerseList.isNotEmpty) {
