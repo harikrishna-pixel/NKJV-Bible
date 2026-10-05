@@ -717,7 +717,11 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
     if (totalSec <= 0) return 'Soon';
     final mins = (totalSec / 60).ceil();
     if (mins <= 1) return 'STARTS IN 1 MIN';
-    return 'STARTS IN $mins MIN';
+    final hours = mins ~/ 60;
+    final rem = mins % 60;
+    if (hours <= 0) return 'STARTS IN $mins MIN';
+    if (rem == 0) return 'STARTS IN $hours HR';
+    return 'STARTS IN $hours HR $rem MIN';
   }
 
   /// Waiting slots after current, wrapping when `loops` (excludes next/hotspot).

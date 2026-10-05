@@ -111,7 +111,6 @@ class PrayerShareScreen extends StatelessWidget {
             ? const Color(0xFFF5F0E6)
             : themeProvider.backgroundColor);
 
-    final cardBg = isDark ? Colors.white.withValues(alpha: 0.07) : Colors.white;
     final tileBg = isDark ? Colors.white.withValues(alpha: 0.06) : Colors.white;
 
     return Scaffold(
@@ -144,100 +143,11 @@ class PrayerShareScreen extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Flexible(
-                child: Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: cardBg,
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: brown.withValues(alpha: 0.22)),
-                  ),
-                  child: SingleChildScrollView(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          title.trim().isEmpty
-                              ? 'Prayer Request'
-                              : title.trim(),
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w800,
-                            color: isDark ? Colors.white : brown,
-                            fontFamily: 'Georgia',
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        Builder(
-                          builder: (_) {
-                            final myWords =
-                                PrayerDualDescription.myWords(description);
-                            final ai =
-                                PrayerDualDescription.aiPrayer(description);
-                            if (myWords != null && ai != null) {
-                              return Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    'My Words',
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.w700,
-                                      fontSize: 12,
-                                      color: isDark ? Colors.white70 : brown,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    myWords,
-                                    style: TextStyle(
-                                      fontSize: 13,
-                                      fontStyle: FontStyle.italic,
-                                      height: 1.35,
-                                      color: isDark
-                                          ? Colors.white70
-                                          : Colors.grey.shade800,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 10),
-                                  Text(
-                                    'Prayer Created for You',
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.w700,
-                                      fontSize: 12,
-                                      color: isDark ? Colors.white70 : brown,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    ai,
-                                    style: TextStyle(
-                                      fontSize: 12.5,
-                                      height: 1.35,
-                                      color: isDark
-                                          ? Colors.white70
-                                          : Colors.grey.shade800,
-                                    ),
-                                  ),
-                                ],
-                              );
-                            }
-                            return Text(
-                              description.trim().isEmpty
-                                  ? '-'
-                                  : description.trim(),
-                              style: TextStyle(
-                                fontSize: 13,
-                                height: 1.35,
-                                color: isDark
-                                    ? Colors.white70
-                                    : Colors.grey.shade800,
-                              ),
-                            );
-                          },
-                        ),
-                      ],
-                    ),
+              Expanded(
+                child: SingleChildScrollView(
+                  child: _prayerDetailBody(
+                    isDark: isDark,
+                    brown: brown,
                   ),
                 ),
               ),
@@ -278,6 +188,153 @@ class PrayerShareScreen extends StatelessWidget {
       ),
         )
       )
+    );
+  }
+
+  Widget _prayerDetailBody({
+    required bool isDark,
+    required Color brown,
+  }) {
+    final myWords = PrayerDualDescription.myWords(description)?.trim();
+    final ai = PrayerDualDescription.aiPrayer(description)?.trim();
+    final plain = description.trim();
+    final onBg = isDark ? const Color(0xFFF5EFE4) : const Color(0xFF3D2914);
+    final onBgBrown = isDark ? const Color(0xFFE8D4B8) : brown;
+    final onBgMuted = isDark ? const Color(0xFFD8C8B4) : const Color(0xFF8A7568);
+    final hasMyWords = myWords != null && myWords.isNotEmpty;
+    final hasAi = ai != null && ai.isNotEmpty;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          title.trim().isEmpty ? 'Prayer Request' : title.trim(),
+          style: TextStyle(
+            fontFamily: 'Georgia',
+            fontSize: 20,
+            fontWeight: FontWeight.w700,
+            height: 1.25,
+            color: onBg,
+          ),
+        ),
+        const SizedBox(height: 16),
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.fromLTRB(20, 18, 20, 20),
+          decoration: BoxDecoration(
+            color: isDark
+                ? const Color(0xFF2C2118)
+                : Colors.white.withValues(alpha: 0.72),
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (hasMyWords) ...[
+                Row(
+                  children: [
+                    Icon(
+                      Icons.description_outlined,
+                      size: 16,
+                      color: onBgMuted,
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      'Original Request',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                        color: onBg,
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      '(Your words)',
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: onBgMuted,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 14),
+                Text(
+                  '"$myWords"',
+                  style: TextStyle(
+                    fontSize: 16,
+                    height: 1.55,
+                    fontStyle: FontStyle.italic,
+                    color: onBg,
+                  ),
+                ),
+              ],
+              if (hasMyWords && (hasAi || plain.isNotEmpty)) ...[
+                const SizedBox(height: 20),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Divider(
+                        color: onBgBrown.withValues(alpha: 0.35),
+                        thickness: 1,
+                      ),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 10),
+                      child: Icon(
+                        Icons.menu_book_outlined,
+                        size: 18,
+                        color: onBgBrown,
+                      ),
+                    ),
+                    Expanded(
+                      child: Divider(
+                        color: onBgBrown.withValues(alpha: 0.35),
+                        thickness: 1,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 18),
+              ],
+              if (hasAi || (!hasMyWords && plain.isNotEmpty)) ...[
+                Row(
+                  children: [
+                    Text(
+                      'Prayer',
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                        color: onBg,
+                      ),
+                    ),
+                    if (hasAi) ...[
+                      const SizedBox(width: 6),
+                      Text(
+                        '(Enhanced with AI)',
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: onBgMuted,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  hasAi ? ai : plain,
+                  style: TextStyle(
+                    fontSize: 15,
+                    height: 1.65,
+                    color: isDark
+                        ? const Color(0xFFD5CBE0)
+                        : const Color(0xFF5C5670),
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ],
     );
   }
 
