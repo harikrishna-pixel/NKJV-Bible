@@ -244,6 +244,64 @@ class NotificationsServices {
     );
   }
 
+  /// One local notification on the last day of the 3-day trial. Not repeating.
+  static const int trialEndReminderId = 7401;
+
+  Future<void> scheduleTrialEndReminder({
+    required DateTime when,
+    required String title,
+    required String body,
+  }) async {
+    await ensureInitialized();
+    if (!await isNotificationPermissionGranted()) {
+      final granted = await requestNotificationPermissions();
+      if (!granted) return;
+    }
+    await _plugin.cancel(trialEndReminderId);
+    if (!when.isAfter(DateTime.now())) return;
+
+    await _ensureExactAlarmIfNeeded();
+    tz.initializeTimeZones();
+    final utc = when.toUtc();
+    final scheduled = tz.TZDateTime.utc(
+      utc.year,
+      utc.month,
+      utc.day,
+      utc.hour,
+      utc.minute,
+    );
+    log('Trial end reminder once at $scheduled');
+
+    await _plugin.zonedSchedule(
+      trialEndReminderId,
+      title,
+      body,
+      scheduled,
+      const NotificationDetails(
+        android: AndroidNotificationDetails(
+          'trial_end_reminder_channel',
+          'Trial reminder',
+          channelDescription: 'One reminder on the last day of the free trial',
+          importance: Importance.max,
+          priority: Priority.max,
+          icon: '@mipmap/ic_launcher',
+        ),
+        iOS: DarwinNotificationDetails(
+          presentAlert: true,
+          presentSound: true,
+        ),
+      ),
+      uiLocalNotificationDateInterpretation:
+          UILocalNotificationDateInterpretation.absoluteTime,
+      androidScheduleMode: AndroidScheduleMode.alarmClock,
+    );
+  }
+
+  Future<void> cancelTrialEndReminder() async {
+    await ensureInitialized();
+    await _plugin.cancel(trialEndReminderId);
+  }
+
   void stopNotification(int id) async {
     await _plugin.cancel(id);
   }

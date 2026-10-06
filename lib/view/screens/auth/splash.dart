@@ -41,6 +41,8 @@ import 'package:biblebookapp/view/constants/colors.dart';
 import 'package:biblebookapp/view/constants/theme_provider.dart';
 import 'package:biblebookapp/view/screens/calendar_screen/model/calendar_model.dart';
 import 'package:biblebookapp/view/screens/dashboard/constants.dart';
+import 'package:biblebookapp/view/screens/intro_subcribtion_screen.dart';
+import 'package:biblebookapp/view/screens/paywall_navigation.dart';
 import 'package:biblebookapp/view/widget/notification_service.dart';
 
 import '../../../Model/dailyVersesMainListModel.dart';
@@ -174,21 +176,7 @@ class _SplashScreenState extends State<SplashScreen>
   /// cannot show it either.
   /// Returns true only if the open ad was actually shown.
   Future<bool> _runSplashOpenAdIfNeeded() async {
-    final prefs = await SharedPreferences.getInstance();
-    final onboardingDone =
-        await SharPreferences.getBoolean(SharPreferences.onboarding);
-    if (onboardingDone != true) return false;
-
-    // Ads off only for an active premium purchase.
-    if (!await _shouldShowSplashOpenAd()) {
-      await prefs.setString("showopenad", "false");
-      return false;
-    }
-
-    await SharPreferences.setString('test', 'test');
-    final shown = await loadOpenAd();
-    await prefs.setString("showopenad", "false");
-    return shown;
+    return false;
   }
 
   void _finishSplashOpenAdPreload(bool loaded) {
@@ -437,7 +425,6 @@ class _SplashScreenState extends State<SplashScreen>
 
   Future<void> _initialize() async {
     WidgetsBinding.instance.addPostFrameCallback((_) async {
-      unawaited(_preloadSplashOpenAd());
       final password = dotenv.env[AssetsConstants.dbPasswordKey]!;
       try {
         // Only do essential initialization that's required before navigation
@@ -859,6 +846,27 @@ class _SplashScreenState extends State<SplashScreen>
       unawaited(provider.warmDataBeforeHomeScreen());
     } catch (e) {
       debugPrint('warmDataBeforeHomeScreen error: $e');
+    }
+    if (!mounted) return;
+    final hasSubscription = !await _shouldShowSplashOpenAd();
+    if (!hasSubscription &&
+        await SubscriptionScreen.isDashboardIapEnabled()) {
+      final sixMonthPlan = await SharPreferences.getString('sixMonthPlan') ??
+          BibleInfo.sixMonthPlanid;
+      final oneYearPlan = await SharPreferences.getString('oneYearPlan') ??
+          BibleInfo.oneYearPlanid;
+      final lifeTimePlan = await SharPreferences.getString('lifeTimePlan') ??
+          BibleInfo.lifeTimePlanid;
+      if (!mounted) return;
+      Get.offAll(
+        () => PaywallNavigation.buildVisiblePaywall(
+          sixMonthPlan: sixMonthPlan,
+          oneYearPlan: oneYearPlan,
+          lifeTimePlan: lifeTimePlan,
+          checkad: 'splash',
+        ),
+      );
+      return;
     }
     if (!mounted) return;
     await StreakFlowNavigation.navigateToStreakFlowOrHome(context);

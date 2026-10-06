@@ -1,6 +1,6 @@
 import 'package:biblebookapp/view/screens/dashboard/constants.dart';
 import 'package:biblebookapp/view/screens/intro_subcribtion_screen.dart';
-import 'package:biblebookapp/view/screens/multi_select_paywall.dart';
+import 'package:biblebookapp/view/screens/yearly_trial_paywall.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
@@ -31,20 +31,11 @@ class PaywallNavigation {
   }) {
     final six = _sixMonthIdForVisiblePaywall(sixMonthPlan);
     final year = _oneYearIdForVisiblePaywall(oneYearPlan);
-    if (_useMultiPaywall) {
-      return MultiSelectPaywall(
-        sixMonthPlan: six,
-        oneYearPlan: year,
-        lifeTimePlan: lifeTimePlan,
-        checkad: checkad,
-      );
-    }
-    return SubscriptionScreen(
+    return YearlyTrialPaywall(
       sixMonthPlan: six,
       oneYearPlan: year,
       lifeTimePlan: lifeTimePlan,
       checkad: checkad,
-      fromHomeExitOffer: fromHomeExitOffer,
     );
   }
 
