@@ -10,11 +10,12 @@ import 'package:http_parser/http_parser.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-/// Support chat calls. No auth header.
+/// Support chat calls.
 class ChatSupportApi {
   ChatSupportApi._();
 
-  static const String baseUrl = 'https://api.biblehi.com';
+  static const String baseUrl = 'https://appsupport.marberx.com';
+  static const String _authorization = 'marberx@123tech';
   static const String _deviceUserKey = 'support_chat_user_id';
 
   /// Same id every time: the login id, or one stored on the device.
@@ -36,7 +37,10 @@ class ChatSupportApi {
   }
 
   static Map<String, String> _jsonHeaders() {
-    return const {'Content-Type': 'application/json'};
+    return const {
+      'Content-Type': 'application/json',
+      'Authorization': _authorization,
+    };
   }
 
   static Future<T> _guard<T>(Future<T> Function() action) async {
@@ -62,7 +66,7 @@ class ChatSupportApi {
         queryParameters: {'userId': userId},
       );
       final response = await http
-          .get(uri)
+          .get(uri, headers: const {'Authorization': _authorization})
           .timeout(const Duration(seconds: 20));
       final body = _asMap(response.body);
       if (response.statusCode != 200) {
@@ -89,6 +93,7 @@ class ChatSupportApi {
         'PUT',
         Uri.parse('$baseUrl/api/upload'),
       );
+      request.headers['Authorization'] = _authorization;
       request.files.add(await http.MultipartFile.fromPath(
         'image',
         path,
