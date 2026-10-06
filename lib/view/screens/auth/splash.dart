@@ -918,42 +918,9 @@ class _SplashScreenState extends State<SplashScreen>
       // Get the application documents directory
       final directory = await getApplicationDocumentsDirectory();
 
-      // Safety for upgrade users: only delete legacy DBs when current DB has
-      // both core data (verse/book) AND library data (bookmark/highlight), so we
-      // never delete the only copy of My Library data.
-      bool canDeleteLegacyDbs = false;
-      try {
-        final db = await DBHelper().db;
-        if (db != null) {
-          final verseCountRows =
-          await db.rawQuery("SELECT COUNT(*) as c FROM verse");
-          final bookCountRows =
-          await db.rawQuery("SELECT COUNT(*) as c FROM book");
-          final bookmarkCountRows =
-          await db.rawQuery("SELECT COUNT(*) as c FROM bookmark");
-          final highlightCountRows =
-          await db.rawQuery("SELECT COUNT(*) as c FROM highlight");
-          final verseCount =
-              (verseCountRows.isNotEmpty ? (verseCountRows.first["c"] as int?) : 0) ?? 0;
-          final bookCount =
-              (bookCountRows.isNotEmpty ? (bookCountRows.first["c"] as int?) : 0) ?? 0;
-          final bookmarkCount =
-              (bookmarkCountRows.isNotEmpty ? (bookmarkCountRows.first["c"] as int?) : 0) ?? 0;
-          final highlightCount =
-              (highlightCountRows.isNotEmpty ? (highlightCountRows.first["c"] as int?) : 0) ?? 0;
-          final hasLibraryData = bookmarkCount > 0 || highlightCount > 0;
-          canDeleteLegacyDbs = verseCount > 0 && bookCount > 0 && hasLibraryData;
-          print(
-              'SPLASH deleteFiles check verseCount=$verseCount bookCount=$bookCount bookmarkCount=$bookmarkCount highlightCount=$highlightCount hasLibraryData=$hasLibraryData canDeleteLegacyDbs=$canDeleteLegacyDbs');
-          if (verseCount > 0 && bookCount > 0 && !hasLibraryData) {
-            print(
-                'testapp Keeping legacy DBs (current DB has no library data yet).');
-          }
-        }
-      } catch (e) {
-        print('SPLASH deleteFiles error verifying encrypted DB data: $e');
-        canDeleteLegacyDbs = false;
-      }
+      // Legacy DBs (bible.db / bible2.db) are retired by
+      // DBMigrationHelper.copyUserDataFromLegacyIfNeeded once every library
+      // row is verified in bible_enc.db; never delete them here.
 
       // Define file paths
       final file1 = File('${directory.path}/book.json');
@@ -975,33 +942,6 @@ class _SplashScreenState extends State<SplashScreen>
         debugPrint('file2.txt does not exist');
       }
 
-      try {
-        if (!canDeleteLegacyDbs) {
-          print(
-              'testapp Skipping legacy DB deletion (target DB missing core data).');
-          return;
-        }
-
-        final dir = await getApplicationDocumentsDirectory();
-        final oldDbFile = File(p.join(dir.path, 'bible.db'));
-        if (await oldDbFile.exists()) {
-          await oldDbFile.delete();
-          debugPrint('Deleted old unencrypted DB: bible.db');
-        }
-
-        final dotDbFile = File(p.join(dir.path, '.bible.db'));
-        if (await dotDbFile.exists()) {
-          await dotDbFile.delete();
-          debugPrint('Deleted old encrypted DB: .bible.db');
-        }
-        final dotDbFile2 = File(p.join(dir.path, 'bible2.db'));
-        if (await dotDbFile2.exists()) {
-          await dotDbFile2.delete();
-          debugPrint('Deleted old encrypted DB: bible2.db');
-        }
-      } catch (e) {
-        debugPrint('Error deleting old DB files: $e');
-      }
     } catch (e) {
       debugPrint('Error deleting files: $e');
     }

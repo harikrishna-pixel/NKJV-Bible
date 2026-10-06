@@ -53,9 +53,11 @@ class OverallDbModel {
       await DBHelper().insertBookmark(e);
       await DBHelper().updateVersesDataByContent(
           e.content.toString(), 'is_bookmarked', 'yes');
-//! plaincontent is versse id
-      await DBHelper().updateVersesData(
-          int.parse(e.plaincontent.toString()), 'is_bookmarked', 'yes');
+//! plaincontent is versse id (absent in v40 backups)
+      final verseId = int.tryParse(e.plaincontent?.toString() ?? '');
+      if (verseId != null) {
+        await DBHelper().updateVersesData(verseId, 'is_bookmarked', 'yes');
+      }
     }
     for (final e in highlight ?? const <HighLightContentModal>[]) {
       await DBHelper().insertIntoHighLight(e);
@@ -63,23 +65,27 @@ class OverallDbModel {
           e.content.toString(), 'is_highlighted', '${e.color}');
       //! plaincontent is versse id
       await DBHelper().updateVersesData(
-          int.parse(e.verseid ?? '0'), 'is_highlighted', '${e.color}');
+          int.tryParse(e.verseid ?? '0') ?? 0, 'is_highlighted', '${e.color}');
     }
     for (final e in underline ?? const <BookMarkModel>[]) {
       await DBHelper().insertUnderLine(e);
       await DBHelper().updateVersesDataByContent(
           e.content.toString(), 'is_underlined', 'yes');
-      //! plaincontent is versse id
-      await DBHelper().updateVersesData(
-          int.parse(e.plaincontent.toString()), 'is_underlined', 'yes');
+      //! plaincontent is versse id (absent in v40 backups)
+      final verseId = int.tryParse(e.plaincontent?.toString() ?? '');
+      if (verseId != null) {
+        await DBHelper().updateVersesData(verseId, 'is_underlined', 'yes');
+      }
     }
     for (final e in notes ?? const <SaveNotesModel>[]) {
       await DBHelper().insertNotes(e);
       await DBHelper().updateVersesDataByContent(
           e.content.toString(), 'is_noted', '${e.notes}');
-//! plaincontent is versse id
-      await DBHelper().updateVersesData(
-          int.parse(e.plaincontent.toString()), 'is_noted', '${e.notes}');
+//! plaincontent is versse id (absent in v40 backups)
+      final verseId = int.tryParse(e.plaincontent?.toString() ?? '');
+      if (verseId != null) {
+        await DBHelper().updateVersesData(verseId, 'is_noted', '${e.notes}');
+      }
     }
     for (final e in images ?? const <SaveImageModel>[]) {
       await DBHelper().saveImage(e);

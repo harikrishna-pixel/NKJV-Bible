@@ -51,7 +51,7 @@ class DBHelper {
   }
 
   Future<dynamic> get db async {
-    if (_db != null) {
+    if (_db != null && _db.isOpen == true) {
       return _db;
     }
     _db = await initDatabase();
@@ -899,7 +899,7 @@ class DBMigrationHelper {
 
   static Future<bool> _isDatabaseEncrypted(String path) async {
     try {
-      final db = await plain.openDatabase(path);
+      final db = await plain.openDatabase(path, singleInstance: false);
       await db.rawQuery("SELECT name FROM sqlite_master LIMIT 1");
       await db.close();
       debugPrint("testapp DB at $path is UNENCRYPTED.");
@@ -933,7 +933,8 @@ class DBMigrationHelper {
   static Future<bool> _targetDbHasCoreData(
       String targetPath, String password) async {
     try {
-      final db = await sqlcipher.openDatabase(targetPath, password: password);
+      final db = await sqlcipher.openDatabase(targetPath,
+          password: password, singleInstance: false);
       final verseCountRows =
           await db.rawQuery("SELECT COUNT(*) as c FROM verse");
       final bookCountRows = await db.rawQuery("SELECT COUNT(*) as c FROM book");
@@ -957,7 +958,8 @@ class DBMigrationHelper {
   static Future<bool> _targetDbHasLibraryData(
       String targetPath, String password) async {
     try {
-      final db = await sqlcipher.openDatabase(targetPath, password: password);
+      final db = await sqlcipher.openDatabase(targetPath,
+          password: password, singleInstance: false);
 
       Future<int> countFrom(String table) async {
         try {
@@ -1077,8 +1079,9 @@ class DBMigrationHelper {
     dynamic oldDb;
     try {
       oldDb = looksEncrypted
-          ? await sqlcipher.openDatabase(sourceDbPath, password: password)
-          : await plain.openDatabase(sourceDbPath);
+          ? await sqlcipher.openDatabase(sourceDbPath,
+              password: password, singleInstance: false)
+          : await plain.openDatabase(sourceDbPath, singleInstance: false);
     } catch (e) {
       debugPrint('testapp Error opening source DB: $e');
       return;
@@ -1090,6 +1093,7 @@ class DBMigrationHelper {
       newDb = await sqlcipher.openDatabase(
         newDbPath,
         password: password,
+        singleInstance: false,
         version: 3,
         onCreate: (db, version) async {
           await _createTables(db);
@@ -1157,17 +1161,23 @@ class DBMigrationHelper {
         if (targetColumns.isEmpty) continue;
 
         final rows = await oldDb.query(legacyTableName);
-        for (final row in rows) {
-          final mappedRow =
-              _mapAndFilterRow(targetTableName, row, targetColumns);
-          try {
-            if (mappedRow.isNotEmpty) {
-              await newDb.insert(targetTableName, mappedRow,
-                  conflictAlgorithm: sqlcipher.ConflictAlgorithm.ignore);
+        // One transaction per table: row-by-row autocommit took minutes for
+        // the 31k-row legacy verse table.
+        try {
+          await newDb.transaction((txn) async {
+            final batch = txn.batch();
+            for (final row in rows) {
+              final mappedRow =
+                  _mapAndFilterRow(targetTableName, row, targetColumns);
+              if (mappedRow.isNotEmpty) {
+                batch.insert(targetTableName, mappedRow,
+                    conflictAlgorithm: sqlcipher.ConflictAlgorithm.ignore);
+              }
             }
-          } catch (e) {
-            debugPrint("testapp Insert error in '$targetTableName': $e");
-          }
+            await batch.commit(noResult: true, continueOnError: true);
+          });
+        } catch (e) {
+          debugPrint("testapp Insert error in '$targetTableName': $e");
         }
         if (rows.isNotEmpty) {
           debugPrint(
@@ -1243,8 +1253,9 @@ class DBMigrationHelper {
           : false;
       
       dynamic sourceDb = looksEncrypted
-          ? await sqlcipher.openDatabase(sourceDbPath, password: password)
-          : await plain.openDatabase(sourceDbPath);
+          ? await sqlcipher.openDatabase(sourceDbPath,
+              password: password, singleInstance: false)
+          : await plain.openDatabase(sourceDbPath, singleInstance: false);
 
       for (final tableName in _userDataTables) {
         try {
@@ -1305,7 +1316,9 @@ class DBMigrationHelper {
       final backupFiles = [
         'bible_enc.db.bak',
         'bible.db.bak',
-        '.bible.db.bak'
+        '.bible.db.bak',
+        'bible.db.migrated',
+        'bible2.db.migrated',
       ];
       
       for (final backupFile in backupFiles) {
@@ -1348,11 +1361,12 @@ class DBMigrationHelper {
     dynamic backupDb;
     try {
       // First try as encrypted
-      backupDb = await sqlcipher.openDatabase(backupPath, password: password);
+      backupDb = await sqlcipher.openDatabase(backupPath,
+          password: password, singleInstance: false);
     } catch (_) {
       try {
         // Then try as unencrypted
-        backupDb = await plain.openDatabase(backupPath);
+        backupDb = await plain.openDatabase(backupPath, singleInstance: false);
       } catch (e) {
         debugPrint('_recoverFromBackupFile: Cannot open backup file $backupPath: $e');
         return;
@@ -1360,7 +1374,8 @@ class DBMigrationHelper {
     }
 
     try {
-      final newDb = await sqlcipher.openDatabase(newDbPath, password: password);
+      final newDb = await sqlcipher.openDatabase(newDbPath,
+          password: password, singleInstance: false);
       
       // Check if backup has user data
       bool hasUserData = false;
@@ -1436,18 +1451,23 @@ class DBMigrationHelper {
     dynamic legacyDb;
     try {
       legacyDb = looksEncrypted
-          ? await sqlcipher.openDatabase(sourceDbPath, password: password)
-          : await plain.openDatabase(sourceDbPath);
+          ? await sqlcipher.openDatabase(sourceDbPath,
+              password: password, singleInstance: false)
+          : await plain.openDatabase(sourceDbPath, singleInstance: false);
     } catch (e) {
       print('copyUserDataFromLegacyIfNeeded: could not open legacy DB: $e');
       return;
     }
 
+    // singleInstance: false — the shared instance is DBHelper's connection;
+    // closing it here left the whole app (My Library) on a closed DB.
     sqlcipher.Database? newDb;
+    bool allCopied = true;
     try {
       newDb = await sqlcipher.openDatabase(
         newDbPath,
         password: password,
+        singleInstance: false,
       );
     } catch (e) {
       print('copyUserDataFromLegacyIfNeeded: could not open new DB: $e');
@@ -1495,6 +1515,8 @@ class DBMigrationHelper {
       };
 
       for (final tableName in _userDataTables) {
+        // Seeded from assets/jsonFile/dailyVerse.json, not user data.
+        if (tableName == 'dailyVersesMainList') continue;
         try {
           final newCountRows =
               await newDb.rawQuery("SELECT COUNT(*) as c FROM $tableName");
@@ -1513,35 +1535,85 @@ class DBMigrationHelper {
           );
           if (legacyTable == null) continue;
 
-          final rows = await legacyDb.query(legacyTable);
+          final List<Map<String, Object?>> rows =
+              List<Map<String, Object?>>.from(
+                  await legacyDb.query(legacyTable));
           if (rows.isEmpty) {
             debugPrint('copyUserDataFromLegacyIfNeeded: $legacyTable is empty, skipping');
             continue;
           }
 
           final targetColumns = await _getTableColumns(newDb, tableName);
-          int copiedCount = 0;
-          for (final row in rows) {
-            final mappedRow = _mapAndFilterRow(tableName, row, targetColumns);
-            mappedRow.remove('id'); // Remove ID to avoid conflicts
-            if (mappedRow.isEmpty) continue;
-            try {
-              await newDb.insert(tableName, mappedRow,
-                  conflictAlgorithm: sqlcipher.ConflictAlgorithm.ignore);
-              copiedCount++;
-            } catch (e) {
-              debugPrint("testapp copyUserData insert '$tableName': $e");
-            }
+          final mappedRows = rows
+              .map((row) => _mapAndFilterRow(tableName, row, targetColumns)
+                ..remove('id'))
+              .where((row) => row.isNotEmpty)
+              .toList();
+          if (mappedRows.isEmpty) continue;
+
+          // Rows are matched on the columns the legacy table actually has
+          // (ids differ between DBs and timestamps are defaulted).
+          final keyColumns = mappedRows.first.keys
+              .where((c) => c != 'timestamp')
+              .toList();
+          if (keyColumns.isEmpty) continue;
+          String keyOf(Map<String, Object?> row) =>
+              keyColumns.map((c) => '${row[c]}').join('\u0001');
+
+          // Earlier builds re-inserted every legacy row on each launch.
+          final quotedKeys = keyColumns.map((c) => '"$c"').join(', ');
+          await newDb.execute(
+              'DELETE FROM $tableName WHERE id NOT IN (SELECT MIN(id) FROM $tableName GROUP BY $quotedKeys)');
+
+          final existingKeys = (await newDb.query(tableName,
+                  columns: keyColumns.map((c) => '"$c"').toList()))
+              .map(keyOf)
+              .toSet();
+          final missing = <String, Map<String, Object?>>{};
+          for (final row in mappedRows) {
+            final key = keyOf(row);
+            if (!existingKeys.contains(key)) missing[key] = row;
           }
+
+          if (missing.isNotEmpty) {
+            await newDb.transaction((txn) async {
+              final batch = txn.batch();
+              for (final row in missing.values) {
+                batch.insert(tableName, row);
+              }
+              await batch.commit(noResult: true);
+            });
+          }
+
+          final afterKeys = (await newDb.query(tableName,
+                  columns: keyColumns.map((c) => '"$c"').toList()))
+              .map(keyOf)
+              .toSet();
+          final stillMissing =
+              mappedRows.where((r) => !afterKeys.contains(keyOf(r))).length;
+          if (stillMissing > 0) allCopied = false;
           print(
-              'copyUserDataFromLegacyIfNeeded: copied $copiedCount/${rows.length} rows from $legacyTable into $tableName');
+              'copyUserDataFromLegacyIfNeeded: $tableName legacy=${rows.length} inserted=${missing.length} stillMissing=$stillMissing');
         } catch (e) {
+          allCopied = false;
           print('copyUserDataFromLegacyIfNeeded: table $tableName error: $e');
         }
       }
     } finally {
       await legacyDb?.close();
       await newDb.close();
+    }
+
+    // Retire the legacy file only after every row is verified in the new DB.
+    // Renamed rather than deleted so emergencyRecoverUserData can still use it.
+    if (allCopied) {
+      try {
+        await File(sourceDbPath).rename('$sourceDbPath.migrated');
+        print(
+            'copyUserDataFromLegacyIfNeeded: all rows verified, renamed legacy DB to $sourceDbPath.migrated');
+      } catch (e) {
+        print('copyUserDataFromLegacyIfNeeded: rename legacy DB failed: $e');
+      }
     }
   }
 
