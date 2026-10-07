@@ -367,21 +367,11 @@ class _YearlyTrialPaywallState extends State<YearlyTrialPaywall> {
       child: Scaffold(
         backgroundColor: _bg,
         body: SafeArea(
-          child: LayoutBuilder(
-            builder: (context, constraints) {
-              return Padding(
-            padding: EdgeInsets.fromLTRB(hPad, 8, hPad, 8),
+          child: SingleChildScrollView(
+            physics: const BouncingScrollPhysics(),
+            padding: EdgeInsets.fromLTRB(hPad, 22, hPad, 18),
             child: Column(
               children: [
-                Expanded(
-                  child: FittedBox(
-                    fit: BoxFit.scaleDown,
-                    alignment: Alignment.topCenter,
-                    child: SizedBox(
-                      width: constraints.maxWidth - (hPad * 2),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
                 Container(
                   padding:
                       const EdgeInsets.symmetric(horizontal: 16, vertical: 7),
@@ -633,12 +623,7 @@ class _YearlyTrialPaywallState extends State<YearlyTrialPaywall> {
                     ],
                   ),
                 ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 8),
+                const SizedBox(height: 16),
                 SizedBox(
                   width: double.infinity,
                   height: 54,
@@ -709,8 +694,6 @@ class _YearlyTrialPaywallState extends State<YearlyTrialPaywall> {
                 ),
               ],
             ),
-          );
-            },
           ),
         ),
       ),
