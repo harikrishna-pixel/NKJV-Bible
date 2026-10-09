@@ -17,6 +17,8 @@ import 'package:html/parser.dart' as html;
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:share_plus/share_plus.dart';
 
+import 'package:biblebookapp/utils/library_verse_flags_sync.dart';
+
 import '../../../controller/dpProvider.dart';
 import '../../constants/colors.dart';
 import '../../constants/constant.dart';
@@ -62,7 +64,8 @@ class _NotesScreenState extends State<NotesScreen> {
 
   Future<List<SaveNotesModel>> _loadData() async {
     // CRITICAL: Always try to restore legacy data first
-    await DBMigrationHelper.tryRestoreLibraryDataFromLegacy();
+    final inserted = await DBMigrationHelper.tryRestoreLibraryDataFromLegacy();
+    await LibraryVerseFlagsSync.reapplyAfterLegacyCopy(inserted);
     final notes = await DBHelper().getNotes();
     
     // Debug logging to help diagnose issues
@@ -236,7 +239,11 @@ class _NotesScreenState extends State<NotesScreen> {
                                                 const SizedBox(
                                                   height: 35,
                                                 ),
-                                                SingleChildScrollView(
+                                                Align(
+                                                  alignment: screenWidth > 450
+                                                      ? Alignment.center
+                                                      : Alignment.centerLeft,
+                                                  child: SingleChildScrollView(
                                                   scrollDirection:
                                                       Axis.horizontal,
                                                   child: Row(
@@ -696,6 +703,7 @@ class _NotesScreenState extends State<NotesScreen> {
                                                                               // await DBHelper().updateVersesDataByContent(data.content.toString(), "is_noted", "no");
                                                                               await DBHelper().deleteNotes(data.id!.toInt()).then((value) {
                                                                                 loadData();
+                                                                                reloadOpenChapterAfterLibraryChange();
                                                                                 Get.back();
                                                                               });
                                                                             },
@@ -761,6 +769,7 @@ class _NotesScreenState extends State<NotesScreen> {
                                                       ],
                                                     ),
                                                   ],
+                                                ),
                                                 ),
                                                 ),
                                               ],
@@ -871,7 +880,11 @@ class _NotesScreenState extends State<NotesScreen> {
                                             const SizedBox(
                                               height: 35,
                                             ),
-                                            SingleChildScrollView(
+                                            Align(
+                                              alignment: screenWidth > 450
+                                                  ? Alignment.center
+                                                  : Alignment.centerLeft,
+                                              child: SingleChildScrollView(
                                               scrollDirection:
                                                   Axis.horizontal,
                                               child: Row(
@@ -1344,6 +1357,7 @@ class _NotesScreenState extends State<NotesScreen> {
                                                                               .deleteNotes(data.id!.toInt())
                                                                               .then((value) {
                                                                             loadData();
+                                                                            reloadOpenChapterAfterLibraryChange();
                                                                             Get.back();
                                                                           });
                                                                         },
@@ -1418,6 +1432,7 @@ class _NotesScreenState extends State<NotesScreen> {
                                               ],
                                             ),
                                           ),
+                                            ),
                                         ],
                                       ),
                                     );

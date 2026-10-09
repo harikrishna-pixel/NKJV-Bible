@@ -280,6 +280,7 @@ class BibleInfo {
   // Sample English chapter. Shown in MP3 Audio Settings only when this file loads.
   static const String englishBibleAudio =
       "https://bibleoffice.com/BibleReplications/dev/v1/uploads/bible_audio/English/1/1.mp3";
+  static const String englishBibleAudioName = 'English Bible Audio';
 
   // Text to Speech Settings - iOS
   static String isTextToSpeechAvailableIos = "1";

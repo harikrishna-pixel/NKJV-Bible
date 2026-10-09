@@ -10,6 +10,7 @@ import 'package:biblebookapp/core/bible_extract_paths.dart';
 import 'package:biblebookapp/core/notifiers/download.notifier.dart';
 import 'package:biblebookapp/main.dart';
 import 'package:biblebookapp/utils/emoji_text_style.dart';
+import 'package:biblebookapp/utils/library_verse_flags_sync.dart';
 import 'package:biblebookapp/view/widget/thanks_for_love_rating_dialog_content.dart';
 import 'package:biblebookapp/view/constants/assets_constants.dart';
 import 'package:biblebookapp/view/constants/constant.dart';
@@ -965,12 +966,18 @@ class BibleVersionsScreenState extends State<BibleVersionsScreen> {
                       setState(() {
                         _progress = 15;
                       });
+                      final readingProgress =
+                          await LibraryVerseFlagsSync.saveReadingProgress();
                       await loadBookContent(foldername);
 
                       setState(() {
                         _progress = 27;
                       });
                       await loadBookList(foldername);
+                      // loadBookContent rebuilds `verse` with no marks.
+                      await LibraryVerseFlagsSync.reapplyToVerseTable();
+                      await LibraryVerseFlagsSync.restoreReadingProgress(
+                          readingProgress);
 
                       setState(() {
                         _progress = 43;

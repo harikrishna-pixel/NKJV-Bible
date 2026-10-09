@@ -813,7 +813,7 @@ class _DailyJourneyScreenState extends State<DailyJourneyScreen> {
                         icon: Icons.eco,
                         title: 'Find Peace',
                         subtitle: 'Release your worries.',
-                        onTap: () => PourOutWorriesScreen.openIfLoggedIn(),
+                        onTap: () => PourOutWorriesScreen.open(),
                         textColor: textColor,
                         panelColor: panelColor,
                       ),

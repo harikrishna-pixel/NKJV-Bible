@@ -336,10 +336,7 @@ class PrayerQueueListResult {
       return int.tryParse(v?.toString() ?? '') ?? fallback;
     }
 
-    DateTime? asDate(dynamic v) {
-      if (v == null) return null;
-      return DateTime.tryParse(v.toString());
-    }
+    DateTime? asDate(dynamic v) => _prayerQueueUtc(v);
 
     return PrayerQueueListResult(
       slotSeconds: asInt(map['slotSeconds'], 420),
@@ -387,10 +384,7 @@ class PrayerQueueCurrentResult {
       return int.tryParse(v?.toString() ?? '') ?? fallback;
     }
 
-    DateTime? asDate(dynamic v) {
-      if (v == null) return null;
-      return DateTime.tryParse(v.toString());
-    }
+    DateTime? asDate(dynamic v) => _prayerQueueUtc(v);
 
     final nextId = map['nextPrayerId']?.toString().trim();
     return PrayerQueueCurrentResult(
@@ -456,4 +450,26 @@ class PrayerDualDescription {
     if (t.isEmpty || b.isEmpty) return false;
     return t == b || b.startsWith(t);
   }
+}
+
+/// Queue times from the server are global (UTC).
+DateTime? _prayerQueueUtc(dynamic v) {
+  if (v == null) return null;
+  final raw = v.toString().trim();
+  if (raw.isEmpty) return null;
+  final parsed = DateTime.tryParse(raw);
+  if (parsed == null) return null;
+  final hasZone = raw.endsWith('Z') ||
+      RegExp(r'[+-]\d{2}:\d{2}$').hasMatch(raw);
+  if (hasZone) return parsed.toUtc();
+  return DateTime.utc(
+    parsed.year,
+    parsed.month,
+    parsed.day,
+    parsed.hour,
+    parsed.minute,
+    parsed.second,
+    parsed.millisecond,
+    parsed.microsecond,
+  );
 }

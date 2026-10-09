@@ -19,6 +19,8 @@ import 'package:package_info_plus/package_info_plus.dart';
 import 'package:share_plus/share_plus.dart';
 
 import '../../../Model/bookMarkModel.dart';
+import 'package:biblebookapp/utils/library_verse_flags_sync.dart';
+
 import '../../../controller/dpProvider.dart';
 import '../../constants/colors.dart';
 import '../../constants/constant.dart';
@@ -63,7 +65,8 @@ class _BookMarkScreenState extends State<BookMarkScreen> {
 
   Future<List<BookMarkModel>> _loadData() async {
     // CRITICAL: Always try to restore legacy data first
-    await DBMigrationHelper.tryRestoreLibraryDataFromLegacy();
+    final inserted = await DBMigrationHelper.tryRestoreLibraryDataFromLegacy();
+    await LibraryVerseFlagsSync.reapplyAfterLegacyCopy(inserted);
     final bookmarks = await DBHelper().getBookMark();
     
     // Debug logging to help diagnose issues
@@ -250,7 +253,11 @@ class _BookMarkScreenState extends State<BookMarkScreen> {
                                                 const SizedBox(
                                                   height: 25,
                                                 ),
-                                                SingleChildScrollView(
+                                                Align(
+                                                  alignment: screenWidth > 450
+                                                      ? Alignment.center
+                                                      : Alignment.centerLeft,
+                                                  child: SingleChildScrollView(
                                                   scrollDirection:
                                                       Axis.horizontal,
                                                   child: Row(
@@ -728,6 +735,7 @@ class _BookMarkScreenState extends State<BookMarkScreen> {
                                                                               // DBHelper().updateVersesDataByContent((parse(data.content).body?.text ?? '').toString(), "is_bookmarked", "no").then((value) {});
                                                                               DBHelper().deleteBookmark(data.id!.toInt()).then((value) {
                                                                                 loadData();
+                                                                                reloadOpenChapterAfterLibraryChange();
                                                                                 Get.back();
                                                                               });
                                                                             },
@@ -865,6 +873,7 @@ class _BookMarkScreenState extends State<BookMarkScreen> {
                                                   ],
                                                 ),
                                                 ),
+                                                ),
                                               ],
                                             ),
                                           );
@@ -964,7 +973,11 @@ class _BookMarkScreenState extends State<BookMarkScreen> {
                                             const SizedBox(
                                               height: 35,
                                             ),
-                                            SingleChildScrollView(
+                                            Align(
+                                              alignment: screenWidth > 450
+                                                  ? Alignment.center
+                                                  : Alignment.centerLeft,
+                                              child: SingleChildScrollView(
                                               scrollDirection:
                                                   Axis.horizontal,
                                               child: Row(
@@ -1493,6 +1506,7 @@ class _BookMarkScreenState extends State<BookMarkScreen> {
                                                                               .deleteBookmark(data.id!.toInt())
                                                                               .then((value) {
                                                                             loadData();
+                                                                            reloadOpenChapterAfterLibraryChange();
                                                                             Get.back();
                                                                           });
                                                                         },
@@ -1574,6 +1588,7 @@ class _BookMarkScreenState extends State<BookMarkScreen> {
                                               ],
                                             ),
                                           ),
+                                            ),
                                         ],
                                       ),
                                     );

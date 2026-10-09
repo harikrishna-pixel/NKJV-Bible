@@ -31,6 +31,7 @@ import 'package:biblebookapp/Model/highLightContentModal.dart';
 import 'package:biblebookapp/Model/mainBookListModel.dart';
 import 'package:biblebookapp/Model/saveNotesModel.dart';
 import 'package:biblebookapp/controller/dashboard_controller.dart';
+import 'package:biblebookapp/utils/library_verse_flags_sync.dart';
 import 'package:biblebookapp/core/extract_zip_json.dart';
 import 'package:biblebookapp/core/notifiers/download.notifier.dart';
 import 'package:biblebookapp/initialization_helper.dart';
@@ -41,8 +42,6 @@ import 'package:biblebookapp/view/constants/colors.dart';
 import 'package:biblebookapp/view/constants/theme_provider.dart';
 import 'package:biblebookapp/view/screens/calendar_screen/model/calendar_model.dart';
 import 'package:biblebookapp/view/screens/dashboard/constants.dart';
-import 'package:biblebookapp/view/screens/intro_subcribtion_screen.dart';
-import 'package:biblebookapp/view/screens/paywall_navigation.dart';
 import 'package:biblebookapp/view/widget/notification_service.dart';
 
 import '../../../Model/dailyVersesMainListModel.dart';
@@ -473,7 +472,6 @@ class _SplashScreenState extends State<SplashScreen>
           await Provider.of<DownloadProvider>(context, listen: false)
               .loadDailyVerses();
         }
-        await loadLocal();
 
         // Essential: Set default book if not set + preserve legacy user data
         await Future.wait<void>([
@@ -505,12 +503,18 @@ class _SplashScreenState extends State<SplashScreen>
           }),
           DBMigrationHelper.copyUserDataFromLegacyIfNeeded(password),
         ]);
-
         // Essential: Update local DB (sync verse flags with bookmarks/highlights)
         await Future.wait<void>([
           updateLocalDB(),
           deleteFiles(),
         ]);
+        // Mark verse rows from the restored library (book, chapter, verse),
+        // then drop any chapter loaded before those marks existed.
+        await LibraryVerseFlagsSync.reapplyToVerseTable();
+        reloadOpenChapterAfterLibraryChange();
+        // Snapshot verses only after library flags are painted, so the first
+        // Reading open does not reuse the pre-restore chapter.
+        await loadLocal();
         print('SPLASH after copyUserDataFromLegacyIfNeeded');
         if (kDebugMode) {
           await DBHelper.debugPrintLibraryTableCounts();
@@ -678,7 +682,7 @@ class _SplashScreenState extends State<SplashScreen>
 
   /// Additive: decide Welcome Old→New logos vs single new logo.
   /// New install → false. In-place upgrade from older build → true.
-  /// Does not change navigation or onboarding completion.
+  /// Upgrade from a build without a saved version (before 115) resets onboarding.
   Future<void> _updateWelcomeLogoComparisonFlag() async {
     try {
       final info = await PackageInfo.fromPlatform();
@@ -703,6 +707,10 @@ class _SplashScreenState extends State<SplashScreen>
         showComparison = launchCount > 1 ||
             (selectedBook != null && selectedBook.isNotEmpty) ||
             loadedList;
+        // Builds before 115 never saved their version: show onboarding again.
+        if (showComparison) {
+          await SharPreferences.setBoolean(SharPreferences.onboarding, false);
+        }
       }
 
       await SharPreferences.setBoolean(
@@ -775,7 +783,7 @@ class _SplashScreenState extends State<SplashScreen>
     final isOnboardingCompleted =
     await SharPreferences.getBoolean(SharPreferences.onboarding);
 
-    // First launch: show welcome -> onboarding questions
+    // Onboarding still shows when it was never finished, including an update.
     if (isOnboardingCompleted == null || !isOnboardingCompleted) {
       _schedulePostSplashAtt();
       Get.offAll(() => const WelcomeScreen());
@@ -846,27 +854,6 @@ class _SplashScreenState extends State<SplashScreen>
       unawaited(provider.warmDataBeforeHomeScreen());
     } catch (e) {
       debugPrint('warmDataBeforeHomeScreen error: $e');
-    }
-    if (!mounted) return;
-    final hasSubscription = !await _shouldShowSplashOpenAd();
-    if (!hasSubscription &&
-        await SubscriptionScreen.isDashboardIapEnabled()) {
-      final sixMonthPlan = await SharPreferences.getString('sixMonthPlan') ??
-          BibleInfo.sixMonthPlanid;
-      final oneYearPlan = await SharPreferences.getString('oneYearPlan') ??
-          BibleInfo.oneYearPlanid;
-      final lifeTimePlan = await SharPreferences.getString('lifeTimePlan') ??
-          BibleInfo.lifeTimePlanid;
-      if (!mounted) return;
-      Get.offAll(
-        () => PaywallNavigation.buildVisiblePaywall(
-          sixMonthPlan: sixMonthPlan,
-          oneYearPlan: oneYearPlan,
-          lifeTimePlan: lifeTimePlan,
-          checkad: 'splash',
-        ),
-      );
-      return;
     }
     if (!mounted) return;
     await StreakFlowNavigation.navigateToStreakFlowOrHome(context);

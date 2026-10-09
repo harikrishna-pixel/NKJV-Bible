@@ -421,9 +421,11 @@ class PrayerWallLocalStore {
   static Future<void> markBlockedUser(String userId, {String? email}) async {
     final uid = userId.trim();
     if (uid.isEmpty) return;
-    final s = await loadBlockedUserIds();
-    s.add(uid);
-    await saveBlockedUserIds(s, email: email);
+    // Newest block stays first so the Blocked list keeps that order after restart.
+    final ordered = (await loadBlockedUserIds()).toList();
+    ordered.remove(uid);
+    ordered.insert(0, uid);
+    await saveBlockedUserIds(ordered.toSet(), email: email);
   }
 
   static Future<void> unmarkBlockedUser(String userId, {String? email}) async {

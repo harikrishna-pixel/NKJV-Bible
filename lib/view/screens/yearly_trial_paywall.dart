@@ -11,6 +11,7 @@ import 'package:biblebookapp/view/screens/dashboard/home_screen.dart';
 import 'package:biblebookapp/view/screens/intro_subcribtion_screen.dart';
 import 'package:biblebookapp/view/widget/notification_service.dart';
 import 'package:flutter/material.dart';
+import 'package:internet_connection_checker_plus/internet_connection_checker_plus.dart';
 import 'package:flutter_easyloading/flutter_easyloading.dart';
 import 'package:get/get.dart';
 import 'package:in_app_purchase/in_app_purchase.dart';
@@ -173,7 +174,7 @@ class _YearlyTrialPaywallState extends State<YearlyTrialPaywall> {
     return '$mark${weekly.toStringAsFixed(2)}';
   }
 
-  DateTime get _today => DateTime.now();
+  DateTime get _today => DateTime.now().toUtc();
 
   DateTime get _planBegins =>
       DateTime(_today.year, _today.month, _today.day).add(const Duration(days: 3));
@@ -215,10 +216,33 @@ class _YearlyTrialPaywallState extends State<YearlyTrialPaywall> {
     );
   }
 
+  Future<void> _showNoInternetAlert() {
+    return showDialog<void>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: const Text('No internet connection'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              child: const Text('OK'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   Future<void> _startTrial() async {
     if (_busy) return;
     if (!await SubscriptionScreen.isDashboardIapEnabled()) return;
     if (!mounted) return;
+    final hasInternet = await InternetConnection().hasInternetAccess;
+    if (!mounted) return;
+    if (!hasInternet) {
+      await _showNoInternetAlert();
+      return;
+    }
     setState(() => _busy = true);
     final ok = await Navigator.of(context).push<bool>(
       PageRouteBuilder<bool>(
@@ -242,19 +266,6 @@ class _YearlyTrialPaywallState extends State<YearlyTrialPaywall> {
       await _onPurchaseFinished();
       return;
     }
-    try {
-      final raw = await SharPreferences.getString(
-        SharPreferences.isRewardAdViewTime,
-      );
-      if (raw != null &&
-          raw.isNotEmpty &&
-          DateTime.parse(raw).isAfter(DateTime.now()) &&
-          mounted) {
-        await _scheduleReminderIfNeeded();
-        await _onPurchaseFinished();
-        return;
-      }
-    } catch (_) {}
     if (mounted) setState(() => _busy = false);
   }
 
@@ -516,7 +527,10 @@ class _YearlyTrialPaywallState extends State<YearlyTrialPaywall> {
                         value: _remindMe,
                         activeThumbColor: Colors.white,
                         activeTrackColor: const Color(0xFF34C759),
-                        onChanged: _busy ? null : _onRemindChanged,
+                        onChanged: (value) {
+                          if (_busy) return;
+                          _onRemindChanged(value);
+                        },
                       ),
                     ],
                   ),

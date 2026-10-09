@@ -103,6 +103,10 @@ class floatingButtonState extends State<floatingButton>
   StreamSubscription<Duration>? _positionSubscription;
   bool _handlingMp3Complete = false;
   bool _isAudioSheetOpen = false;
+  bool _audioSheetUiAlive = false;
+  bool _fullPlayerUiAlive = false;
+  bool _ttsSheetUiAlive = false;
+  bool _fullPlayerOpen = false;
   void Function(void Function())? _audioSheetSetState;
   void Function(void Function())? _fullPlayerSetState;
   void Function(void Function())? _ttsSheetSetState;
@@ -116,6 +120,15 @@ class floatingButtonState extends State<floatingButton>
   bool? _fullScreenTts;
   bool _pausedForPhoneCall = false;
   bool _audioPlayingBeforeInterrupt = false;
+  int _ttsProgressEnd = 0;
+  int _ttsSpokenEnd = 0;
+  int _ttsProgressVerse = -1;
+  int _ttsPosSecondsShown = 0;
+  DateTime? _ttsPosAheadAt;
+  bool _ttsProgressHandlerReady = false;
+  DateTime? _ttsIgnoreUntil;
+  DateTime? _ttsProgressAt;
+  DateTime? _ttsUiNotifyAt;
 
   checkTTS() async {
     final ttsStatus =
@@ -415,6 +428,10 @@ class floatingButtonState extends State<floatingButton>
               await audioPlayer.setVolume(volume);
             } catch (_) {}
             await audioPlayer.resume();
+            if (audioPlayer.state != PlayerState.playing) {
+              await Future.delayed(const Duration(milliseconds: 80));
+              await audioPlayer.resume();
+            }
             loadSuccess = true;
             if (mounted) {
               _mp3UiSetState(() {
@@ -517,6 +534,10 @@ class floatingButtonState extends State<floatingButton>
                 await audioPlayer.setVolume(volume);
               } catch (_) {}
               await audioPlayer.resume();
+              if (audioPlayer.state != PlayerState.playing) {
+                await Future.delayed(const Duration(milliseconds: 80));
+                await audioPlayer.resume();
+              }
               loadSuccess = true;
               if (mounted) {
                 _mp3UiSetState(() {
@@ -701,20 +722,184 @@ class floatingButtonState extends State<floatingButton>
     return widget.audioData?.data?.bibleAudioInfo?.audioBasepath;
   }
 
-  void _notifyTtsPlayer() {
-    _ttsSheetSetState?.call(() {});
-    _fullPlayerSetState?.call(() {});
+  void _notifyTtsPlayer({bool throttle = false}) {
+    _publishReaderSpokenWord();
+    if (throttle) {
+      final now = DateTime.now();
+      if (_ttsUiNotifyAt != null &&
+          now.difference(_ttsUiNotifyAt!) <
+              const Duration(milliseconds: 220)) {
+        return;
+      }
+      _ttsUiNotifyAt = now;
+    }
+    _safeCallSetter(_ttsSheetSetState);
+    _safeCallSetter(_fullPlayerSetState);
+    _syncReaderWordTimer();
+  }
+
+  static int readerSpokenChapter = -1;
+  static int readerSpokenVerse = -1;
+  static int readerSpokenStart = 0;
+  static int readerSpokenEnd = 0;
+  static String readerSpokenPlain = '';
+
+  Timer? _readerWordTimer;
+  int _readerWordIndex = 0;
+  int _readerClockVerse = -1;
+  DateTime? _readerVerseStartedAt;
+
+  bool get _readerSpeechActive =>
+      isSpeech ||
+      ttsState == TtsState.playing ||
+      ttsState == TtsState.continued;
+
+  void _syncReaderWordTimer() {
+    if (!_readerSpeechActive) {
+      _readerWordTimer?.cancel();
+      _readerWordTimer = null;
+      return;
+    }
+    _readerWordTimer ??= Timer.periodic(const Duration(milliseconds: 80), (_) {
+      if (!mounted || !_readerSpeechActive) {
+        _readerWordTimer?.cancel();
+        _readerWordTimer = null;
+        return;
+      }
+      _publishReaderSpokenWord();
+      _safeCallSetter(_ttsSheetSetState);
+      _safeCallSetter(_fullPlayerSetState);
+    });
+  }
+
+  void _publishReaderSpokenWord() {
+    final paused = ttsState == TtsState.paused;
+    if ((!_readerSpeechActive && !paused) ||
+        curretNo < 0 ||
+        curretNo >= selectedChapterContent.length) {
+      readerSpokenChapter = -1;
+      readerSpokenVerse = -1;
+      readerSpokenStart = 0;
+      readerSpokenEnd = 0;
+      readerSpokenPlain = '';
+      _readerWordIndex = 0;
+      _readerClockVerse = -1;
+      _readerVerseStartedAt = null;
+      return;
+    }
+    final verse = selectedChapterContent[curretNo];
+    final plain = parse(verse.content?.toString() ?? '').body?.text ??
+        (verse.content?.toString() ?? '');
+    if (plain.isEmpty) return;
+    if (curretNo != _readerClockVerse) {
+      _readerClockVerse = curretNo;
+      _readerWordIndex = 0;
+      _readerVerseStartedAt =
+          DateTime.now().subtract(const Duration(milliseconds: 180));
+    }
+    final words = RegExp(r'\S+').allMatches(plain).toList();
+    if (words.isEmpty) return;
+    final started = _readerVerseStartedAt ?? DateTime.now();
+    final elapsed = DateTime.now().difference(started).inMilliseconds / 1000.0;
+    final wordsPerSecond = 3.3 * _ttsSpeedFactor();
+    var index = wordsPerSecond <= 0 ? 0 : (elapsed * wordsPerSecond).floor();
+    if (allText.isNotEmpty && end > start) {
+      var engineIndex = 0;
+      for (var i = 0; i < words.length; i++) {
+        if (start < words[i].end) {
+          engineIndex = i;
+          break;
+        }
+      }
+      if (engineIndex > index) index = engineIndex;
+    }
+    _readerWordIndex = index;
+    if (_readerWordIndex < 0) _readerWordIndex = 0;
+    if (_readerWordIndex >= words.length) {
+      _readerWordIndex = words.length - 1;
+    }
+    final word = words[_readerWordIndex];
+    readerSpokenChapter = verse.chapterNum?.toInt() ?? -1;
+    readerSpokenVerse = verse.verseNum?.toInt() ?? -1;
+    readerSpokenPlain = plain;
+    readerSpokenStart = word.start;
+    readerSpokenEnd = word.end;
+  }
+
+  void _ignoreTtsEngineEvents({int ms = 700}) {
+    _ttsIgnoreUntil = DateTime.now().add(Duration(milliseconds: ms));
+  }
+
+  bool _ttsEngineEventIgnored() {
+    final until = _ttsIgnoreUntil;
+    return until != null && DateTime.now().isBefore(until);
+  }
+
+  void _safeCallSetter(void Function(void Function())? setter) {
+    if (setter == null) return;
+    setter(() {});
+  }
+
+  void _closeAudioSheetUi() {
+    _audioSheetUiAlive = false;
+    _audioSheetSetState = null;
+  }
+
+  void _closeTtsSheetUi() {
+    _ttsSheetUiAlive = false;
+    _ttsSheetSetState = null;
+  }
+
+  void _closeFullPlayerUi() {
+    _fullPlayerUiAlive = false;
+    _fullPlayerSetState = null;
   }
 
   void _attachTtsProgressHandler() {
+    if (_ttsProgressHandlerReady) return;
+    _ttsProgressHandlerReady = true;
     flutterTts.setProgressHandler(
         (String text, int startOffset, int endOffset, String word) {
       allText = text;
       final len = text.length;
+      if (len <= 0) return;
+      if (curretNo != _ttsProgressVerse) {
+        _ttsProgressVerse = curretNo;
+        _ttsProgressEnd = 0;
+        _ttsSpokenEnd = 0;
+        _ttsProgressAt = DateTime.now();
+      }
+      var wordCount = 1;
+      if (curretNo >= 0 && curretNo < selectedChapterContent.length) {
+        final n = _spokenWordCount(selectedChapterContent[curretNo].content);
+        if (n > 0) wordCount = n;
+      } else {
+        final n = _spokenWordCount(text);
+        if (n > 0) wordCount = n;
+      }
+      final now = DateTime.now();
+      final dt = _ttsProgressAt == null
+          ? 0.22
+          : now.difference(_ttsProgressAt!).inMilliseconds / 1000.0;
+      _ttsProgressAt = now;
+      var maxDelta = ((len *
+                  (dt.clamp(0.0, 0.5) * 2.5 * _ttsSpeedFactor()) /
+                  wordCount)
+              .round())
+          .clamp(0, len);
+      final engineEnd = endOffset.clamp(0, len);
+      if (engineEnd > _ttsProgressEnd && maxDelta < 1) maxDelta = 1;
+      _ttsSpokenEnd = engineEnd;
+      var nextEnd = engineEnd;
+      if (nextEnd < _ttsProgressEnd) nextEnd = _ttsProgressEnd;
+      if (nextEnd > _ttsProgressEnd + maxDelta) {
+        nextEnd = _ttsProgressEnd + maxDelta;
+      }
+      _ttsProgressEnd = nextEnd;
       start = startOffset.clamp(0, len);
-      end = endOffset.clamp(0, len);
+      end = nextEnd;
       if (end < start) end = start;
-      _notifyTtsPlayer();
+      _notifyTtsPlayer(throttle: true);
     });
   }
 
@@ -734,6 +919,7 @@ class floatingButtonState extends State<floatingButton>
       await flutterTts.setVolume(volume);
     } catch (_) {}
     if (!wasPlaying || !_isTtsInitialized) return;
+    _ignoreTtsEngineEvents();
     _ttsVolumeRestarting = true;
     try {
       try {
@@ -890,6 +1076,11 @@ class floatingButtonState extends State<floatingButton>
 
     flutterTts.setCancelHandler(() {
       if (_ttsVolumeRestarting) return;
+      if (_ttsEngineEventIgnored() || _ttsAdvancingChapter) return;
+      if (isManualNavigation) {
+        isManualNavigation = false;
+        return;
+      }
       if (mounted) {
         setState(() {
           ttsState = TtsState.stopped;
@@ -917,6 +1108,9 @@ class floatingButtonState extends State<floatingButton>
     });
     flutterTts.setCompletionHandler(() async {
       if (_ttsVolumeRestarting) {
+        return;
+      }
+      if (_ttsEngineEventIgnored()) {
         return;
       }
       // Don't auto-advance if manually paused
@@ -1096,6 +1290,58 @@ class floatingButtonState extends State<floatingButton>
       debugPrint("Error getting voices: $e");
       return [];
     }
+  }
+
+  String _bibleAudioNameFromPath(String url) {
+    final parts = Uri.tryParse(url)?.pathSegments ?? const <String>[];
+    final audioIndex = parts.indexOf('bible_audio');
+    if (audioIndex >= 0 && audioIndex + 1 < parts.length) {
+      final name = Uri.decodeComponent(parts[audioIndex + 1]).trim();
+      if (name.isNotEmpty && !RegExp(r'^\d+$').hasMatch(name)) {
+        if (name.toLowerCase().endsWith('bible audio')) return name;
+        return '$name Bible Audio';
+      }
+    }
+    return 'Bible Audio';
+  }
+
+  String _languageNameFromApiCode(String code) {
+    final primary = code.split(RegExp(r'[-_]')).first.trim().toLowerCase();
+    const names = <String, String>{
+      'en': 'English',
+      'ja': 'Japanese',
+      'pt': 'Portuguese',
+      'ta': 'Tamil',
+      'te': 'Telugu',
+      'hi': 'Hindi',
+      'es': 'Spanish',
+      'fr': 'French',
+      'ko': 'Korean',
+      'zh': 'Chinese',
+      'ar': 'Arabic',
+      'de': 'German',
+      'ml': 'Malayalam',
+      'kn': 'Kannada',
+      'bn': 'Bengali',
+    };
+    return names[primary] ?? '';
+  }
+
+  String _recordedAudioVoiceLabel() {
+    final info = widget.audioData?.data?.bibleAudioInfo;
+    final code = (info?.textToSpeechLanguageCodeIos?.trim().isNotEmpty ?? false)
+        ? info!.textToSpeechLanguageCodeIos!.trim()
+        : (info?.textToSpeechLanguageCodeAndroid?.trim() ?? '');
+    final fromCode = _languageNameFromApiCode(code);
+    if (fromCode.isNotEmpty) return '$fromCode Bible Audio';
+    final language = widget.audioData?.data?.languageName?.trim() ?? '';
+    if (language.isNotEmpty) {
+      if (language.toLowerCase().endsWith('bible audio')) return language;
+      return '$language Bible Audio';
+    }
+    final fromApi = info?.audioBasepath?.trim() ?? '';
+    final path = fromApi.isNotEmpty ? fromApi : BibleInfo.audioBasePath.trim();
+    return _bibleAudioNameFromPath(path);
   }
 
   String _getVoiceDisplayName(dynamic voice) {
@@ -1905,8 +2151,11 @@ class floatingButtonState extends State<floatingButton>
     _durationSubscription = null;
     _positionSubscription = null;
     _completeSubscription = null;
-    _audioSheetSetState = null;
-    _fullPlayerSetState = null;
+    _readerWordTimer?.cancel();
+    _readerWordTimer = null;
+    _closeAudioSheetUi();
+    _closeTtsSheetUi();
+    _closeFullPlayerUi();
 
     // Stop TTS if running - safely check if flutterTts is initialized
     // Note: TTS handlers already check 'mounted' before calling setState, so they're safe
@@ -2242,14 +2491,17 @@ class floatingButtonState extends State<floatingButton>
     // Additive: completion listener lives on State so minimize keeps auto-next.
     _ensureMp3CompletionListener();
     _isAudioSheetOpen = true;
+    _audioSheetUiAlive = true;
 
     return showModalBottomSheet(
       backgroundColor: Colors.black12,
       context: context,
       builder: (context) {
         return StatefulBuilder(builder: (context, setState) {
-          // Let State completion handler refresh this sheet UI when open.
-          _audioSheetSetState = setState;
+          _audioSheetSetState = (fn) {
+            if (!_audioSheetUiAlive) return;
+            setState(fn);
+          };
 
           // Attach listeners only once for this sheet
           if (!listenersAttached) {
@@ -2257,7 +2509,7 @@ class floatingButtonState extends State<floatingButton>
 
             // Position updates
             positionSub = audioPlayer.onPositionChanged.listen((p) {
-              if (!context.mounted) return;
+              if (!_audioSheetUiAlive) return;
               setState(() {
                 position = p;
               });
@@ -2265,7 +2517,7 @@ class floatingButtonState extends State<floatingButton>
 
             // Duration updates (when a new source loads this will fire)
             durationSub = audioPlayer.onDurationChanged.listen((d) {
-              if (!context.mounted) return;
+              if (!_audioSheetUiAlive) return;
               setState(() {
                 duration = d;
               });
@@ -2273,7 +2525,11 @@ class floatingButtonState extends State<floatingButton>
           } // end attach listeners
 
           // Build UI
-          return Container(
+          return PopScope(
+            onPopInvokedWithResult: (didPop, _) {
+              if (didPop) _closeAudioSheetUi();
+            },
+            child: Container(
             height: 148,
             decoration: const BoxDecoration(
               borderRadius: BorderRadius.only(
@@ -2294,8 +2550,11 @@ class floatingButtonState extends State<floatingButton>
                           _mp3Chosen = true;
                           _readerUseTts = false;
                           _fullScreenTts = false;
+                          _closeAudioSheetUi();
                           Navigator.of(context).pop();
-                          _openReaderFullPlayer(tts: false);
+                          if (!_fullPlayerOpen) {
+                            _openReaderFullPlayer(tts: false);
+                          }
                         },
                         child: Icon(
                           Icons.keyboard_arrow_up,
@@ -2783,13 +3042,14 @@ class floatingButtonState extends State<floatingButton>
                 ),
               ],
             ),
+          ),
           );
         });
       },
     ).then((value) {
       // sheet closed: cancel sheet-local listeners only (keep completion for auto-next).
       _isAudioSheetOpen = false;
-      _audioSheetSetState = null;
+      _closeAudioSheetUi();
       if (positionSub != null) {
         positionSub!.cancel();
         positionSub = null;
@@ -3224,7 +3484,7 @@ class floatingButtonState extends State<floatingButton>
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: Text(
-                        'Default',
+                        _recordedAudioVoiceLabel(),
                         style: TextStyle(
                           color: CommanColor.lightDarkPrimary(context),
                           letterSpacing: BibleInfo.letterSpacing,
@@ -3816,14 +4076,30 @@ class floatingButtonState extends State<floatingButton>
     }
 
     if (widget.textToSpeechLoad == false) {
+      _ttsSheetUiAlive = true;
       return showModalBottomSheet(
         backgroundColor: Colors.black12,
         context: context,
         builder: (context) {
           return StatefulBuilder(
-            builder: (BuildContext context, StateSetter setState) {
-              _ttsSheetSetState = setState;
-              return Container(
+            builder: (BuildContext context, StateSetter setModalState) {
+              void setState(VoidCallback fn) {
+                if (!context.mounted) {
+                  fn();
+                  return;
+                }
+                setModalState(fn);
+              }
+
+              _ttsSheetSetState = (fn) {
+                if (!_ttsSheetUiAlive) return;
+                setState(fn);
+              };
+              return PopScope(
+                onPopInvokedWithResult: (didPop, _) {
+                  if (didPop) _closeTtsSheetUi();
+                },
+                child: Container(
                   decoration: const BoxDecoration(
                       borderRadius: BorderRadius.only(
                           topLeft: Radius.circular(20),
@@ -3851,8 +4127,12 @@ class floatingButtonState extends State<floatingButton>
                                     isSpeech = true;
                                     ttsState = TtsState.playing;
                                   }
+                                  _ignoreTtsEngineEvents();
+                                  _closeTtsSheetUi();
                                   Navigator.of(context).pop();
-                                  _openReaderFullPlayer(tts: true);
+                                  if (!_fullPlayerOpen) {
+                                    _openReaderFullPlayer(tts: true);
+                                  }
                                 },
                                 child: Icon(
                                   Icons.keyboard_arrow_up,
@@ -3930,7 +4210,14 @@ class floatingButtonState extends State<floatingButton>
                       const SizedBox(height: 25),
                       SizedBox(
                           width: MediaQuery.of(context).size.width * 0.86,
-                          child: _showTtsWordHighlight
+                          child: readerSpokenPlain.isNotEmpty &&
+                                  readerSpokenEnd > readerSpokenStart
+                              ? _textFromInput(
+                                  readerSpokenStart,
+                                  readerSpokenEnd,
+                                  readerSpokenPlain,
+                                )
+                              : _showTtsWordHighlight
                               ? _textFromInput(start, end, allText)
                               : Text(
                                   selectedChapterContent.length > curretNo
@@ -4395,12 +4682,13 @@ class floatingButtonState extends State<floatingButton>
                         ],
                       ),
                     ],
-                  ));
+                  )),
+              );
             },
           );
         },
       ).then((value) {
-        _ttsSheetSetState = null;
+        _closeTtsSheetUi();
         if (mounted && context.mounted) {
           setState(() {});
         }
@@ -4639,6 +4927,15 @@ class floatingButtonState extends State<floatingButton>
     return Duration(seconds: secs < 1 ? 1 : secs);
   }
 
+  int _ttsSecondsForCompletedVerses() {
+    var words = 0;
+    for (var i = 0; i < curretNo && i < selectedChapterContent.length; i++) {
+      words += _spokenWordCount(selectedChapterContent[i].content);
+    }
+    final secs = (words / (2.5 * _ttsSpeedFactor())).round();
+    return secs < 0 ? 0 : secs;
+  }
+
   Duration _ttsEstimatedPosition() {
     var words = 0;
     for (var i = 0; i < curretNo && i < selectedChapterContent.length; i++) {
@@ -4648,12 +4945,30 @@ class floatingButtonState extends State<floatingButton>
       final currentWords =
           _spokenWordCount(selectedChapterContent[curretNo].content);
       if (currentWords > 0 && allText.isNotEmpty) {
-        final frac = (end.clamp(0, allText.length)) / allText.length;
+        final spoken = _ttsSpokenEnd.clamp(0, allText.length);
+        final frac = spoken / allText.length;
         words += (currentWords * frac).round();
       }
     }
     final secs = (words / (2.5 * _ttsSpeedFactor())).round();
-    return Duration(seconds: secs < 0 ? 0 : secs);
+    final clamped = secs < 0 ? 0 : secs;
+    // Hide a one-frame spike. If the later time stays, it is real playback
+    // and the bar must move. Leaving it rejected freezes the bar.
+    if (_ttsPosSecondsShown > 0 && clamped > _ttsPosSecondsShown + 2) {
+      _ttsPosAheadAt ??= DateTime.now();
+      if (DateTime.now().difference(_ttsPosAheadAt!) <
+          const Duration(milliseconds: 350)) {
+        return Duration(seconds: _ttsPosSecondsShown);
+      }
+    } else {
+      _ttsPosAheadAt = null;
+    }
+    if (clamped < _ttsPosSecondsShown) {
+      return Duration(seconds: _ttsPosSecondsShown);
+    }
+    _ttsPosAheadAt = null;
+    _ttsPosSecondsShown = clamped;
+    return Duration(seconds: clamped);
   }
 
   int _ttsVerseAtSeconds(int seconds) {
@@ -4721,6 +5036,8 @@ class floatingButtonState extends State<floatingButton>
     if (curretNo >= 0 && curretNo < selectedChapterContent.length) {
       _newVoiceText = selectedChapterContent[curretNo].content;
     }
+    _ttsPosAheadAt = null;
+    _ttsPosSecondsShown = _ttsSecondsForCompletedVerses();
     if (was && _newVoiceText != null && _newVoiceText!.isNotEmpty) {
       isSpeech = true;
       isManuallyPaused = false;
@@ -4732,7 +5049,12 @@ class floatingButtonState extends State<floatingButton>
   }
 
   Future<void> _jumpToChapter(int chapter) async {
-    if (chapter < 1 || chapter > _chapterTotal()) return;
+    if (chapter < 1) return;
+    if (chapter > _chapterTotal()) {
+      Constants.showToast(
+          _showTtsUi() ? "Reached End" : "Already at last chapter");
+      return;
+    }
     if (_showTtsUi()) {
       final was = isSpeech || ttsState == TtsState.playing;
       if (_isTtsInitialized) {
@@ -4743,6 +5065,8 @@ class floatingButtonState extends State<floatingButton>
       isManualNavigation = true;
       selectedChapter = chapter;
       curretNo = 0;
+      _ttsPosSecondsShown = 0;
+      _ttsPosAheadAt = null;
       await setChapterContent();
       await updateReadingScreenChapter(chapter);
       if (selectedChapterContent.isNotEmpty) {
@@ -4823,12 +5147,17 @@ class floatingButtonState extends State<floatingButton>
 
   Future<void> _openReaderFullPlayer({required bool tts}) async {
     if (!mounted) return;
+    if (_fullPlayerOpen) return;
+    _fullPlayerOpen = true;
+    _fullPlayerUiAlive = true;
     _reopenOldSheet = false;
     _fullScreenTts = tts;
     _readerUseTts = tts;
     if (tts) {
       _attachTtsProgressHandler();
+      _notifyTtsPlayer();
     }
+    try {
     await Navigator.of(context).push(
       PageRouteBuilder<void>(
         transitionDuration: const Duration(milliseconds: 320),
@@ -4836,7 +5165,10 @@ class floatingButtonState extends State<floatingButton>
         pageBuilder: (routeContext, animation, secondaryAnimation) {
           return StatefulBuilder(
             builder: (ctx, setModal) {
-              _fullPlayerSetState = setModal;
+              _fullPlayerSetState = (fn) {
+                if (!_fullPlayerUiAlive || !ctx.mounted) return;
+                setModal(fn);
+              };
               return _readerFullPlayer(ctx);
             },
           );
@@ -4853,8 +5185,11 @@ class floatingButtonState extends State<floatingButton>
         },
       ),
     );
-    _fullScreenTts = null;
-    _fullPlayerSetState = null;
+    } finally {
+      _fullScreenTts = null;
+      _closeFullPlayerUi();
+      _fullPlayerOpen = false;
+    }
     if (!_reopenOldSheet || !mounted) return;
     _reopenOldSheet = false;
     if (tts) {
@@ -4884,7 +5219,11 @@ class floatingButtonState extends State<floatingButton>
     final ttsPosSeconds =
         ttsPosition.inSeconds.clamp(0, ttsMaxSeconds);
     final maxSeconds = duration.inSeconds > 0 ? duration.inSeconds : 1;
-    return Scaffold(
+    return PopScope(
+      onPopInvokedWithResult: (didPop, _) {
+        if (didPop) _closeFullPlayerUi();
+      },
+      child: Scaffold(
       backgroundColor: card,
       body: SafeArea(
         child: Padding(
@@ -4896,6 +5235,7 @@ class floatingButtonState extends State<floatingButton>
                   IconButton(
                     onPressed: () {
                       _reopenOldSheet = true;
+                      _closeFullPlayerUi();
                       Navigator.of(ctx).pop();
                     },
                     icon: Icon(Icons.keyboard_arrow_down, color: ink, size: 28),
@@ -4913,14 +5253,16 @@ class floatingButtonState extends State<floatingButton>
                             fontWeight: FontWeight.w700,
                           ),
                         ),
-                        const SizedBox(height: 2),
-                        Text(
-                          ttsUi ? 'Read Aloud' : 'NLT Audio',
-                          style: TextStyle(
-                            color: ink.withValues(alpha: 0.55),
-                            fontSize: 13,
+                        if (ttsUi) ...[
+                          const SizedBox(height: 2),
+                          Text(
+                            'Read Aloud',
+                            style: TextStyle(
+                              color: ink.withValues(alpha: 0.55),
+                              fontSize: 13,
+                            ),
                           ),
-                        ),
+                        ],
                       ],
                     ),
                   ),
@@ -5105,11 +5447,12 @@ class floatingButtonState extends State<floatingButton>
               Padding(
                 padding: const EdgeInsets.only(bottom: 4),
                 child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Expanded(
                       child: _playerAction(
                         ctx,
-                        iconWidget: _voiceMicIcon(_playerInk(ctx), size: 32),
+                        iconWidget: _voiceMicIcon(_playerInk(ctx), size: 24),
                         label: 'Voice',
                         onTap: _showCombinedVoiceSettingsSheet,
                       ),
@@ -5126,7 +5469,7 @@ class floatingButtonState extends State<floatingButton>
                               : _playerInk(ctx).withValues(alpha: 0.38),
                           size: 24,
                         ),
-                        label: 'Sleep\nTimer',
+                        label: 'Sleep Timer',
                         onTap: _showSleepSheet,
                       ),
                     ),
@@ -5145,6 +5488,7 @@ class floatingButtonState extends State<floatingButton>
           ),
         ),
       ),
+    ),
     );
   }
 
@@ -5210,18 +5554,22 @@ class floatingButtonState extends State<floatingButton>
         padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
         child: Column(
           mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            iconWidget ?? Icon(icon!, color: ink, size: 24),
-            const SizedBox(height: 6),
             SizedBox(
-              height: 30,
-              child: Text(
-                label,
-                textAlign: TextAlign.center,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(color: ink, fontSize: 12, height: 1.15),
+              height: 24,
+              width: 24,
+              child: Center(
+                child: iconWidget ?? Icon(icon!, color: ink, size: 24),
               ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              label,
+              textAlign: TextAlign.center,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(color: ink, fontSize: 12, height: 1.15),
             ),
           ],
         ),

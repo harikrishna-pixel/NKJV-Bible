@@ -7,7 +7,7 @@ import 'package:biblebookapp/view/screens/dashboard/about.dart';
 import 'package:biblebookapp/view/screens/dashboard/constants.dart';
 import 'package:biblebookapp/view/screens/dashboard/home_screen.dart';
 import 'package:biblebookapp/view/screens/dashboard/preference_selection_screen.dart';
-import 'package:biblebookapp/view/screens/chat_support/chat_support_screen.dart';
+// import 'package:biblebookapp/view/screens/chat_support/chat_support_screen.dart';
 import 'package:biblebookapp/view/screens/prayer_wall/prayer_wall_screen.dart';
 import 'package:biblebookapp/view/screens/intro_subcribtion_screen.dart';
 import 'package:biblebookapp/view/screens/paywall_navigation.dart';
@@ -1429,37 +1429,37 @@ class _SettingScreenState extends State<SettingScreen>
                 const SizedBox(
                   height: 5,
                 ),
-                Padding(
-                  padding: EdgeInsets.symmetric(
-                      horizontal: 20, vertical: screenWidth < 380 ? 5 : 10),
-                  child: InkWell(
-                    onTap: () {
-                      SharPreferences.setString('OpenAd', '1');
-                      Get.to(
-                        () => const ChatSupportScreen(),
-                        transition: Transition.cupertino,
-                        duration: const Duration(milliseconds: 250),
-                      );
-                    },
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.center,
-                      mainAxisAlignment: MainAxisAlignment.start,
-                      children: [
-                        Text(
-                          "Chat Support",
-                          style: CommanStyle.bw16500(context)
-                              .copyWith(color: _settingsRowInk(context)),
-                        ),
-                        const Spacer(),
-                        Icon(
-                          Icons.navigate_next,
-                          color: _settingsRowInk(context),
-                          size: 24,
-                        )
-                      ],
-                    ),
-                  ),
-                ),
+                // Padding(
+                //   padding: EdgeInsets.symmetric(
+                //       horizontal: 20, vertical: screenWidth < 380 ? 5 : 10),
+                //   child: InkWell(
+                //     onTap: () {
+                //       SharPreferences.setString('OpenAd', '1');
+                //       Get.to(
+                //         () => const ChatSupportScreen(),
+                //         transition: Transition.cupertino,
+                //         duration: const Duration(milliseconds: 250),
+                //       );
+                //     },
+                //     child: Row(
+                //       crossAxisAlignment: CrossAxisAlignment.center,
+                //       mainAxisAlignment: MainAxisAlignment.start,
+                //       children: [
+                //         Text(
+                //           "Chat Support",
+                //           style: CommanStyle.bw16500(context)
+                //               .copyWith(color: _settingsRowInk(context)),
+                //         ),
+                //         const Spacer(),
+                //         Icon(
+                //           Icons.navigate_next,
+                //           color: _settingsRowInk(context),
+                //           size: 24,
+                //         )
+                //       ],
+                //     ),
+                //   ),
+                // ),
                 const SizedBox(
                   height: 5,
                 ),

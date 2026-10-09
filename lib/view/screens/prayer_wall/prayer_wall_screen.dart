@@ -131,6 +131,10 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
   bool _queueLoading = false;
   Timer? _queueTickTimer;
   DateTime? _queueSlotEndsAt;
+  /// Server remaining time when the queue was fetched. Counted down with a
+  /// clock that ignores a manual phone date change.
+  int? _queueMsAtFetch;
+  final Stopwatch _queueCountdown = Stopwatch();
   bool _waitingViewAll = false;
   /// Prevents double-tap from stacking multiple Hotspot/Prayer detail routes.
   bool _openingQueueDetail = false;
@@ -226,16 +230,22 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
     _hydrateMyPrayerIdsFromDisk();
     _hydrateReportedPrayerIdsFromDisk();
     _hydrateBlockedUserIdsFromDisk();
-    _loadAuthAndLocalName();
-    // Load queue immediately so Hotspot UI is not blocked on wall GET.
-    unawaited(_refreshQueue());
-    _refresh();
+    // Resolve viewer user_id first so wall/queue GET sends
+    // excludeBlockedForUserId (two-way block) instead of a plain list.
+    unawaited(_bootstrapWallLoads());
     final posted = widget.openPostedPrayer;
     if (posted != null && posted.id.trim().isNotEmpty) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         unawaited(_openPostedPrayerDetail());
       });
     }
+  }
+
+  Future<void> _bootstrapWallLoads() async {
+    await _loadAuthAndLocalName();
+    if (!mounted) return;
+    unawaited(_refreshQueue());
+    await _refresh();
   }
 
   Future<void> _openPostedPrayerDetail() async {
@@ -253,6 +263,7 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
   @override
   void dispose() {
     _queueTickTimer?.cancel();
+    _queueCountdown.stop();
     FocusManager.instance.removeListener(_onFocusOrMetricsChanged);
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
@@ -645,6 +656,12 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
         _queueCurrent = current;
         _queueList = list;
         _queueSlotEndsAt = current.slotEndsAt ?? list.slotEndsAt;
+        _queueMsAtFetch = current.msRemaining > 0
+            ? current.msRemaining
+            : list.msRemaining;
+        _queueCountdown
+          ..reset()
+          ..start();
         _queueLoading = false;
         _queueError = null;
       });
@@ -662,13 +679,7 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
     _queueTickTimer?.cancel();
     _queueTickTimer = Timer.periodic(const Duration(seconds: 1), (_) {
       if (!mounted) return;
-      final ends = _queueSlotEndsAt;
-      if (ends == null) {
-        setState(() {});
-        return;
-      }
-      final left = ends.toUtc().difference(DateTime.now().toUtc()).inMilliseconds;
-      if (left <= 0) {
+      if (_queueMsRemaining <= 0) {
         _queueTickTimer?.cancel();
         unawaited(_refreshQueue());
         return;
@@ -678,9 +689,9 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
   }
 
   int get _queueMsRemaining {
-    final ends = _queueSlotEndsAt;
-    if (ends != null) {
-      final left = ends.toUtc().difference(DateTime.now().toUtc()).inMilliseconds;
+    final atFetch = _queueMsAtFetch;
+    if (atFetch != null) {
+      final left = atFetch - _queueCountdown.elapsedMilliseconds;
       return left < 0 ? 0 : left;
     }
     return _queueCurrent?.msRemaining ?? _queueList?.msRemaining ?? 0;
@@ -709,9 +720,20 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
     final totalSec =
         ((steps - 1) * slotSeconds) + (ms / 1000).floor();
     if (totalSec <= 0) return 'Soon';
-    final mins = (totalSec / 60).ceil();
-    if (mins <= 1) return 'STARTS IN 1 MIN';
-    return 'STARTS IN $mins MIN';
+    var hours = totalSec ~/ 3600;
+    var mins = ((totalSec % 3600) / 60).ceil();
+    if (mins == 60) {
+      hours += 1;
+      mins = 0;
+    }
+    if (hours <= 0) {
+      if (mins <= 1) return 'STARTS IN 1 MIN';
+      return 'STARTS IN $mins MIN';
+    }
+    final hourLabel = hours == 1 ? '1 HR' : '$hours HRS';
+    if (mins <= 0) return 'STARTS IN $hourLabel';
+    final minLabel = mins == 1 ? '1 MIN' : '$mins MIN';
+    return 'STARTS IN $hourLabel $minLabel';
   }
 
   /// Waiting slots after current, wrapping when `loops` (excludes next/hotspot).
@@ -2008,6 +2030,14 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
     }
   }
 
+  bool _isPrayerInputTooShort(String text) {
+    final trimmed = text.trim();
+    if (trimmed.length < 50) return true;
+    final words =
+        trimmed.split(RegExp(r'\s+')).where((word) => word.isNotEmpty).length;
+    return words < 3;
+  }
+
   Future<void> _openPrayerActions(PrayerWallItem item) async {
     final isMine = _isMyPrayer(item);
     if (!isMine) return;
@@ -2374,6 +2404,11 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
           .replaceAll(PrayerDualDescription.myWordsMarker, '')
           .replaceAll(PrayerDualDescription.aiMarker, '')
           .trim();
+      if (_isPrayerInputTooShort(newTitle) || _isPrayerInputTooShort(newDesc)) {
+        if (!mounted) return;
+        Constants.showToast('Please enter at least 50 characters.');
+        return;
+      }
       if (PrayerDualDescription.isDual(item.description)) {
         newDesc = PrayerDualDescription.encode(
           originalWords: PrayerDualDescription.myWords(item.description) ?? '',
@@ -2409,9 +2444,51 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
     return 'Just now';
   }
 
+  /// Newest profile name used by prayers that share one email.
+  String _latestAuthorNameForEmail(String email) {
+    final want = email.trim().toLowerCase();
+    if (want.isEmpty) return '';
+    PrayerWallItem? newest;
+    void consider(PrayerWallItem? prayer) {
+      if (prayer == null || prayer.isAnonymous) return;
+      if ((prayer.email ?? '').trim().toLowerCase() != want) return;
+      final name = (prayer.authorName ?? '').trim();
+      if (name.isEmpty) return;
+      final current = newest;
+      if (current == null) {
+        newest = prayer;
+        return;
+      }
+      final at = prayer.createdAt ?? DateTime.fromMillisecondsSinceEpoch(0);
+      final best = current.createdAt ?? DateTime.fromMillisecondsSinceEpoch(0);
+      if (at.isAfter(best)) newest = prayer;
+    }
+
+    for (final prayer in _all) {
+      consider(prayer);
+    }
+    for (final prayer in _historyItems) {
+      consider(prayer);
+    }
+    final queued = _queueList?.items ?? const <PrayerQueueSlotItem>[];
+    for (final slot in queued) {
+      consider(slot.prayer);
+    }
+    consider(_queueCurrent?.prayer);
+    consider(_queueComingUpNext);
+    return (newest?.authorName ?? '').trim();
+  }
+
   /// Display name on a card. Own posts use the name saved with the prayer
   /// (API / local map), not a forced login-cache override.
   String _cardDisplayName(PrayerWallItem item) {
+    if (!item.isAnonymous) {
+      final email = (item.email ?? '').trim().toLowerCase();
+      if (email.isNotEmpty) {
+        final latest = _latestAuthorNameForEmail(email);
+        if (latest.isNotEmpty) return latest;
+      }
+    }
     final fromApi = (item.authorName ?? '').trim();
     final fromMap = (_prayerAuthorMap[item.id] ?? '').trim();
 

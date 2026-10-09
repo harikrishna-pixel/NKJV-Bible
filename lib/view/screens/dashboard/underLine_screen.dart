@@ -19,6 +19,8 @@ import 'package:package_info_plus/package_info_plus.dart';
 import 'package:share_plus/share_plus.dart';
 
 import '../../../Model/bookMarkModel.dart';
+import 'package:biblebookapp/utils/library_verse_flags_sync.dart';
+
 import '../../../controller/dpProvider.dart';
 import '../../constants/colors.dart';
 import '../../constants/constant.dart';
@@ -65,7 +67,8 @@ class _UnderLineScreenState extends State<UnderLineScreen> {
   }
 
   loadData() async {
-    await DBMigrationHelper.tryRestoreLibraryDataFromLegacy();
+    final inserted = await DBMigrationHelper.tryRestoreLibraryDataFromLegacy();
+    await LibraryVerseFlagsSync.reapplyAfterLegacyCopy(inserted);
     if (!mounted) return;
     setState(() {
       underListData = DBHelper().getUnderLine();
@@ -236,7 +239,11 @@ class _UnderLineScreenState extends State<UnderLineScreen> {
                                                 const SizedBox(
                                                   height: 35,
                                                 ),
-                                                SingleChildScrollView(
+                                                Align(
+                                                  alignment: screenWidth > 450
+                                                      ? Alignment.center
+                                                      : Alignment.centerLeft,
+                                                  child: SingleChildScrollView(
                                                   scrollDirection:
                                                       Axis.horizontal,
                                                   child: Row(
@@ -706,6 +713,7 @@ class _UnderLineScreenState extends State<UnderLineScreen> {
                                                                               // DBHelper().updateVersesDataByContent(data.content.toString(), "is_underlined", "no");
                                                                               DBHelper().deleteUnderline(data.id!.toInt()).then((value) {
                                                                                 loadData();
+                                                                                reloadOpenChapterAfterLibraryChange();
                                                                                 Get.back();
                                                                               });
                                                                             },
@@ -773,6 +781,7 @@ class _UnderLineScreenState extends State<UnderLineScreen> {
                                                   ],
                                                 ),
                                                 ),
+                                                ),
                                               ],
                                             ),
                                           );
@@ -780,7 +789,7 @@ class _UnderLineScreenState extends State<UnderLineScreen> {
                                       );
                                     },
                                     child: Text(
-                                      '''${data!.content}''',
+                                      '''${data.content}''',
                                       style: CommanStyle
                                           .bw14500withBgColorAndUnderLine(
                                               context,
@@ -872,7 +881,11 @@ class _UnderLineScreenState extends State<UnderLineScreen> {
                                             const SizedBox(
                                               height: 35,
                                             ),
-                                            SingleChildScrollView(
+                                            Align(
+                                              alignment: screenWidth > 450
+                                                  ? Alignment.center
+                                                  : Alignment.centerLeft,
+                                              child: SingleChildScrollView(
                                               scrollDirection:
                                                   Axis.horizontal,
                                               child: Row(
@@ -1357,6 +1370,7 @@ class _UnderLineScreenState extends State<UnderLineScreen> {
                                                                               .deleteUnderline(data.id!.toInt())
                                                                               .then((value) {
                                                                             loadData();
+                                                                            reloadOpenChapterAfterLibraryChange();
                                                                             Get.back();
                                                                           });
                                                                         },
@@ -1431,8 +1445,9 @@ class _UnderLineScreenState extends State<UnderLineScreen> {
                                               ],
                                             ),
                                           ),
-                                        ],
-                                      ),
+                                        ),
+                                      ],
+                                    ),
                                     );
                                     },
                                   );

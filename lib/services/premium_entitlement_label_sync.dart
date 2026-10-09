@@ -37,6 +37,60 @@ class PremiumEntitlementLabelSync {
     return null;
   }
 
+  /// One label for Restore, the active-plan box, and Subscription Info.
+  /// `month`, `sixmonth`, `year`, `twoyear`, `lifetime`, or null.
+  static String? periodKind({
+    String? plan,
+    String? productId,
+    required int daysRemaining,
+  }) {
+    final id = (productId ?? '').toLowerCase();
+    final planKey = (plan ?? '').toLowerCase();
+    final knownOneYear = id.contains('oneyear') ||
+        id.contains('1year') ||
+        BibleInfo.isArOneYearProductId(productId ?? '');
+    final knownSixMonth = id.contains('sixmonth') ||
+        id.contains('6month') ||
+        BibleInfo.isArSixMonthProductId(productId ?? '');
+    final knownOneMonth = BibleInfo.isOneMonthProductId(productId ?? '');
+    final twoYearByDays = daysRemaining >= 680 && daysRemaining <= 800;
+    final oneYearByDays = daysRemaining >= 330 && daysRemaining <= 400;
+    final sixByDays = daysRemaining >= 120 && daysRemaining <= 220;
+    final monthByDays = daysRemaining >= 20 && daysRemaining <= 45;
+
+    if (planKey == 'platinum' ||
+        id.contains('lifetime') ||
+        daysRemaining > 10000) {
+      return 'lifetime';
+    }
+    if (planKey == 'twoyear' ||
+        id.contains('twoyear') ||
+        ((planKey == 'gold' || planKey.isEmpty) &&
+            twoYearByDays &&
+            !knownOneYear)) {
+      return 'twoyear';
+    }
+    if (planKey == 'gold' ||
+        knownOneYear ||
+        (planKey != 'silver' &&
+            oneYearByDays &&
+            !knownSixMonth &&
+            !knownOneMonth)) {
+      return 'year';
+    }
+    if (knownSixMonth ||
+        ((planKey == 'silver' || planKey.isEmpty) &&
+            sixByDays &&
+            !knownOneMonth &&
+            !knownOneYear)) {
+      return 'sixmonth';
+    }
+    if (planKey == 'silver' || knownOneMonth || monthByDays) {
+      return 'month';
+    }
+    return null;
+  }
+
   static String? planKeyForProductId(String productId) {
     final id = productId.toLowerCase();
     if (id.contains('lifetime')) return 'platinum';

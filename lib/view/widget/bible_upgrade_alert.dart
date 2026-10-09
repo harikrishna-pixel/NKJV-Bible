@@ -52,12 +52,15 @@ class BibleUpgradeAlertState extends UpgradeAlertState {
   static bool _journeyGateReleased = false;
 
   /// Home awaits this so Continue Journey never overlaps the Update Alert.
+  /// The store version check can finish after Home is ready. Keep waiting
+  /// until that check starts, then until the alert is dismissed.
   static Future<void> waitForUpdateFlowBeforeContinueJourney() async {
-    for (var i = 0; i < 100; i++) {
-      if (_journeyGateCompleter != null || _journeyGateReleased) {
-        break;
-      }
-      await Future.delayed(const Duration(milliseconds: 50));
+    const step = Duration(milliseconds: 50);
+    final startDeadline = DateTime.now().add(const Duration(seconds: 60));
+    while (DateTime.now().isBefore(startDeadline)) {
+      if (_journeyGateReleased) return;
+      if (_journeyGateCompleter != null) break;
+      await Future.delayed(step);
     }
     if (_journeyGateReleased) return;
     final completer = _journeyGateCompleter;

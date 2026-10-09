@@ -58,6 +58,14 @@ void _keepOnlyTextFocus(FocusNode keep) {
   }
 }
 
+bool _isPrayerInputTooShort(String text) {
+  final trimmed = text.trim();
+  if (trimmed.length < 50) return true;
+  final words =
+      trimmed.split(RegExp(r'\s+')).where((word) => word.isNotEmpty).length;
+  return words < 3;
+}
+
 /// "Post a Prayer" — POST `/api/prayers`. Duration/credits are UI-only (not sent to API).
 class PostPrayerScreen extends StatefulWidget {
   const PostPrayerScreen({
@@ -452,6 +460,15 @@ class _PostPrayerScreenState extends State<PostPrayerScreen> {
     if (words.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please enter your prayer request.')),
+      );
+      return;
+    }
+    if (_isPrayerInputTooShort(_titleCtrl.text) ||
+        _isPrayerInputTooShort(words)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please enter at least 50 characters.'),
+        ),
       );
       return;
     }
@@ -1268,6 +1285,14 @@ class _PrayerDetailsComposeScreenState
       );
       return;
     }
+    if (_isPrayerInputTooShort(words)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please enter at least 50 characters.'),
+        ),
+      );
+      return;
+    }
     setState(() => _creating = true);
     final english = await PrayerWallService.formatPrayerInEnglish(
       userWords: words,
@@ -1304,6 +1329,15 @@ class _PrayerDetailsComposeScreenState
     if (english.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please enter the prayer text.')),
+      );
+      return;
+    }
+    if (_isPrayerInputTooShort(english) ||
+        _isPrayerInputTooShort(_originalWords)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please enter at least 50 characters.'),
+        ),
       );
       return;
     }

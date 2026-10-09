@@ -9,6 +9,7 @@ import 'package:biblebookapp/Model/verseBookContentModel.dart';
 import 'package:biblebookapp/controller/dpProvider.dart';
 import 'package:biblebookapp/core/bible_extract_paths.dart';
 import 'package:biblebookapp/core/notifiers/download.notifier.dart';
+import 'package:biblebookapp/utils/library_verse_flags_sync.dart';
 import 'package:biblebookapp/view/constants/assets_constants.dart';
 import 'package:biblebookapp/view/constants/constant.dart';
 import 'package:biblebookapp/view/screens/dashboard/constants.dart';
@@ -32,6 +33,27 @@ import 'package:biblebookapp/view/constants/colors.dart';
 import 'package:biblebookapp/view/constants/images.dart';
 import 'package:biblebookapp/view/constants/theme_provider.dart';
 import 'package:biblebookapp/utils/internet_speed_checker.dart';
+import 'package:internet_connection_checker_plus/internet_connection_checker_plus.dart';
+
+/// True when a plan is saved and its expiry is still in the future.
+Future<bool> _hasActivePremiumPlan() async {
+  final prefs = await SharedPreferences.getInstance();
+  final plan = (prefs.getString('subscription_plan') ?? '').toLowerCase().trim();
+  final hasPlan = plan == 'platinum' ||
+      plan == 'gold' ||
+      plan == 'silver' ||
+      plan == 'twoyear';
+  final rewardTime =
+      await SharPreferences.getString(SharPreferences.isRewardAdViewTime);
+  if (rewardTime == null || rewardTime.isEmpty) return false;
+  final saveTime = DateTime.tryParse(rewardTime);
+  if (saveTime == null) return false;
+  final now = DateTime.now();
+  if (hasPlan) return saveTime.isAfter(now);
+  // Old builds saved only the expiry. Short ad-free windows (reward ads, up to
+  // 3 days) are not premium.
+  return saveTime.isAfter(now.add(const Duration(days: 3)));
+}
 
 class PreferenceSelectionScreen extends StatefulWidget {
   final bool isSetting;
@@ -908,9 +930,15 @@ class PreferenceSelectionScreenState extends State<PreferenceSelectionScreen> {
                               .toString(),
                         );
 
+                        final readingProgress =
+                            await LibraryVerseFlagsSync.saveReadingProgress();
                         await loadBookContent(
                             BibleInfo.folders.first);
                         await loadBookList(BibleInfo.folders.first);
+                        // loadBookContent rebuilds `verse` with no marks.
+                        await LibraryVerseFlagsSync.reapplyToVerseTable();
+                        await LibraryVerseFlagsSync.restoreReadingProgress(
+                            readingProgress);
                         await _finalizeBibleSetupAndPreloadHomeData();
                         await DBHelper().db.then((db) async {
                           if (db != null) {
@@ -953,8 +981,14 @@ class PreferenceSelectionScreenState extends State<PreferenceSelectionScreen> {
                         // Show success dialog after user dismisses loading dialog
                         // This will be handled when user taps Continue button
                       } else {
+                        final readingProgress =
+                            await LibraryVerseFlagsSync.saveReadingProgress();
                         await loadBookContent(widget.selectedbible);
                         await loadBookList(widget.selectedbible);
+                        // loadBookContent rebuilds `verse` with no marks.
+                        await LibraryVerseFlagsSync.reapplyToVerseTable();
+                        await LibraryVerseFlagsSync.restoreReadingProgress(
+                            readingProgress);
                         await _finalizeBibleSetupAndPreloadHomeData();
                         await DBHelper().db.then((db) async {
                           if (db != null) {
@@ -1603,9 +1637,7 @@ class FaithJourneyDialog {
                               await SharPreferences.setBoolean(
                                   SharPreferences.onboarding, true);
 
-                              final shouldShowPaywall = await PaywallPreloadService
-                                  .canShowOnboardingPaywall();
-                              if (!shouldShowPaywall) {
+                              if (await _hasActivePremiumPlan()) {
                                 if (navContext != null && navContext.mounted) {
                                   await StreakFlowNavigation
                                       .navigateToStreakFlowOrHome(navContext);
@@ -1613,25 +1645,54 @@ class FaithJourneyDialog {
                                 return;
                               }
 
-                              try {
-                                final connectionSpeed =
-                                    await InternetSpeedChecker.checkSpeed(
-                                  timeout: const Duration(seconds: 8),
-                                );
-                                final isVerySlowConnection =
-                                    connectionSpeed != null &&
-                                        connectionSpeed > 12000;
-                                if (isVerySlowConnection) {
+                              final hasInternet =
+                                  await InternetConnection().hasInternetAccess;
+                              if (!hasInternet) {
+                                if (!await SubscriptionScreen
+                                    .isDashboardIapEnabled()) {
                                   if (navContext != null &&
                                       navContext.mounted) {
                                     await StreakFlowNavigation
-                                        .navigateToStreakFlowOrHome(navContext);
+                                        .navigateToStreakFlowOrHome(
+                                            navContext);
                                   }
                                   return;
                                 }
-                              } catch (e) {
-                                debugPrint(
-                                    'Error checking connection speed in onboarding: $e');
+                              } else {
+                                final shouldShowPaywall =
+                                    await PaywallPreloadService
+                                        .canShowOnboardingPaywall();
+                                if (!shouldShowPaywall) {
+                                  if (navContext != null &&
+                                      navContext.mounted) {
+                                    await StreakFlowNavigation
+                                        .navigateToStreakFlowOrHome(
+                                            navContext);
+                                  }
+                                  return;
+                                }
+
+                                try {
+                                  final connectionSpeed =
+                                      await InternetSpeedChecker.checkSpeed(
+                                    timeout: const Duration(seconds: 8),
+                                  );
+                                  final isVerySlowConnection =
+                                      connectionSpeed != null &&
+                                          connectionSpeed > 12000;
+                                  if (isVerySlowConnection) {
+                                    if (navContext != null &&
+                                        navContext.mounted) {
+                                      await StreakFlowNavigation
+                                          .navigateToStreakFlowOrHome(
+                                              navContext);
+                                    }
+                                    return;
+                                  }
+                                } catch (e) {
+                                  debugPrint(
+                                      'Error checking connection speed in onboarding: $e');
+                                }
                               }
 
                               final sixMonthPlan = BibleInfo.sixMonthPlanid;

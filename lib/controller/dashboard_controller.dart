@@ -26,6 +26,13 @@ import '../view/constants/share_preferences.dart';
 import 'api_service.dart';
 import 'dpProvider.dart';
 
+/// Reload the open reading chapter after a My Library edit so highlight,
+/// bookmark, note, and underline changes show without leaving the app.
+void reloadOpenChapterAfterLibraryChange() {
+  if (!Get.isRegistered<DashBoardController>()) return;
+  Get.find<DashBoardController>().forceReloadSelectedChapter();
+}
+
 class DashBoardController extends GetxController with WidgetsBindingObserver {
   final webViewLoading = false.obs;
   final webViewKey = GlobalKey().obs;

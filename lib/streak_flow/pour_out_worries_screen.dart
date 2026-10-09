@@ -1,8 +1,6 @@
-import 'package:biblebookapp/core/notifiers/cache.notifier.dart';
 import 'package:biblebookapp/streak_flow/take_moment_intro_screen.dart';
 import 'package:biblebookapp/streak_flow/take_moment_rest_screen.dart';
 import 'package:biblebookapp/view/constants/colors.dart';
-import 'package:biblebookapp/view/constants/constant.dart';
 import 'package:biblebookapp/view/constants/theme_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
@@ -14,14 +12,7 @@ import 'package:flutter/services.dart';
 class PourOutWorriesScreen extends StatefulWidget {
   const PourOutWorriesScreen({super.key});
 
-  /// Guests see a login toast. Signed-in users open Find Peace as before.
-  static Future<void> openIfLoggedIn() async {
-    final token = await CacheNotifier().readCache(key: 'authtoken');
-    final signedIn = token != null && token.toString().trim().isNotEmpty;
-    if (!signedIn) {
-      Constants.showToast('Login required');
-      return;
-    }
+  static Future<void> open() async {
     Get.to(() => const PourOutWorriesScreen());
   }
 

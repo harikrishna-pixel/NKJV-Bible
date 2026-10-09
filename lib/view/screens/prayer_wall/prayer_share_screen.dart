@@ -139,13 +139,10 @@ class PrayerShareScreen extends StatelessWidget {
       ),
       body: SafeArea(
         top: false,
-        child: Padding(
+        child: ListView(
           padding: const EdgeInsets.fromLTRB(16, 16, 16, 22),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Flexible(
-                child: Container(
+          children: [
+              Container(
                   width: double.infinity,
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
@@ -153,8 +150,7 @@ class PrayerShareScreen extends StatelessWidget {
                     borderRadius: BorderRadius.circular(16),
                     border: Border.all(color: brown.withValues(alpha: 0.22)),
                   ),
-                  child: SingleChildScrollView(
-                    child: Column(
+                  child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
@@ -238,9 +234,7 @@ class PrayerShareScreen extends StatelessWidget {
                         ),
                       ],
                     ),
-                  ),
                 ),
-              ),
               const SizedBox(height: 16),
               _actionTile(
                 context,
@@ -276,8 +270,7 @@ class PrayerShareScreen extends StatelessWidget {
           ),
         ),
       ),
-        )
-      )
+    ),
     );
   }
 

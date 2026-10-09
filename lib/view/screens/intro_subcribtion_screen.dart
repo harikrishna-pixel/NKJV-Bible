@@ -254,6 +254,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen>
   bool _isSixMonthProductId(String productId) {
     // AR 1 Month uses the 6M paywall slot ID (onemonthauto) — do not treat it as 6M.
     if (BibleInfo.isArOneMonthProductId(productId)) return false;
+    if (BibleInfo.isArSixMonthProductId(productId)) return true;
     return productId == _resolvedSixMonthPlanId ||
         productId == widget.sixMonthPlan ||
         (productId.contains('sixmonth') &&
@@ -617,11 +618,9 @@ class _SubscriptionScreenState extends State<SubscriptionScreen>
       }
     }
 
-    final timedForPick = BibleInfo.isAutoRenewablePaywallMode
-        ? timed
-            .where((e) => !_isSixMonthProductId(e['id'] ?? ''))
-            .toList()
-        : timed;
+    // Keep 6-month receipts (old sixmonthadsfree and arsixm) so Restore
+    // can apply them. Newest dated purchase still wins.
+    final timedForPick = timed;
 
     final remembered = await _readLastIapProduct();
     final rememberedTier =
@@ -699,6 +698,9 @@ class _SubscriptionScreenState extends State<SubscriptionScreen>
       return true;
     }
     if (_isLifetimeProductId(remembered) && _isLifetimeProductId(productId)) {
+      return true;
+    }
+    if (_isSixMonthProductId(remembered) && _isSixMonthProductId(productId)) {
       return true;
     }
     return false;
@@ -2349,32 +2351,6 @@ class _SubscriptionScreenState extends State<SubscriptionScreen>
           transactionDate: date,
         )) {
           EasyLoading.dismiss();
-          return;
-        }
-        if (BibleInfo.isAutoRenewablePaywallMode) {
-          var oneMonthDiff =
-              dateTime.add(const Duration(days: 30)).difference(DateTime.now());
-          if (oneMonthDiff.isNegative || oneMonthDiff.inHours < 24) {
-            oneMonthDiff = const Duration(days: 30);
-          }
-          await controller.disableAd(oneMonthDiff);
-          if (downloadProvider != null) {
-            await downloadProvider.setSubscriptionPlan('silver');
-          }
-          await Future.delayed(Duration(seconds: 1));
-          EasyLoading.dismiss();
-          Constants.showToast(
-            successToastMessage,
-            startFlag == true ? 1000 : 2000,
-          );
-          if (startFlag != true) {
-            await Future.delayed(const Duration(seconds: 2));
-          }
-          await SharPreferences.setBoolean('closead', true);
-          await _completePaywallSubscriptionNavigation(
-            startFlag: startFlag == true,
-            invisiblePopSuccess: true,
-          );
           return;
         }
         await _applySixMonthPremium(controller, anchorDate: dateTime);

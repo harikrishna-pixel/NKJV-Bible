@@ -38,6 +38,9 @@ class DBHelper {
   // Keep dynamic so we can still query in fallback scenarios.
   static dynamic _db;
 
+  /// Verse highlight/bookmark/note flags changed. Reading reloads on return.
+  static bool readingVerseFlagsDirty = false;
+
   /// Cold start (Splash): drop any in-memory connection so we always open
   /// the on-disk `bible_enc.db`. Fixes stale singleton after reinstall/overwrite
   /// when prefs were restored but the DB file is new or empty.
@@ -305,11 +308,80 @@ class DBHelper {
     return queryResult.map((e) => VerseBookContentModel.fromJson(e)).toList();
   }
 
+  /// Paint one verse flag from a library row.
+  /// Library stores the on-screen chapter and verse (1-based). The verse table
+  /// stores verse_num 0-based, and chapter_num may be 0-based too.
+  /// When [plainText] is set, only a row with that same text is marked.
+  Future<int> updateVerseFlagByLibraryPlace({
+    required num? bookNum,
+    required num? chapterNum,
+    required num? verseNum,
+    required String column,
+    required String value,
+    String plainText = '',
+  }) async {
+    const allowed = {
+      'is_bookmarked',
+      'is_highlighted',
+      'is_underlined',
+      'is_noted',
+    };
+    if (!allowed.contains(column)) return 0;
+    final book = bookNum?.toInt();
+    final chapter = chapterNum?.toInt();
+    final verse = verseNum?.toInt();
+    if (book == null || chapter == null || verse == null) return 0;
+    if (book < 0 || chapter < 0 || verse < 0) return 0;
+
+    final dbClient = await db;
+    if (dbClient == null) return 0;
+
+    final books = <int>[book, if (book > 0) book - 1];
+    final chapters = <int>[if (chapter > 0) chapter - 1, chapter];
+    final verses = <int>[if (verse > 0) verse - 1, verse];
+    final wanted = plainText.trim();
+
+    for (final b in books) {
+      for (final c in chapters) {
+        for (final v in verses) {
+          final rows = await dbClient.query(
+            'verse',
+            columns: ['id', 'content'],
+            where: 'book_num = ? AND chapter_num = ? AND verse_num = ?',
+            whereArgs: [b, c, v],
+            limit: 1,
+          );
+          if (rows.isEmpty) continue;
+          if (wanted.isNotEmpty) {
+            final htmlContent = rows.first['content']?.toString() ?? '';
+            final parsed =
+                html_parser.parse(htmlContent).body?.text?.trim() ?? '';
+            if (parsed != wanted) continue;
+          }
+          final id = rows.first['id'];
+          final res = await dbClient.update(
+            'verse',
+            {column: value},
+            where: 'id = ?',
+            whereArgs: [id],
+          );
+          if (res > 0) {
+            readingVerseFlagsDirty = true;
+            return res;
+          }
+        }
+      }
+    }
+
+    return 0;
+  }
+
   Future<int> updateVersesData(int? id, String title, String value) async {
     if (id != null) {
       var dbClient = await db;
       var res = await dbClient!
           .update("verse", {title: value}, where: "id = ?", whereArgs: [id]);
+      readingVerseFlagsDirty = true;
       return res;
     }
     return 0;
@@ -324,6 +396,7 @@ class DBHelper {
       where: "id = ?",
       whereArgs: [id],
     );
+    readingVerseFlagsDirty = true;
     return res;
   }
 
@@ -332,6 +405,7 @@ class DBHelper {
     var dbClient = await db;
     var res = await dbClient!.update("verse", {title: value},
         where: "content = ?", whereArgs: [content]);
+    readingVerseFlagsDirty = true;
     return res;
   }
 
@@ -352,6 +426,7 @@ class DBHelper {
         final int id = verse["id"];
 
         // Step 3: Update this verse
+        readingVerseFlagsDirty = true;
         return await dbClient.update(
           "verse",
           {title: value},
@@ -381,6 +456,7 @@ class DBHelper {
         // debugPrint(
         //     "check highlight - ${verse["id"]}  ${parsedText.trim()} =  ${plainContent.trim()}");
         // Step 3: Update this verse
+        readingVerseFlagsDirty = true;
         return await dbClient.update(
           "verse",
           {title: value},
@@ -407,6 +483,7 @@ class DBHelper {
         where: 'content = ?',
         whereArgs: [content],
       );
+      readingVerseFlagsDirty = true;
       return res;
     } catch (e) {
       debugPrint('Error updating verse: $e');
@@ -1290,10 +1367,10 @@ class DBMigrationHelper {
   }
 
   /// Call from Library screens when data is empty to retry copying from legacy DB.
-  static Future<void> tryRestoreLibraryDataFromLegacy() async {
+  static Future<bool> tryRestoreLibraryDataFromLegacy() async {
     final password = dotenv.env[AssetsConstants.dbPasswordKey];
-    if (password == null || password.isEmpty) return;
-    await copyUserDataFromLegacyIfNeeded(password);
+    if (password == null || password.isEmpty) return false;
+    return copyUserDataFromLegacyIfNeeded(password);
   }
 
   /// Emergency recovery method for users who already updated and lost data
@@ -1423,7 +1500,8 @@ class DBMigrationHelper {
 
   /// If legacy DB still exists and current DB has no user data, copy it over.
   /// Call after migration and before deleting legacy DB files.
-  static Future<void> copyUserDataFromLegacyIfNeeded(String password) async {
+  static Future<bool> copyUserDataFromLegacyIfNeeded(String password) async {
+    var insertedAny = false;
     final sourceDbPath = await getSourceDbPath();
     final newDbPath = await getNewDbPath();
 
@@ -1436,12 +1514,12 @@ class DBMigrationHelper {
 
     if (!newExists) {
       print('copyUserDataFromLegacyIfNeeded: target DB missing ($newDbPath).');
-      return;
+      return false;
     }
 
     if (!sourceExists) {
       print('copyUserDataFromLegacyIfNeeded: no legacy source DB to copy.');
-      return;
+      return false;
     }
 
     final looksEncrypted = !sourceDbPath!.endsWith(_unencryptedDbName)
@@ -1456,7 +1534,7 @@ class DBMigrationHelper {
           : await plain.openDatabase(sourceDbPath, singleInstance: false);
     } catch (e) {
       print('copyUserDataFromLegacyIfNeeded: could not open legacy DB: $e');
-      return;
+      return false;
     }
 
     // singleInstance: false — the shared instance is DBHelper's connection;
@@ -1472,7 +1550,7 @@ class DBMigrationHelper {
     } catch (e) {
       print('copyUserDataFromLegacyIfNeeded: could not open new DB: $e');
       await legacyDb?.close();
-      return;
+      return false;
     }
 
     try {
@@ -1576,6 +1654,7 @@ class DBMigrationHelper {
           }
 
           if (missing.isNotEmpty) {
+            insertedAny = true;
             await newDb.transaction((txn) async {
               final batch = txn.batch();
               for (final row in missing.values) {
@@ -1615,6 +1694,7 @@ class DBMigrationHelper {
         print('copyUserDataFromLegacyIfNeeded: rename legacy DB failed: $e');
       }
     }
+    return insertedAny;
   }
 
   static Future<void> _createTables(sqlcipher.Database db) async {

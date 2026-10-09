@@ -19,6 +19,8 @@ import 'package:html/parser.dart' as html;
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:share_plus/share_plus.dart';
 
+import 'package:biblebookapp/utils/library_verse_flags_sync.dart';
+
 import '../../../controller/dpProvider.dart';
 import '../../constants/colors.dart';
 import '../../constants/constant.dart';
@@ -65,7 +67,8 @@ class _HighLightScreenState extends State<HighLightScreen> {
 
   Future<List<HighLightContentModal>> _loadData() async {
     // CRITICAL: Always try to restore legacy data first
-    await DBMigrationHelper.tryRestoreLibraryDataFromLegacy();
+    final inserted = await DBMigrationHelper.tryRestoreLibraryDataFromLegacy();
+    await LibraryVerseFlagsSync.reapplyAfterLegacyCopy(inserted);
     final highlights = await DBHelper().getHighlight();
     
     // Debug logging to help diagnose issues
@@ -261,7 +264,11 @@ class _HighLightScreenState extends State<HighLightScreen> {
                                                   const SizedBox(
                                                     height: 35,
                                                   ),
-                                                  SingleChildScrollView(
+                                                  Align(
+                                                    alignment: screenWidth > 450
+                                                        ? Alignment.center
+                                                        : Alignment.centerLeft,
+                                                    child: SingleChildScrollView(
                                                     scrollDirection:
                                                         Axis.horizontal,
                                                     child: Row(
@@ -725,6 +732,7 @@ class _HighLightScreenState extends State<HighLightScreen> {
                                                                                 DBHelper().updateVersesDataByContent(data.content.toString(), "is_highlighted", "no");
                                                                                 DBHelper().deleteHighlight(data.id!.toInt()).then((value) {
                                                                                   loadData();
+                                                                                  reloadOpenChapterAfterLibraryChange();
                                                                                   Get.back();
                                                                                 });
                                                                               },
@@ -791,6 +799,7 @@ class _HighLightScreenState extends State<HighLightScreen> {
                                                       ),
                                                     ],
                                                   ),
+                                                ),
                                                 ),
                                                 ],
                                               ),
@@ -896,7 +905,11 @@ class _HighLightScreenState extends State<HighLightScreen> {
                                             const SizedBox(
                                               height: 35,
                                             ),
-                                            SingleChildScrollView(
+                                            Align(
+                                              alignment: screenWidth > 450
+                                                  ? Alignment.center
+                                                  : Alignment.centerLeft,
+                                              child: SingleChildScrollView(
                                               scrollDirection:
                                                   Axis.horizontal,
                                               child: Row(
@@ -1377,6 +1390,7 @@ class _HighLightScreenState extends State<HighLightScreen> {
                                                                               .deleteHighlight(data.id!.toInt())
                                                                               .then((value) {
                                                                             loadData();
+                                                                            reloadOpenChapterAfterLibraryChange();
                                                                             Get.back();
                                                                           });
                                                                         },
@@ -1451,6 +1465,7 @@ class _HighLightScreenState extends State<HighLightScreen> {
                                               ],
                                             ),
                                           ),
+                                            ),
                                         ],
                                       ),
                                     );
