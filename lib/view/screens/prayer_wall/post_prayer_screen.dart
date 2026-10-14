@@ -1345,7 +1345,7 @@ class _PrayerDetailsComposeScreenState
       context,
       _PrayerDetailsComposeResult(
         originalWords: _originalWords,
-        englishPrayer: english,
+        englishPrayer: english, 
       ),
     );
   }
