@@ -77,10 +77,35 @@ class BibleInfo {
 
   static bool enableIAP = true;
 
-  /// Paywall UI mode: `1` = classic single paywall, `2` = multi / auto-renewable.
-  static int paywallShows = 2;
+  /// Paywall UI: `1` = AR paywall and open ads. `2` = pro paywall.
+  /// Pro paywall stays until purchase, restore, or an already-active premium
+  /// plan. Open ads stay off while this is `2`.
+  static int paywallShows = 1;
 
-  static bool get isAutoRenewablePaywallMode => paywallShows == 2;
+  static bool get isProPaywall => paywallShows == 2;
+
+  /// Both visible paywalls use the auto-renewable product IDs.
+  static bool get isAutoRenewablePaywallMode =>
+      paywallShows == 1 || paywallShows == 2;
+
+  /// Active premium, including old builds that saved only an expiry date.
+  /// A reward-ad window of 3 days or less is not premium.
+  static Future<bool> hasActivePremiumPlan() async {
+    final prefs = await SharedPreferences.getInstance();
+    final plan =
+        (prefs.getString('subscription_plan') ?? '').toLowerCase().trim();
+    final hasPlan = plan == 'platinum' ||
+        plan == 'gold' ||
+        plan == 'silver' ||
+        plan == 'twoyear';
+    final rewardTime = prefs.getString('isRewardAdViewTime');
+    if (rewardTime == null || rewardTime.isEmpty) return false;
+    final saveTime = DateTime.tryParse(rewardTime);
+    if (saveTime == null) return false;
+    final now = DateTime.now();
+    if (hasPlan) return saveTime.isAfter(now);
+    return saveTime.isAfter(now.add(const Duration(days: 3)));
+  }
 
   /// When [paywallShows] is `2`, Chat & Prayer may skip credits for AI Premium.
   /// Prefer [shouldSkipChatPrayerCredits] (checks plan). Free/Lifetime use coins.

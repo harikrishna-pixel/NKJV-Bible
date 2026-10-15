@@ -330,7 +330,17 @@ class DownloadProvider with ChangeNotifier {
     // final prefs = await SharedPreferences.getInstance();
     await prefs.setStringList(
         'selected_categories', selectedCategories.toSet().toList());
-    await prefs.remove(_legacyDailyVerseDayKey);
+    final todayKey = DateFormat('yyyy-MM-dd').format(DateTime.now());
+    final keepLegacyToday =
+        prefs.getString(_legacyDailyVerseDayKey) == todayKey ||
+            prefs.getString(_legacyPinnedDayKey) == todayKey;
+    if (!keepLegacyToday) {
+      await prefs.remove(_legacyDailyVerseDayKey);
+      await prefs.remove(_legacyPinnedVerseKey);
+      await prefs.remove(_legacyPinnedDayKey);
+    }
+    final scheduleFrom =
+        keepLegacyToday ? DateTime.now().add(const Duration(days: 1)) : null;
 
     // 2. Load all data
     final rawData =
@@ -349,13 +359,22 @@ class DownloadProvider with ChangeNotifier {
     if (existingRows.isNotEmpty) {
       // Keep previously received verses; drop only deselected topics.
       if (categories.isEmpty) {
-        await dbClient.execute("DELETE FROM dailyVersesnew");
+        if (!keepLegacyToday) {
+          await dbClient.execute("DELETE FROM dailyVersesnew");
+        }
       } else {
         final placeholders = List.filled(categories.length, '?').join(',');
-        await dbClient.rawDelete(
-          'DELETE FROM dailyVersesnew WHERE Category_Name NOT IN ($placeholders)',
-          categories,
-        );
+        if (keepLegacyToday) {
+          await dbClient.rawDelete(
+            'DELETE FROM dailyVersesnew WHERE Category_Name NOT IN ($placeholders) AND Date NOT LIKE ?',
+            [...categories, '$todayKey%'],
+          );
+        } else {
+          await dbClient.rawDelete(
+            'DELETE FROM dailyVersesnew WHERE Category_Name NOT IN ($placeholders)',
+            categories,
+          );
+        }
       }
 
       final survivingRows =
@@ -378,6 +397,7 @@ class DownloadProvider with ChangeNotifier {
           filteredData: filteredData,
           categories: categories,
           survivingRows: survivingRows,
+          firstNewDate: scheduleFrom,
         );
       }
     } else {
@@ -388,7 +408,7 @@ class DownloadProvider with ChangeNotifier {
       await _insertDailyVersesFromMainList(
         dbClient: dbClient,
         data: interleaved,
-        startDate: DateTime.now(),
+        startDate: scheduleFrom ?? DateTime.now(),
       );
     }
 
@@ -399,6 +419,9 @@ class DownloadProvider with ChangeNotifier {
   }
 
   static const _legacyDailyVerseDayKey = 'legacyDailyVerseDay';
+  static const _legacyPinnedVerseKey = 'legacyDailyVersePinned';
+  static const _legacyPinnedDayKey = 'legacyDailyVersePinnedDay';
+  static const pendingLegacyDailyVerseKey = 'pendingLegacyDailyVerse';
 
   /// Update from a build without topics: keeps its daily verses as history and
   /// schedules topic verses from tomorrow (today when there are no old verses).
@@ -432,6 +455,16 @@ class DownloadProvider with ChangeNotifier {
         .toSet()
         .toList();
     if (categories.isEmpty) categories.add('Faith');
+
+    // Save the update-day marker before topics. A second load (Daily Verse
+    // screen refresh, or topic save) must not rebuild today's verse.
+    if (pastLegacy.isNotEmpty) {
+      await prefs.setString(
+        _legacyDailyVerseDayKey,
+        DateFormat('yyyy-MM-dd').format(DateTime.now()),
+      );
+      await _savePinnedLegacyVerseFromRow(prefs, pastLegacy);
+    }
 
     await prefs.setStringList('selected_categories', categories);
 
@@ -471,6 +504,107 @@ class DownloadProvider with ChangeNotifier {
       startDate: today.add(const Duration(days: 1)),
     ));
     return true;
+  }
+
+  DailyVerseList _dailyVerseFromLegacyRow(Map<String, dynamic> row) {
+    return DailyVerseList(
+      categoryName: row['Category_Name']?.toString(),
+      categoryId: num.tryParse('${row['Category_Id']}'),
+      book: row['Book']?.toString(),
+      bookId: num.tryParse('${row['Book_Id']}'),
+      chapter: num.tryParse('${row['Chapter']}'),
+      verse: row['Verse']?.toString(),
+      date: row['Date']?.toString(),
+      verseNum: int.tryParse('${row['Verse_Num']}'),
+    );
+  }
+
+  DailyVerseList _todayOrFirstDailyVerse(List<DailyVerseList> list) {
+    final now = DateTime.now();
+    for (final verse in list) {
+      try {
+        final day = DateTime.parse(verse.date.toString());
+        if (day.year == now.year &&
+            day.month == now.month &&
+            day.day == now.day) {
+          return verse;
+        }
+      } catch (_) {}
+    }
+    return list.first;
+  }
+
+  Future<void> _savePinnedLegacyVerseFromRow(
+    SharedPreferences prefs,
+    List<Map<String, dynamic>> pastLegacy,
+  ) async {
+    if (prefs.getString(_legacyPinnedVerseKey) != null) return;
+    final sorted = [...pastLegacy];
+    sorted.sort((a, b) {
+      try {
+        return DateTime.parse(b['Date'].toString())
+            .compareTo(DateTime.parse(a['Date'].toString()));
+      } catch (_) {
+        return 0;
+      }
+    });
+    final today = _dailyVerseDateOnly(DateTime.now());
+    final row = sorted.firstWhere(
+      (item) {
+        try {
+          return _dailyVerseDateOnly(DateTime.parse(item['Date'].toString())) ==
+              today;
+        } catch (_) {
+          return false;
+        }
+      },
+      orElse: () => sorted.first,
+    );
+    await prefs.setString(
+      _legacyPinnedVerseKey,
+      jsonEncode(_dailyVerseFromLegacyRow(row).toJson()),
+    );
+    await prefs.setString(
+      _legacyPinnedDayKey,
+      DateFormat('yyyy-MM-dd').format(DateTime.now()),
+    );
+  }
+
+  Future<void> _lockLegacyTodayVerse(
+    SharedPreferences prefs,
+    String todayKey,
+  ) async {
+    if (prefs.getString(_legacyDailyVerseDayKey) != todayKey) return;
+
+    DailyVerseList? pinned;
+    final raw = prefs.getString(_legacyPinnedVerseKey);
+    if (raw != null && raw.isNotEmpty) {
+      try {
+        pinned = DailyVerseList.fromJson(
+          Map<String, dynamic>.from(jsonDecode(raw) as Map),
+        );
+      } catch (_) {}
+    }
+    if (pinned == null) {
+      if (dailyVerseList.isEmpty) return;
+      pinned = _todayOrFirstDailyVerse(dailyVerseList);
+      await prefs.setString(_legacyPinnedVerseKey, jsonEncode(pinned.toJson()));
+    }
+    await prefs.setString(_legacyPinnedDayKey, todayKey);
+
+    final locked = pinned.copyWith(date: DateTime.now().toString());
+    final now = DateTime.now();
+    final rest = dailyVerseList.where((verse) {
+      try {
+        final day = DateTime.parse(verse.date.toString());
+        return day.year != now.year ||
+            day.month != now.month ||
+            day.day != now.day;
+      } catch (_) {
+        return true;
+      }
+    }).toList();
+    dailyVerseList = [locked, ...rest];
   }
 
   Future<void> _insertDailyVersesFromMainList({
@@ -611,8 +745,9 @@ class DownloadProvider with ChangeNotifier {
     required List<Map<String, dynamic>> filteredData,
     required List<String> categories,
     required List<Map<String, dynamic>> survivingRows,
+    DateTime? firstNewDate,
   }) async {
-    final today = _dailyVerseDateOnly(DateTime.now());
+    final today = _dailyVerseDateOnly(firstNewDate ?? DateTime.now());
     final idsToDelete = <int>[];
     final pastKeys = <String>{};
 
@@ -1065,8 +1200,14 @@ class DownloadProvider with ChangeNotifier {
     final prefs = await SharedPreferences.getInstance();
 
     final todayKey = DateFormat('yyyy-MM-dd').format(DateTime.now());
+    final pendingLegacy = prefs.getBool(pendingLegacyDailyVerseKey) ?? false;
+    if (pendingLegacy) {
+      await prefs.setBool(pendingLegacyDailyVerseKey, false);
+    }
     if (prefs.getStringList('selected_categories') == null &&
-        await SharPreferences.getBoolean(SharPreferences.onboarding) == true) {
+        (pendingLegacy ||
+            await SharPreferences.getBoolean(SharPreferences.onboarding) ==
+                true)) {
       final legacyDb = await DBHelper().db;
       if (legacyDb != null) {
         if (await _startTopicsAfterLegacyDailyVerses(legacyDb, prefs)) {
@@ -1075,14 +1216,30 @@ class DownloadProvider with ChangeNotifier {
         await prefs.setBool('dataIsChanged', true);
       }
     }
+    final pinnedDay = prefs.getString(_legacyPinnedDayKey);
+    if (pinnedDay != null && pinnedDay != todayKey) {
+      await prefs.remove(_legacyPinnedVerseKey);
+      await prefs.remove(_legacyPinnedDayKey);
+      await prefs.remove(_legacyDailyVerseDayKey);
+    } else if (pinnedDay == todayKey) {
+      await prefs.setString(_legacyDailyVerseDayKey, todayKey);
+    }
     final showLegacyToday =
         prefs.getString(_legacyDailyVerseDayKey) == todayKey;
+
+    // Keep the exact verse first shown on the update day.
+    if (showLegacyToday && dailyVerseList.isNotEmpty) {
+      await _lockLegacyTodayVerse(prefs, todayKey);
+      isLoadingDailyVerse = false;
+      notifyListeners();
+      return;
+    }
 
     final bool dataIsChanged = prefs.getBool('dataIsChanged') ?? true;
     final String? cachedJson = prefs.getString('cachedDailyVerseList_v2');
 
     // Already in memory from splash/home/preference preload.
-    if (!dataIsChanged && dailyVerseList.isNotEmpty) {
+    if (!showLegacyToday && !dataIsChanged && dailyVerseList.isNotEmpty) {
       await _ensureDailyVerseBookNamesMatchBookId();
       isLoadingDailyVerse = false;
       notifyListeners();
@@ -1090,7 +1247,8 @@ class DownloadProvider with ChangeNotifier {
     }
 
     // Instant path: prefs JSON cache (no DB round-trip before first paint).
-    if (!dataIsChanged &&
+    if (!showLegacyToday &&
+        !dataIsChanged &&
         cachedJson != null &&
         cachedJson.isNotEmpty &&
         await _hydrateDailyVersesFromPrefsJson(cachedJson)) {
@@ -1103,7 +1261,7 @@ class DownloadProvider with ChangeNotifier {
     isLoadingDailyVerse = true;
     notifyListeners();
 
-    if (!dataIsChanged && cachedJson != null) {
+    if (!showLegacyToday && !dataIsChanged && cachedJson != null) {
       final selectedForCache =
           prefs.getStringList('selected_categories') ?? [];
       final List<dynamic> decodedCache = jsonDecode(cachedJson);
@@ -1227,6 +1385,9 @@ class DownloadProvider with ChangeNotifier {
     }
 
     dailyVerseList = enrichedList;
+    if (showLegacyToday) {
+      await _lockLegacyTodayVerse(prefs, todayKey);
+    }
     debugPrint("dailyVerseList new is ${dailyVerseList.length}");
     // Cache only when we actually have verses — empty first-install loads must
     // not mark dataIsChanged=false or Verse for You stays stuck on empty cache.
@@ -1432,7 +1593,14 @@ class DownloadProvider with ChangeNotifier {
     final cachedJson = prefs.getString('cachedDailyVerseList_v2');
     if (cachedJson == null || cachedJson.isEmpty) return false;
 
-    return _hydrateDailyVersesFromPrefsJson(cachedJson);
+    final loaded = await _hydrateDailyVersesFromPrefsJson(cachedJson);
+    if (loaded) {
+      final todayKey = DateFormat('yyyy-MM-dd').format(DateTime.now());
+      if (prefs.getString(_legacyDailyVerseDayKey) == todayKey) {
+        await _lockLegacyTodayVerse(prefs, todayKey);
+      }
+    }
+    return loaded;
   }
 
   Future<bool> _hydrateDailyVersesFromPrefsJson(String cachedJson) async {

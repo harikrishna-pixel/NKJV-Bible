@@ -332,6 +332,8 @@ class DBHelper {
     final verse = verseNum?.toInt();
     if (book == null || chapter == null || verse == null) return 0;
     if (book < 0 || chapter < 0 || verse < 0) return 0;
+    final wanted = plainText.trim();
+    if (book == 0 && wanted.isEmpty) return 0;
 
     final dbClient = await db;
     if (dbClient == null) return 0;
@@ -339,7 +341,6 @@ class DBHelper {
     final books = <int>[book, if (book > 0) book - 1];
     final chapters = <int>[if (chapter > 0) chapter - 1, chapter];
     final verses = <int>[if (verse > 0) verse - 1, verse];
-    final wanted = plainText.trim();
 
     for (final b in books) {
       for (final c in chapters) {
@@ -440,14 +441,21 @@ class DBHelper {
   }
 
   Future<int> updateVersesDataByContentnewcheck(
-      String plainContent, String title, String value) async {
+      String plainContent, String title, String value, {int? bookNum}) async {
     final dbClient = await db;
 
     // Step 1: Get all verses
     final List<Map<String, dynamic>> verses = await dbClient!.query("verse");
+    final bookNums = bookNum == null
+        ? null
+        : <int>{bookNum, if (bookNum > 0) bookNum - 1};
 
     // Step 2: Find the one with matching plain text
     for (final verse in verses) {
+      if (bookNums != null) {
+        final rowBook = int.tryParse('${verse["book_num"]}');
+        if (rowBook == null || !bookNums.contains(rowBook)) continue;
+      }
       final htmlContent = verse["content"] ?? "";
       final parsedText = html_parser.parse(htmlContent).body?.text ?? "";
 
@@ -1212,7 +1220,7 @@ class DBMigrationHelper {
 
       // Check if target already has core data to determine migration strategy
       final targetHasCore = await _targetDbHasCoreData(newDbPath, password);
-      final userDataTables = ['bookmark', 'highlight', 'underline', 'save_notes', 'calendar', 'save_images'];
+      final userDataTables = ['bookmark', 'highlight', 'underline', 'save_notes', 'calendar', 'save_images', 'dailyVerses'];
 
       for (final tableMap in tables) {
         final legacyTableName = tableMap['name'] as String;
@@ -1590,6 +1598,7 @@ class DBMigrationHelper {
           'dailyVersesMainList',
           'daily_verses_main_list'
         ],
+        'dailyVerses': ['dailyVerses', 'daily_verses'],
       };
 
       for (final tableName in _userDataTables) {

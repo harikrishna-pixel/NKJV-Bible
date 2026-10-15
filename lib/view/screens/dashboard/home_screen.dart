@@ -2294,11 +2294,16 @@ class _HomeScreenState extends State<HomeScreen>
     // If book name is empty (first time), load default book from database
     if (data.isEmpty) {
       try {
+        final savedBookNum =
+            await SharPreferences.getString(SharPreferences.selectedBookNum);
+        final parsedBookNum = int.tryParse(savedBookNum ?? '');
+        final lookupBookNum =
+            (parsedBookNum != null && parsedBookNum != 0) ? parsedBookNum : 0;
         final db = await DBHelper().db;
         if (db != null) {
           final result = await db.rawQuery(
             "SELECT * FROM book WHERE book_num = ?",
-            [int.parse("0")],
+            [lookupBookNum],
           );
 
           if (result.isNotEmpty && result[0]["title"] != null) {
@@ -6651,6 +6656,18 @@ class _HomeScreenState extends State<HomeScreen>
         widget.selectedVerseNumForRead.toString();
     state.controller!.selectedBookNameForRead.value =
         widget.selectedBookNameForRead.toString();
+    final savedBookName = widget.selectedBookNameForRead.toString().trim();
+    final savedBookNum = widget.selectedBookForRead.toString().trim();
+    final savedChapter = widget.selectedChapterForRead.toString().trim();
+    if (savedBookName.isNotEmpty && savedBookName.toLowerCase() != 'null') {
+      state.controller!.selectedBook.value = savedBookName;
+    }
+    if (savedBookNum.isNotEmpty && savedBookNum.toLowerCase() != 'null') {
+      state.controller!.selectedBookNum.value = savedBookNum;
+    }
+    if (savedChapter.isNotEmpty && savedChapter.toLowerCase() != 'null') {
+      state.controller!.selectedChapter.value = savedChapter;
+    }
   }
 
   void _handleAdExpiration(GetXState<DashBoardController> state,

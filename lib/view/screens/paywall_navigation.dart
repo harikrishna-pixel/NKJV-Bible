@@ -1,5 +1,6 @@
 import 'package:biblebookapp/view/screens/dashboard/constants.dart';
 import 'package:biblebookapp/view/screens/intro_subcribtion_screen.dart';
+import 'package:biblebookapp/view/screens/multi_select_paywall.dart';
 import 'package:biblebookapp/view/screens/yearly_trial_paywall.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
@@ -9,18 +10,17 @@ import 'package:get/get.dart';
 class PaywallNavigation {
   PaywallNavigation._();
 
-  static bool get _useMultiPaywall => BibleInfo.isAutoRenewablePaywallMode;
+  static bool get _useArProductIds => BibleInfo.isAutoRenewablePaywallMode;
 
-  /// Paywall 2 short slot → AR 1-month ID.
-  /// Paywall 1 short slot → classic 1-month ID (`onemonthadsfree`).
+  /// Paywall 1 and 2 use the auto-renewable plan IDs.
   /// AR 6M / classic 6M stay in constants for fallback/restore only.
   static String _sixMonthIdForVisiblePaywall(String sixMonthPlan) =>
-      _useMultiPaywall
+      _useArProductIds
           ? BibleInfo.arOneMonthPlanid
           : BibleInfo.oneMonthPlanid;
 
   static String _oneYearIdForVisiblePaywall(String oneYearPlan) =>
-      _useMultiPaywall ? BibleInfo.arOneYearPlanid : oneYearPlan;
+      _useArProductIds ? BibleInfo.arOneYearPlanid : oneYearPlan;
 
   static Widget buildVisiblePaywall({
     required String sixMonthPlan,
@@ -31,8 +31,16 @@ class PaywallNavigation {
   }) {
     final six = _sixMonthIdForVisiblePaywall(sixMonthPlan);
     final year = _oneYearIdForVisiblePaywall(oneYearPlan);
-    if (_useMultiPaywall) {
+    if (BibleInfo.isProPaywall) {
       return YearlyTrialPaywall(
+        sixMonthPlan: six,
+        oneYearPlan: year,
+        lifeTimePlan: lifeTimePlan,
+        checkad: checkad,
+      );
+    }
+    if (BibleInfo.paywallShows == 1) {
+      return MultiSelectPaywall(
         sixMonthPlan: six,
         oneYearPlan: year,
         lifeTimePlan: lifeTimePlan,

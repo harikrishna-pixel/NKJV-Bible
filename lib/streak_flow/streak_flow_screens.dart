@@ -1770,13 +1770,26 @@ void _goToHome(BuildContext context) {
   } catch (e) {
     debugPrint('warmDataBeforeHomeScreen error: $e');
   }
+  unawaited(_openReadingHomeFromSavedBook());
+}
+
+Future<void> _openReadingHomeFromSavedBook() async {
+  final bookName =
+      (await SharPreferences.getString(SharPreferences.selectedBook) ?? '')
+          .trim();
+  final bookNum =
+      (await SharPreferences.getString(SharPreferences.selectedBookNum) ?? '')
+          .trim();
+  final chapter =
+      (await SharPreferences.getString(SharPreferences.selectedChapter) ?? '')
+          .trim();
   Get.offAll(
         () => HomeScreen(
       From: "splash",
       selectedVerseNumForRead: "",
-      selectedBookForRead: "",
-      selectedChapterForRead: "",
-      selectedBookNameForRead: "",
+      selectedBookForRead: bookNum,
+      selectedChapterForRead: chapter,
+      selectedBookNameForRead: bookName,
       selectedVerseForRead: "",
     ),
     transition: Transition.fadeIn,
@@ -4801,19 +4814,7 @@ class _StreakCompletedScreenState extends State<StreakCompletedScreen>
     } catch (e) {
       debugPrint('warmDataBeforeHomeScreen error: $e');
     }
-    Get.offAll(
-          () => HomeScreen(
-        From: "splash",
-        selectedVerseNumForRead: "",
-        selectedBookForRead: "",
-        selectedChapterForRead: "",
-        selectedBookNameForRead: "",
-        selectedVerseForRead: "",
-      ),
-      transition: Transition.fadeIn,
-      duration: const Duration(milliseconds: 280),
-      opaque: true,
-    );
+    unawaited(_openReadingHomeFromSavedBook());
   }
 
   Future<void> _onContinuePressed(BuildContext context) async {

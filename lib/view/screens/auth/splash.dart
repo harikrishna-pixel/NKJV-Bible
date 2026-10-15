@@ -42,6 +42,8 @@ import 'package:biblebookapp/view/constants/colors.dart';
 import 'package:biblebookapp/view/constants/theme_provider.dart';
 import 'package:biblebookapp/view/screens/calendar_screen/model/calendar_model.dart';
 import 'package:biblebookapp/view/screens/dashboard/constants.dart';
+import 'package:biblebookapp/view/screens/intro_subcribtion_screen.dart';
+import 'package:biblebookapp/view/screens/paywall_navigation.dart';
 import 'package:biblebookapp/view/widget/notification_service.dart';
 
 import '../../../Model/dailyVersesMainListModel.dart';
@@ -174,8 +176,33 @@ class _SplashScreenState extends State<SplashScreen>
   /// `'test'` return skips the ad, then `showopenad` is cleared so Home
   /// cannot show it either.
   /// Returns true only if the open ad was actually shown.
+  /// At 98% splash progress: show the preloaded open ad, then the caller
+  /// moves the bar to 100%. AR paywall only. Pro paywall skips it.
   Future<bool> _runSplashOpenAdIfNeeded() async {
-    return false;
+    if (BibleInfo.paywallShows != 1) return false;
+    final prefs = await SharedPreferences.getInstance();
+    final onboardingDone =
+        await SharPreferences.getBoolean(SharPreferences.onboarding);
+    if (onboardingDone != true) return false;
+
+    if (!await _shouldShowSplashOpenAd()) {
+      await prefs.setString("showopenad", "false");
+      return false;
+    }
+
+    await SharPreferences.setString('test', 'test');
+    // Splash can finish before the ad finishes loading. Wait up to 3.5s.
+    if (_appOpenAd == null) {
+      final pending = _splashOpenAdPreloadCompleter;
+      if (pending != null && !pending.isCompleted) {
+        try {
+          await pending.future.timeout(const Duration(milliseconds: 3500));
+        } catch (_) {}
+      }
+    }
+    final shown = await loadOpenAd();
+    await prefs.setString("showopenad", "false");
+    return shown;
   }
 
   void _finishSplashOpenAdPreload(bool loaded) {
@@ -191,6 +218,10 @@ class _SplashScreenState extends State<SplashScreen>
     if (_splashOpenAdPreloadStarted) return;
     _splashOpenAdPreloadStarted = true;
     _splashOpenAdPreloadCompleter = Completer<bool>();
+    if (BibleInfo.paywallShows != 1) {
+      _finishSplashOpenAdPreload(false);
+      return;
+    }
     try {
       final onboardingDone =
           await SharPreferences.getBoolean(SharPreferences.onboarding);
@@ -234,6 +265,7 @@ class _SplashScreenState extends State<SplashScreen>
   }
 
   Future<bool> _shouldShowSplashOpenAd() async {
+    if (BibleInfo.isProPaywall) return false;
     final prefs = await SharedPreferences.getInstance();
     final plan =
         (prefs.getString('subscription_plan') ?? '').toLowerCase().trim();
@@ -363,6 +395,7 @@ class _SplashScreenState extends State<SplashScreen>
       _completeSplashOpenAd();
       return false;
     }
+    // Stay on splash at 98% until the user closes the ad, then 100% and Home.
     if (_splashOpenAdCompleter != null &&
         !_splashOpenAdCompleter!.isCompleted) {
       await _splashOpenAdCompleter!.future;
@@ -424,6 +457,14 @@ class _SplashScreenState extends State<SplashScreen>
 
   Future<void> _initialize() async {
     WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (await _shouldReplayOnboardingForOldUpdate()) {
+        await SharPreferences.setBoolean(SharPreferences.onboarding, false);
+        final prefs = await SharedPreferences.getInstance();
+        if (prefs.getStringList('selected_categories') == null) {
+          await prefs.setBool(DownloadProvider.pendingLegacyDailyVerseKey, true);
+        }
+      }
+      unawaited(_preloadSplashOpenAd());
       final password = dotenv.env[AssetsConstants.dbPasswordKey]!;
       try {
         // Only do essential initialization that's required before navigation
@@ -466,6 +507,7 @@ class _SplashScreenState extends State<SplashScreen>
         // Prefs can survive reinstall/restore while DB is empty → clear "loaded"
         // flags and JSON caches so daily verse + home never trust stale state.
         await reconcilePersistedBibleStateWithDatabase();
+        await DBMigrationHelper.copyUserDataFromLegacyIfNeeded(password);
         await loadDailyVerseData();
         // Load Verse for You only after daily-verse tables are seeded (first install).
         if (mounted) {
@@ -697,17 +739,7 @@ class _SplashScreenState extends State<SplashScreen>
       } else {
         // First time we track version: treat as upgrader if this install
         // already had prior use (update from a build before this flag existed).
-        final prefs = await SharedPreferences.getInstance();
-        final launchCount = prefs.getInt('launchCount') ?? 0;
-        final selectedBook =
-        await SharPreferences.getString(SharPreferences.selectedBook);
-        final loadedList = await SharPreferences.getBoolean(
-            SharPreferences.isLoadBookList) ??
-            false;
-        showComparison = launchCount > 1 ||
-            (selectedBook != null && selectedBook.isNotEmpty) ||
-            loadedList;
-        // Builds before 115 never saved their version: show onboarding again.
+        showComparison = await _shouldReplayOnboardingForOldUpdate();
         if (showComparison) {
           await SharPreferences.setBoolean(SharPreferences.onboarding, false);
         }
@@ -732,6 +764,25 @@ class _SplashScreenState extends State<SplashScreen>
   }
 
   /// Returns true when [a] is strictly older than [b] (e.g. 1.0.101 < 1.0.115).
+  /// Update from a build that never saved its version still has onboarding
+  /// marked done. Those launches show onboarding again, so open ads stay off.
+  Future<bool> _shouldReplayOnboardingForOldUpdate() async {
+    final last =
+        (await SharPreferences.getString(SharPreferences.lastKnownAppVersion))
+            ?.trim();
+    if (last != null && last.isNotEmpty) return false;
+    final prefs = await SharedPreferences.getInstance();
+    final launchCount = prefs.getInt('launchCount') ?? 0;
+    final selectedBook =
+        await SharPreferences.getString(SharPreferences.selectedBook);
+    final loadedList =
+        await SharPreferences.getBoolean(SharPreferences.isLoadBookList) ??
+            false;
+    return launchCount > 1 ||
+        (selectedBook != null && selectedBook.isNotEmpty) ||
+        loadedList;
+  }
+
   bool _isAppVersionOlder(String a, String b) {
     List<int> parts(String v) => v
         .split(RegExp(r'[^0-9]+'))
@@ -848,6 +899,20 @@ class _SplashScreenState extends State<SplashScreen>
 
     _schedulePostSplashAtt();
     await SharPreferences.setBoolean(SharPreferences.isLoadBookContent, true);
+    if (BibleInfo.isProPaywall && !await BibleInfo.hasActivePremiumPlan()) {
+      if (!mounted) return;
+      Get.offAll(
+        () => PaywallNavigation.buildVisiblePaywall(
+          sixMonthPlan: BibleInfo.sixMonthPlanid,
+          oneYearPlan: BibleInfo.oneYearPlanid,
+          lifeTimePlan: BibleInfo.lifeTimePlanid,
+          checkad: 'splash',
+        ),
+        transition: SubscriptionScreen.paywallRouteTransition,
+        duration: SubscriptionScreen.paywallRouteDuration,
+      );
+      return;
+    }
     try {
       final provider =
       Provider.of<DownloadProvider>(context, listen: false);
@@ -1285,6 +1350,13 @@ class _SplashScreenState extends State<SplashScreen>
 
       // Insert daily verses for the first 20 items
       int saveDay = 0; // Make sure to manage this appropriately
+      final existingDailyRows =
+          await db.rawQuery('SELECT COUNT(*) AS c FROM dailyVerses');
+      final existingDailyCount =
+          int.tryParse('${existingDailyRows.first['c']}') ?? 0;
+      if (existingDailyCount > 0) {
+        return;
+      }
       final newMainList =
       await db.rawQuery("SELECT * FROM dailyVersesMainList");
       for (var i = 0; i < 20 && i < newMainList.length; i++) {
@@ -1327,6 +1399,12 @@ class _SplashScreenState extends State<SplashScreen>
           SharPreferences.dailyVerseUpdateTime, DateTime.now().toString());
     } else {
       // Already populated, check if new daily verse needs to be added
+      // Old-build update day: keep the verses that build already saved.
+      final pendingLegacy = (await SharedPreferences.getInstance())
+              .getBool(DownloadProvider.pendingLegacyDailyVerseKey) ??
+          false;
+      if (pendingLegacy) return;
+
       final saveTime =
       await SharPreferences.getString(SharPreferences.dailyVerseUpdateTime);
       final saveDateTime =
@@ -1428,8 +1506,26 @@ class _SplashScreenState extends State<SplashScreen>
     // 3. Process Highlights
     for (var e in highlights) {
       //  await dbHelper.insertIntoHighLight(e);
+      var highlightBookNum = e.bookNum?.toInt();
+      final highlightBookName = (e.bookName ?? '').trim();
+      if ((highlightBookNum == null || highlightBookNum == 0) &&
+          highlightBookName.isNotEmpty) {
+        final db = await DBHelper().db;
+        if (db != null) {
+          final rows = await db.rawQuery(
+            'SELECT book_num FROM book WHERE LOWER(title) = LOWER(?) LIMIT 1',
+            [highlightBookName],
+          );
+          if (rows.isNotEmpty) {
+            highlightBookNum =
+                int.tryParse('${rows.first['book_num']}') ?? highlightBookNum;
+          }
+        }
+      }
+      if (highlightBookNum == null) continue;
       await DBHelper().updateVersesDataByContentnewcheck(
-          e.content.toString(), 'is_highlighted', '${e.color}');
+          e.content.toString(), 'is_highlighted', '${e.color}',
+          bookNum: highlightBookNum);
     }
 
     // 4. Process Underlines
@@ -2046,42 +2142,8 @@ class _UpgradeCheckWrapperState extends State<UpgradeCheckWrapper> {
     if (widget.check != 'home') return;
 
     Future.microtask(() async {
-      final updateAvailable = _upgrader.isUpdateAvailable();
-
-      final prefs = await SharedPreferences.getInstance();
-
-      final data = prefs.getString('showopenad');
-      final pendingStreakRating = await SharPreferences.getInt(
-          SharPreferences.pendingStreakCompleteCelebration) ??
-          0;
-      // Suppress open ad only while post-streak flow is still pending (Day 1 or Day 2+).
-      // deferUpgradeAlert is for upgrade/rating UI only — not a permanent open-ad block.
-      if (pendingStreakRating >= 1) {
-        await prefs.setString("showopenad", "false");
-        await SharPreferences.setString('OpenAd', '1');
-        await _markOpenAdFlowComplete();
-        return;
-      }
-      final onboardingDone =
-          await SharPreferences.getBoolean(SharPreferences.onboarding);
-      final launchCount = prefs.getInt('launchCount') ?? 0;
-      if (onboardingDone != true || launchCount <= 1) {
-        await _markOpenAdFlowComplete();
-        return;
-      }
-      // debugPrint(
-      //     'upgrader is  ${upgrader.versionInfo} ${upgrader.releaseNotes} $data');
-      if (!updateAvailable && data == "true") {
-        setState(() => shouldShowAd = true);
-        // OpenAdService.showAd(); // ✅ Show open ad only if no update available
-        //  if (widget.check == "show") {
-        await initAppOpen();
-        await prefs.setString("showopenad", "false");
-        // }
-      } else {
-        await _markOpenAdFlowComplete();
-        debugPrint('Update is available. Skipping open ad.');
-      }
+      // Open ads are shown on the splash screen only.
+      await _markOpenAdFlowComplete();
     });
   }
 

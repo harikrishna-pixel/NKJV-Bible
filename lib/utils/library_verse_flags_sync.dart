@@ -90,8 +90,24 @@ class LibraryVerseFlagsSync {
         final raw = e.content?.toString() ?? '';
         final plain =
             _plain(raw.isNotEmpty ? raw : e.plain_content?.toString());
+        var highlightBookNum = e.bookNum;
+        final highlightBookName = (e.bookName ?? '').trim();
+        if ((highlightBookNum == null || highlightBookNum.toInt() == 0) &&
+            highlightBookName.isNotEmpty) {
+          final db = await DBHelper().db;
+          if (db != null) {
+            final rows = await db.rawQuery(
+              'SELECT book_num FROM book WHERE LOWER(title) = LOWER(?) LIMIT 1',
+              [highlightBookName],
+            );
+            if (rows.isNotEmpty) {
+              highlightBookNum =
+                  num.tryParse('${rows.first['book_num']}') ?? highlightBookNum;
+            }
+          }
+        }
         await _paint(
-          bookNum: e.bookNum,
+          bookNum: highlightBookNum,
           chapterNum: e.chapterNum,
           verseNum: e.verseNum,
           plain: plain,
@@ -99,7 +115,8 @@ class LibraryVerseFlagsSync {
           column: 'is_highlighted',
           value: '${e.color}',
           byPlainText: (text) => DBHelper().updateVersesDataByContentnewcheck(
-              text, 'is_highlighted', '${e.color}'),
+              text, 'is_highlighted', '${e.color}',
+              bookNum: highlightBookNum?.toInt()),
         );
       }
 

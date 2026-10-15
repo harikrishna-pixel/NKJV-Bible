@@ -263,8 +263,6 @@ class _LifecycleWrapperState extends State<LifecycleWrapper>
         if (_isAppInBackground && checkad != '1' && _isAppInActive && closead) {
           _isAppInBackground = false;
           _isAppInActive = false;
-          await SharPreferences.setString('OpenAd', '0');
-          await initAppOpen();
         } else {
           // Keep the existing OpenAd flag value so flows that explicitly
           // disable app-open ads (set OpenAd='1') are not overridden here.
@@ -426,14 +424,6 @@ class AppLifecycleReactor {
   }
 
   void _onAppStateChanged(AppState appState) async {
-    if (appState == AppState.foreground) {
-      final prefs = await SharedPreferences.getInstance();
-      final isFirstTime = prefs.getBool('hasShownOpenAd') ?? false;
-
-      if (!isFirstTime) {
-        appOpenAdManager.showAdIfAvailable();
-        await prefs.setBool('hasShownOpenAd', true);
-      }
-    }
+    // Open ads are shown on the splash screen only.
   }
 }

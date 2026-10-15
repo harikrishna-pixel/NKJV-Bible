@@ -68,13 +68,26 @@ class _LeaveRatingScreenState extends State<LeaveRatingScreen> {
         SharPreferences.setBoolean(SharPreferences.deferUpgradeAlert, false));
     // Additive preload only — open ad / rating flow unchanged.
     AdService.preloadInterstitialAdIfNeeded();
+    unawaited(_openReadingHomeFromSavedBook());
+  }
+
+  Future<void> _openReadingHomeFromSavedBook() async {
+    final bookName =
+        (await SharPreferences.getString(SharPreferences.selectedBook) ?? '')
+            .trim();
+    final bookNum =
+        (await SharPreferences.getString(SharPreferences.selectedBookNum) ?? '')
+            .trim();
+    final chapter =
+        (await SharPreferences.getString(SharPreferences.selectedChapter) ?? '')
+            .trim();
     Get.offAll(
           () => HomeScreen(
         From: "splash",
         selectedVerseNumForRead: "",
-        selectedBookForRead: "",
-        selectedChapterForRead: "",
-        selectedBookNameForRead: "",
+        selectedBookForRead: bookNum,
+        selectedChapterForRead: chapter,
+        selectedBookNameForRead: bookName,
         selectedVerseForRead: "",
       ),
       transition: Transition.fadeIn,

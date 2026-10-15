@@ -1431,8 +1431,31 @@ class DashBoardController extends GetxController with WidgetsBindingObserver {
       if (selectedBookValue == null ||
           selectedBookValue.trim().isEmpty ||
           parsedStoredBookNum == null) {
-        selectedBookNum.value = '0';
-        await SharPreferences.setString(SharPreferences.selectedBookNum, '0');
+        final bookTitle =
+            (await SharPreferences.getString(SharPreferences.selectedBook) ??
+                    '')
+                .trim();
+        int? fromTitle;
+        if (bookTitle.isNotEmpty) {
+          final dbForTitle = await DBHelper().db;
+          if (dbForTitle != null) {
+            final titleRows = await dbForTitle.rawQuery(
+              'SELECT book_num FROM book WHERE LOWER(title) = LOWER(?) LIMIT 1',
+              [bookTitle],
+            );
+            if (titleRows.isNotEmpty) {
+              fromTitle = int.tryParse('${titleRows.first['book_num']}');
+            }
+          }
+        }
+        if (fromTitle != null) {
+          selectedBookNum.value = fromTitle.toString();
+          await SharPreferences.setString(
+              SharPreferences.selectedBookNum, fromTitle.toString());
+        } else {
+          selectedBookNum.value = '0';
+          await SharPreferences.setString(SharPreferences.selectedBookNum, '0');
+        }
       } else {
         selectedBookNum.value = selectedBookValue.toString();
       }

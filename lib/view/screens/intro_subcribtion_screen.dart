@@ -100,6 +100,9 @@ class SubscriptionScreen extends StatefulWidget {
           'SubscriptionScreen: dashboard IAP disabled — skip openPaywallStacked');
       return null;
     }
+    if (BibleInfo.isProPaywall && await BibleInfo.hasActivePremiumPlan()) {
+      return null;
+    }
     return PaywallNavigation.openStacked<T>(
       sixMonthPlan: sixMonthPlan,
       oneYearPlan: oneYearPlan,

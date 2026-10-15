@@ -36,24 +36,7 @@ import 'package:biblebookapp/utils/internet_speed_checker.dart';
 import 'package:internet_connection_checker_plus/internet_connection_checker_plus.dart';
 
 /// True when a plan is saved and its expiry is still in the future.
-Future<bool> _hasActivePremiumPlan() async {
-  final prefs = await SharedPreferences.getInstance();
-  final plan = (prefs.getString('subscription_plan') ?? '').toLowerCase().trim();
-  final hasPlan = plan == 'platinum' ||
-      plan == 'gold' ||
-      plan == 'silver' ||
-      plan == 'twoyear';
-  final rewardTime =
-      await SharPreferences.getString(SharPreferences.isRewardAdViewTime);
-  if (rewardTime == null || rewardTime.isEmpty) return false;
-  final saveTime = DateTime.tryParse(rewardTime);
-  if (saveTime == null) return false;
-  final now = DateTime.now();
-  if (hasPlan) return saveTime.isAfter(now);
-  // Old builds saved only the expiry. Short ad-free windows (reward ads, up to
-  // 3 days) are not premium.
-  return saveTime.isAfter(now.add(const Duration(days: 3)));
-}
+Future<bool> _hasActivePremiumPlan() => BibleInfo.hasActivePremiumPlan();
 
 class PreferenceSelectionScreen extends StatefulWidget {
   final bool isSetting;
