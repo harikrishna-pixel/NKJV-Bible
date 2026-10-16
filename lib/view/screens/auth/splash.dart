@@ -179,6 +179,7 @@ class _SplashScreenState extends State<SplashScreen>
   /// At 98% splash progress: show the preloaded open ad, then the caller
   /// moves the bar to 100%. AR paywall only. Pro paywall skips it.
   Future<bool> _runSplashOpenAdIfNeeded() async {
+    if (!await SharPreferences.adsEnabledFromApiOrConstant()) return false;
     if (BibleInfo.paywallShows != 1) return false;
     final prefs = await SharedPreferences.getInstance();
     final onboardingDone =
@@ -222,7 +223,8 @@ class _SplashScreenState extends State<SplashScreen>
     if (_splashOpenAdPreloadStarted) return;
     _splashOpenAdPreloadStarted = true;
     _splashOpenAdPreloadCompleter = Completer<bool>();
-    if (BibleInfo.paywallShows != 1) {
+    if (!await SharPreferences.adsEnabledFromApiOrConstant() ||
+        BibleInfo.paywallShows != 1) {
       _finishSplashOpenAdPreload(false);
       return;
     }
@@ -330,6 +332,7 @@ class _SplashScreenState extends State<SplashScreen>
   }
 
   Future<void> _loadSplashOpenAdNow() async {
+    if (!await SharPreferences.adsEnabledFromApiOrConstant()) return;
     final openAdUnitId = await _resolveOpenAdUnitId();
     if (openAdUnitId.isEmpty) {
       debugPrint('AppOpenAd skipped: empty ad unit id');
@@ -360,6 +363,7 @@ class _SplashScreenState extends State<SplashScreen>
   }
 
   Future<bool> loadOpenAd() async {
+    if (!await SharPreferences.adsEnabledFromApiOrConstant()) return false;
     // Splash is 4s. Use only the ad already preloaded. Do not wait again.
     if (_appOpenAd == null) {
       debugPrint('AppOpenAd not ready at splash leave');
@@ -1928,6 +1932,10 @@ class AdConsentManager {
       try {
         debugPrint("ATT denied 4 — storing 'Don't track' and skipping");
         //  await _handleConsentFlow();
+        if (!await SharPreferences.adsEnabledFromApiOrConstant()) {
+          _canRequestAds = false;
+          return false;
+        }
         await _initializationHelper.initialize();
         return _canRequestAds;
       } catch (e) {
@@ -2159,6 +2167,10 @@ class _UpgradeCheckWrapperState extends State<UpgradeCheckWrapper> {
   }
 
   loadOpenAd() async {
+    if (!await SharPreferences.adsEnabledFromApiOrConstant()) {
+      await _markOpenAdFlowComplete();
+      return;
+    }
     final trackingAllowed = await isTrackingAllowed();
     debugPrint('ad pop loadOpenAd -  ${!trackingAllowed}');
     bool? isAdEnabledFromApi =

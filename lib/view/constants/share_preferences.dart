@@ -1,3 +1,4 @@
+import 'package:biblebookapp/view/screens/dashboard/constants.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class SharPreferences {
@@ -244,13 +245,17 @@ class SharPreferences {
     await preferences.clear();
   }
 
+  /// API `ads_Type` (`isAdsEnabledApi`) first. Local `enableAds` only if API not received.
+  static Future<bool> adsEnabledFromApiOrConstant() async {
+    final fromApi =
+        await SharPreferences.getBoolean(SharPreferences.isAdsEnabledApi);
+    return fromApi ?? BibleInfo.enableAds;
+  }
+
   static Future<bool> shouldLoadAd() async {
+    if (!await adsEnabledFromApiOrConstant()) return false;
     final isAdEnabled =
         await SharPreferences.getBoolean(SharPreferences.isAdsEnabled);
-    final isAdEnabledFromApi =
-        await SharPreferences.getBoolean(SharPreferences.isAdsEnabledApi);
-    final shouldLoadAd =
-        ((isAdEnabledFromApi ?? true) && (isAdEnabled ?? true));
-    return shouldLoadAd;
+    return isAdEnabled ?? true;
   }
 }

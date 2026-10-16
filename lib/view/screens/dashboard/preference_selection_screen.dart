@@ -32,7 +32,6 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:biblebookapp/view/constants/colors.dart';
 import 'package:biblebookapp/view/constants/images.dart';
 import 'package:biblebookapp/view/constants/theme_provider.dart';
-import 'package:biblebookapp/utils/internet_speed_checker.dart';
 import 'package:internet_connection_checker_plus/internet_connection_checker_plus.dart';
 
 /// True when a plan is saved and its expiry is still in the future.
@@ -1653,28 +1652,6 @@ class FaithJourneyDialog {
                                             navContext);
                                   }
                                   return;
-                                }
-
-                                try {
-                                  final connectionSpeed =
-                                      await InternetSpeedChecker.checkSpeed(
-                                    timeout: const Duration(seconds: 8),
-                                  );
-                                  final isVerySlowConnection =
-                                      connectionSpeed != null &&
-                                          connectionSpeed > 12000;
-                                  if (isVerySlowConnection) {
-                                    if (navContext != null &&
-                                        navContext.mounted) {
-                                      await StreakFlowNavigation
-                                          .navigateToStreakFlowOrHome(
-                                              navContext);
-                                    }
-                                    return;
-                                  }
-                                } catch (e) {
-                                  debugPrint(
-                                      'Error checking connection speed in onboarding: $e');
                                 }
                               }
 

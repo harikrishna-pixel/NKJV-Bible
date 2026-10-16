@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:biblebookapp/view/constants/share_preferences.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 
 class InitializationHelper {
@@ -41,6 +42,7 @@ class InitializationHelper {
   }
 
   Future<void> _initialize() async {
+    if (!await SharPreferences.adsEnabledFromApiOrConstant()) return;
     await MobileAds.instance.initialize();
   }
 }

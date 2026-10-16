@@ -424,6 +424,7 @@ class _WalletScreenState extends State<WalletScreen> {
   }
 
   Future<void> _loadRewardedAd() async {
+    if (!await SharPreferences.adsEnabledFromApiOrConstant()) return;
     String? adUnitId =
         await SharPreferences.getString(SharPreferences.rewardedAd);
     if (adUnitId == null || adUnitId.isEmpty) {

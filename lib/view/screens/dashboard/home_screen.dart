@@ -7331,6 +7331,7 @@ class _MyAdBannerState extends State<MyAdBanner> {
   }
 
   fetchbanner() async {
+    if (!await SharPreferences.adsEnabledFromApiOrConstant()) return;
     bool? isAdEnabledFromApi =
         await SharPreferences.getBoolean(SharPreferences.isAdsEnabledApi) ??
             true;
@@ -7473,6 +7474,7 @@ class _MyAdBanner2State extends State<MyAdBanner2> {
   }
 
   fetchbanner() async {
+    if (!await SharPreferences.adsEnabledFromApiOrConstant()) return;
     bool? isAdEnabledFromApi =
         await SharPreferences.getBoolean(SharPreferences.isAdsEnabledApi) ??
             true;

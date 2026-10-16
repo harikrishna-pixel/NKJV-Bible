@@ -305,16 +305,14 @@ class DashBoardController extends GetxController with WidgetsBindingObserver {
 
   Future<void> _processApiResponse(GetAudioModel value) async {
     bool isAdsDisabled = false;
-    // Process ads configuration
+    // Process ads configuration: API ads_Type first, local enableAds only if missing.
     final prefs = await SharedPreferences.getInstance();
     if (value.data != null && value.data?.adsType != null) {
       isAdsDisabled = value.data!.adsType == "0";
-      isAdsCompletlyDisabled.value = isAdsDisabled;
     } else {
-      // Use constants as fallback when API data is not available
       isAdsDisabled = !BibleInfo.enableAds;
-      isAdsCompletlyDisabled.value = isAdsDisabled;
     }
+    isAdsCompletlyDisabled.value = isAdsDisabled;
     await Future.wait([
       _saveBasicPreferences(value),
       _processSubscriptionData(value),
@@ -361,6 +359,11 @@ class DashBoardController extends GetxController with WidgetsBindingObserver {
 
     // Initialize ads if not disabled
     if (!isAdsDisabled) {
+      try {
+        await MobileAds.instance
+            .initialize()
+            .timeout(const Duration(seconds: 5));
+      } catch (_) {}
       await _initializeAds(adIds);
     }
 
@@ -1613,6 +1616,7 @@ class DashBoardController extends GetxController with WidgetsBindingObserver {
   BannerAd? popupBannerAd;
   final isPopupBannerAdLoaded = false.obs;
   Future<void> initBanner({required String adUnitId}) async {
+    if (!await SharPreferences.adsEnabledFromApiOrConstant()) return;
     //final trackingAllowed = await isTrackingAllowed();
     // debugPrint('ad banner trackingAllowed -  ${!trackingAllowed}');
     bannerAd = BannerAd(

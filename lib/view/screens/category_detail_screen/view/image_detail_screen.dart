@@ -55,6 +55,7 @@ class AdService {
   bool get _isInterstitialAdLoaded => _sharedInterstitialLoaded;
 
   void loadRewardedInterstitialAds(VoidCallback onAdLoaded) async {
+    if (!await SharPreferences.adsEnabledFromApiOrConstant()) return;
     String? adUnitId =
         await SharPreferences.getString(SharPreferences.rewardedInterstitialAd);
     RewardedInterstitialAd.loadWithAdManagerAdRequest(
@@ -157,6 +158,7 @@ class AdService {
   }
 
   void loadInterstitialAd(VoidCallback onAdLoaded) async {
+    if (!await SharPreferences.adsEnabledFromApiOrConstant()) return;
     // Already ready — notify caller immediately (Home / Mark as Read).
     if (_sharedInterstitialLoaded && _sharedInterstitialAd != null) {
       onAdLoaded();
@@ -204,6 +206,7 @@ class AdService {
   }
 
   void loadBannerAd(VoidCallback onAdLoaded) async {
+    if (!await SharPreferences.adsEnabledFromApiOrConstant()) return;
     final trackingAllowed = await isTrackingAllowed();
     debugPrint('ad pop loadBannerAd -  ${!trackingAllowed}');
     String? adUnitId =

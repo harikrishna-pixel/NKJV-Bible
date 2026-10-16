@@ -1029,6 +1029,7 @@ class DownloadProvider with ChangeNotifier {
   }
 
   Future<bool> shouldLoadAd() async {
+    if (!await SharPreferences.adsEnabledFromApiOrConstant()) return false;
     final prefs = await SharedPreferences.getInstance();
     return prefs.getBool('ad_enabled') ?? true;
   }

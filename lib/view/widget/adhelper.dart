@@ -84,6 +84,10 @@ class RewardedAdService with WidgetsBindingObserver {
     String? data,
   }) async {
     if (_isAdLoaded) return;
+    if (!await SharPreferences.adsEnabledFromApiOrConstant()) {
+      onAdFailed();
+      return;
+    }
 
     String? adUnitId =
         await SharPreferences.getString(SharPreferences.rewardedAd);

@@ -152,8 +152,10 @@ Future<void> main() async {
 
 Future<void> _bootstrapBackgroundStartup() async {
   try {
-    await MobileAds.instance.initialize().timeout(const Duration(seconds: 8));
-    RewardedAdService();
+    if (await SharPreferences.adsEnabledFromApiOrConstant()) {
+      await MobileAds.instance.initialize().timeout(const Duration(seconds: 8));
+      RewardedAdService();
+    }
   } catch (e) {
     debugPrint("main: MobileAds init failed: $e");
   }
@@ -275,6 +277,7 @@ class _LifecycleWrapperState extends State<LifecycleWrapper>
   }
 
   Future<void> loadOpenAd() async {
+    if (!await SharPreferences.adsEnabledFromApiOrConstant()) return;
     bool? isAdEnabledFromApi =
         await SharPreferences.getBoolean(SharPreferences.isAdsEnabledApi);
     if (isAdEnabledFromApi ?? true) {
@@ -366,6 +369,7 @@ class AppOpenAdManager {
   bool _isShowingAd = false;
 
   void loadAd() async {
+    if (!await SharPreferences.adsEnabledFromApiOrConstant()) return;
     bool? isAdEnabledFromApi =
         await SharPreferences.getBoolean(SharPreferences.isAdsEnabledApi);
     if (isAdEnabledFromApi ?? true) {

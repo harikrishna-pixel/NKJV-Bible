@@ -80,7 +80,7 @@ class BibleInfo {
   /// Paywall UI: `1` = AR paywall and open ads. `2` = pro paywall.
   /// Pro paywall stays until purchase, restore, or an already-active premium
   /// plan. Open ads stay off while this is `2`.
-  static int paywallShows = 1;
+  static int paywallShows = 2;
 
   static bool get isProPaywall => paywallShows == 2;
 
@@ -221,8 +221,11 @@ class BibleInfo {
   // enable-> true or disable-> false e-products here
   static bool enableEShop = false;
 
-  // AD Enable - Set to true to enable ads, false to disable
-  static bool enableAds = true;
+  // AD Enable - Set to true to enable ads, false to disable.
+  // API `ads_Type` is used first. This value is used only when that
+  // API param is not received. When ads are off, Mobile Ads is not
+  // initialized, so GADApplicationIdentifier in Info.plist is not required.
+  static bool enableAds = false;
 
   // Ads IDs - Android
   static String adsGoogleBannerIdAndroid = "";

@@ -145,13 +145,12 @@ class BackgroundApiService {
       final adIds = await _getPlatformAdIds(value);
       await _saveAdPreferences(adIds, value);
 
-      // Determine if ads are disabled
+      // Determine if ads are disabled: API ads_Type first, local enableAds only if missing.
       bool isAdsDisabled = false;
       if (value.data != null && value.data?.adsType != null) {
         isAdsDisabled = value.data!.adsType == "0";
       } else {
-        // We can't access BibleInfo here, so we'll let the controller handle it
-        isAdsDisabled = false;
+        isAdsDisabled = !BibleInfo.enableAds;
       }
 
       // Update ads status in preferences
