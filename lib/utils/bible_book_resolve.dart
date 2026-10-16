@@ -1,4 +1,5 @@
 import 'package:biblebookapp/controller/dpProvider.dart';
+import 'package:biblebookapp/Model/verseBookContentModel.dart';
 import 'package:biblebookapp/utils/bible_version_config.dart';
 
 /// Resolves Daily Verse / JSON English book names to the active Bible's
@@ -306,5 +307,120 @@ class BibleBookResolve {
       [bookNum, indices.$1, indices.$2],
     );
     return List<Map<String, dynamic>>.from(rows);
+  }
+
+  /// Canonical 1-based Daily Verse reference recovered from the same stored
+  /// verse text. Old builds saved verse-table 0-based Book_Id/Chapter/Verse_Num.
+  static Future<({String book, int bookId, int chapter, int verseNum})>
+      canonicalizeDailyVerseIds({
+    required dynamic db,
+    required String? storedBook,
+    required int bookId,
+    required int chapter,
+    required int verseNum,
+    required String? verseHtml,
+  }) async {
+    final storedName = (storedBook ?? '').trim();
+    final want = normalizeVersePlainText(verseHtml);
+
+    Future<String?> contentAt(int b, int c, int v) async {
+      if (b < 0 || c < 0 || v < 0) return null;
+      final rows = await db.rawQuery(
+        'SELECT content FROM verse WHERE book_num = ? AND chapter_num = ? AND verse_num = ? LIMIT 1',
+        [b, c, v],
+      );
+      if (rows.isEmpty) return null;
+      return normalizeVersePlainText(rows.first['content']?.toString());
+    }
+
+    bool same(String? got) {
+      if (want.isEmpty || got == null || got.isEmpty) return false;
+      if (got == want) return true;
+      final n = want.length < 40 ? want.length : 40;
+      final prefix = want.substring(0, n);
+      if (got.startsWith(prefix) || want.startsWith(
+          got.length < n ? got : got.substring(0, n))) {
+        return true;
+      }
+      return false;
+    }
+
+    ({String book, int bookId, int chapter, int verseNum}) fromZeroBased(
+      int b,
+      int c,
+      int v,
+    ) {
+      final id = b + 1;
+      return (
+        book: protestantBookIdToEnglish[id] ??
+            storedName,
+        bookId: id,
+        chapter: c + 1,
+        verseNum: v + 1,
+      );
+    }
+
+    // Current convention: 1-based Book_Id/Chapter/Verse_Num → 0-based verse table.
+    if (bookId > 0 && chapter > 0 && verseNum > 0) {
+      final asOneBased = await contentAt(bookId - 1, chapter - 1, verseNum - 1);
+      if (same(asOneBased)) {
+        return (
+          book: protestantBookIdToEnglish[bookId] ?? storedName,
+          bookId: bookId,
+          chapter: chapter,
+          verseNum: verseNum,
+        );
+      }
+    }
+
+    // Legacy dailyVerses: numbers are already verse-table indices (0-based).
+    final asZeroBased = await contentAt(bookId, chapter, verseNum);
+    if (same(asZeroBased)) {
+      return fromZeroBased(bookId, chapter, verseNum);
+    }
+
+    final raw = (verseHtml ?? '').trim();
+    if (raw.isNotEmpty) {
+      final exact = await db.rawQuery(
+        'SELECT book_num, chapter_num, verse_num FROM verse WHERE content = ? LIMIT 3',
+        [raw],
+      );
+      if (exact.length == 1) {
+        return fromZeroBased(
+          int.parse(exact.first['book_num'].toString()),
+          int.parse(exact.first['chapter_num'].toString()),
+          int.parse(exact.first['verse_num'].toString()),
+        );
+      }
+    }
+
+    if (want.length >= 12) {
+      final like = '%${want.substring(0, want.length < 48 ? want.length : 48)}%';
+      final hits = await db.rawQuery(
+        'SELECT book_num, chapter_num, verse_num, content FROM verse WHERE content LIKE ? LIMIT 8',
+        [like],
+      );
+      final matched = <Map<String, dynamic>>[];
+      for (final row in hits) {
+        if (same(normalizeVersePlainText(row['content']?.toString()))) {
+          matched.add(row);
+        }
+      }
+      if (matched.length == 1) {
+        return fromZeroBased(
+          int.parse(matched.first['book_num'].toString()),
+          int.parse(matched.first['chapter_num'].toString()),
+          int.parse(matched.first['verse_num'].toString()),
+        );
+      }
+    }
+
+    // Do not guess. Keep the stored name and numbers together.
+    return (
+      book: storedName,
+      bookId: bookId,
+      chapter: chapter,
+      verseNum: verseNum,
+    );
   }
 }

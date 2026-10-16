@@ -12,6 +12,7 @@ import 'package:biblebookapp/utils/debugprint.dart';
 import 'package:biblebookapp/home_widget/bible_home_widget.dart';
 import 'package:biblebookapp/view/constants/share_preferences.dart';
 import 'package:biblebookapp/view/screens/auth/splash.dart';
+import 'package:biblebookapp/utils/bible_book_resolve.dart';
 import 'package:biblebookapp/view/screens/dashboard/constants.dart';
 import 'package:biblebookapp/view/widget/home_content_edit_bottom_sheet.dart';
 import 'package:flutter/foundation.dart';
@@ -417,6 +418,7 @@ class DownloadProvider with ChangeNotifier {
   static const _legacyPinnedVerseKey = 'legacyDailyVersePinned';
   static const _legacyPinnedDayKey = 'legacyDailyVersePinnedDay';
   static const pendingLegacyDailyVerseKey = 'pendingLegacyDailyVerse';
+  static const restoredLegacyDailyVersesKey = 'restoredLegacyDailyVerses';
 
   /// Update from a build without topics: keeps its daily verses as history and
   /// schedules topic verses from tomorrow (today when there are no old verses).
@@ -453,19 +455,27 @@ class DownloadProvider with ChangeNotifier {
 
     // Save the update-day marker before topics. A second load (Daily Verse
     // screen refresh, or topic save) must not rebuild today's verse.
+    final fixedLegacyRows = <Map<String, dynamic>>[];
     if (pastLegacy.isNotEmpty) {
+      for (final row in pastLegacy) {
+        final source = Map<String, dynamic>.from(row);
+        source['_table'] = 'dailyVerses';
+        fixedLegacyRows.add(await _canonicalDailyVerseDbRow(dbClient, source));
+      }
       await prefs.setString(
         _legacyDailyVerseDayKey,
         DateFormat('yyyy-MM-dd').format(DateTime.now()),
       );
-      await _savePinnedLegacyVerseFromRow(prefs, pastLegacy);
-    }
-
-    if (pastLegacy.isNotEmpty) {
+      await prefs.setBool(restoredLegacyDailyVersesKey, true);
+      await _savePinnedLegacyVerseFromRow(prefs, fixedLegacyRows);
       await dbClient.transaction((txn) async {
         final batch = txn.batch();
-        for (final row in pastLegacy) {
-          batch.insert('dailyVersesnew', Map<String, dynamic>.from(row)..remove('id'));
+        for (final row in fixedLegacyRows) {
+          batch.insert(
+              'dailyVersesnew',
+              Map<String, dynamic>.from(row)
+                ..remove('id')
+                ..remove('_table'));
         }
         await batch.commit(noResult: true);
       });
@@ -483,8 +493,9 @@ class DownloadProvider with ChangeNotifier {
       });
     }
     await prefs.setStringList('selected_categories', categories);
-    final usedKeys =
-        pastLegacy.map(_dailyVerseScheduleKeyFromInserted).toSet();
+    final usedKeys = (fixedLegacyRows.isNotEmpty ? fixedLegacyRows : pastLegacy)
+        .map(_dailyVerseScheduleKeyFromInserted)
+        .toSet();
     var toSchedule = _interleaveDailyVersesByCategory(filteredData, categories)
         .where((row) => !usedKeys.contains(_dailyVerseScheduleKeyFromMain(row)))
         .toList();
@@ -742,6 +753,57 @@ class DownloadProvider with ChangeNotifier {
       } catch (_) {}
     }
     return categories.any((c) => !represented.contains(c));
+  }
+
+  Future<List<Map<String, dynamic>>> _preferLegacyDailyVerseRowsForSameDates(
+    dynamic dbClient,
+    List<Map<String, dynamic>> current,
+  ) async {
+    List<Map<String, dynamic>> legacy;
+    try {
+      legacy = List<Map<String, dynamic>>.from(
+        await dbClient.rawQuery('SELECT * FROM dailyVerses'),
+      );
+    } catch (_) {
+      return current;
+    }
+    if (legacy.isEmpty) return current;
+
+    String? dayKey(Map<String, dynamic> row) {
+      try {
+        return DateFormat('yyyy-MM-dd').format(
+          _dailyVerseDateOnly(DateTime.parse(row['Date'].toString())),
+        );
+      } catch (_) {
+        return null;
+      }
+    }
+
+    final legacyByDay = <String, Map<String, dynamic>>{};
+    for (final row in legacy) {
+      final key = dayKey(row);
+      if (key == null) continue;
+      final existing = legacyByDay[key];
+      if (existing == null) {
+        legacyByDay[key] = row;
+        continue;
+      }
+      try {
+        if (DateTime.parse(row['Date'].toString()).isAfter(
+            DateTime.parse(existing['Date'].toString()))) {
+          legacyByDay[key] = row;
+        }
+      } catch (_) {}
+    }
+    if (legacyByDay.isEmpty) return current;
+
+    return current.map((row) {
+      final key = dayKey(row);
+      if (key == null || !legacyByDay.containsKey(key)) return row;
+      final restored = Map<String, dynamic>.from(legacyByDay[key]!);
+      restored['_table'] = 'dailyVerses';
+      return restored;
+    }).toList();
   }
 
   bool _hasDailyVerseForDate(
@@ -1173,37 +1235,56 @@ class DownloadProvider with ChangeNotifier {
   bool isLoadingDailyVerse = false;
   List<DailyVerseList> dailyVerseList = [];
 
-  /// Aligns each item's display [DailyVerseList.book] with [Book_Id] → selected
-  /// Bible `book.title` (same mapping Read already uses for book_num).
-  /// Does not change Book_Id, chapter, verse, or content.
+  /// Aligns each item's Book/Chapter/Verse_Num with the stored verse text.
+  /// Old builds stored 0-based verse-table ids; do not remap by Book_Id - 1.
   Future<void> _ensureDailyVerseBookNamesMatchBookId() async {
     if (dailyVerseList.isEmpty) return;
     final dbClient = await DBHelper().db;
     if (dbClient == null) return;
 
-    final bookRows =
-        await dbClient.rawQuery('SELECT book_num, title FROM book');
-    if (bookRows.isEmpty) return;
-
-    final bookTitleByNum = <int, String>{
-      for (final row in bookRows)
-        int.parse(row['book_num'].toString()): row['title'] as String,
-    };
-
     var changed = false;
     final updated = <DailyVerseList>[];
     for (final verse in dailyVerseList) {
-      final bookIdStored = (verse.bookId ?? 0).toInt();
-      final bookNum = bookIdStored > 0 ? bookIdStored - 1 : bookIdStored;
-      final localized =
-          _resolveDailyVerseBookTitle(bookTitleByNum, bookNum) ??
-              _resolveDailyVerseBookTitle(bookTitleByNum, bookIdStored);
-      final current = (verse.book ?? '').trim();
-      if (localized != null &&
-          localized.isNotEmpty &&
-          localized != current) {
+      final bookId = (verse.bookId ?? 0).toInt();
+      final chapter = (verse.chapter ?? 0).toInt();
+      final verseNum = verse.verseNum ?? 0;
+      final canon = await BibleBookResolve.canonicalizeDailyVerseIds(
+        db: dbClient,
+        storedBook: verse.book,
+        bookId: bookId,
+        chapter: chapter,
+        verseNum: verseNum,
+        verseHtml: verse.verse,
+      );
+      final localized = await BibleBookResolve.titleForBookNum(
+            await BibleBookResolve.bookNumForDailyVerse(
+              bookName: canon.book,
+              bookId: canon.bookId,
+              db: dbClient,
+            ),
+            db: dbClient,
+          ) ??
+          canon.book;
+      if (localized != (verse.book ?? '') ||
+          canon.bookId != bookId ||
+          canon.chapter != chapter ||
+          canon.verseNum != verseNum) {
         changed = true;
-        updated.add(verse.copyWith(book: localized));
+        updated.add(verse.copyWith(
+          book: localized,
+          bookId: canon.bookId,
+          chapter: canon.chapter,
+          verseNum: canon.verseNum,
+        ));
+        await _persistCanonicalDailyVerseIds(
+          dbClient,
+          date: verse.date,
+          verseHtml: verse.verse,
+          book: canon.book.isNotEmpty ? canon.book : localized,
+          bookId: canon.bookId,
+          chapter: canon.chapter,
+          verseNum: canon.verseNum,
+        );
       } else {
         updated.add(verse);
       }
@@ -1217,6 +1298,81 @@ class DownloadProvider with ChangeNotifier {
           jsonEncode(dailyVerseList.map((e) => e.toJson()).toSet().toList());
       await prefs.setString('cachedDailyVerseList_v2', jsonList);
     } catch (_) {}
+  }
+
+  Future<Map<String, dynamic>> _canonicalDailyVerseDbRow(
+    dynamic dbClient,
+    Map<String, dynamic> row,
+  ) async {
+    final bookId = int.tryParse('${row['Book_Id']}') ?? 0;
+    final chapter = int.tryParse('${row['Chapter']}') ?? 0;
+    final verseNum = int.tryParse('${row['Verse_Num']}') ?? 0;
+    final canon = await BibleBookResolve.canonicalizeDailyVerseIds(
+      db: dbClient,
+      storedBook: row['Book']?.toString(),
+      bookId: bookId,
+      chapter: chapter,
+      verseNum: verseNum,
+      verseHtml: row['Verse']?.toString(),
+    );
+    final out = Map<String, dynamic>.from(row);
+    out['Book'] = canon.book.isNotEmpty ? canon.book : row['Book'];
+    out['Book_Id'] = canon.bookId;
+    out['Chapter'] = canon.chapter;
+    out['Verse_Num'] = canon.verseNum;
+    await _persistCanonicalDailyVerseIds(
+      dbClient,
+      table: row.containsKey('_table') ? row['_table']?.toString() : null,
+      id: row['id'] is int ? row['id'] as int : int.tryParse('${row['id']}'),
+      date: row['Date']?.toString(),
+      verseHtml: row['Verse']?.toString(),
+      book: out['Book']?.toString() ?? '',
+      bookId: canon.bookId,
+      chapter: canon.chapter,
+      verseNum: canon.verseNum,
+    );
+    return out;
+  }
+
+  Future<void> _persistCanonicalDailyVerseIds(
+    dynamic dbClient, {
+    String? table,
+    int? id,
+    String? date,
+    String? verseHtml,
+    required String book,
+    required int bookId,
+    required int chapter,
+    required int verseNum,
+  }) async {
+    final values = {
+      'Book': book,
+      'Book_Id': bookId,
+      'Chapter': chapter,
+      'Verse_Num': verseNum,
+    };
+    if (table != null && id != null) {
+      try {
+        await dbClient.update(
+          table,
+          values,
+          where: 'id = ?',
+          whereArgs: [id],
+        );
+      } catch (_) {}
+      return;
+    }
+    if (date == null || verseHtml == null) return;
+    for (final name in ['dailyVerses', 'dailyVersesnew']) {
+      try {
+        await dbClient.update(
+          name,
+          values,
+          where: 'Date = ? AND Verse = ?',
+          whereArgs: [date, verseHtml],
+        );
+      } catch (_) {}
+    }
   }
 
   Future<void> loadDailyVerses() async {
@@ -1253,6 +1409,7 @@ class DownloadProvider with ChangeNotifier {
     // Keep the exact verse first shown on the update day.
     if (showLegacyToday && dailyVerseList.isNotEmpty) {
       await _lockLegacyTodayVerse(prefs, todayKey);
+      await _ensureDailyVerseBookNamesMatchBookId();
       isLoadingDailyVerse = false;
       notifyListeners();
       return;
@@ -1379,6 +1536,7 @@ class DownloadProvider with ChangeNotifier {
             filteredData: filteredData,
             categories: cats,
             survivingRows: dailyVerses,
+            firstNewDate: DateTime.now().add(const Duration(days: 1)),
           );
         } else {
           final interleaved =
@@ -1399,6 +1557,13 @@ class DownloadProvider with ChangeNotifier {
         dailyVerses = await dbClient.rawQuery("SELECT * FROM $table");
       }
     }
+    if (table == 'dailyVersesnew' &&
+        (prefs.getBool(restoredLegacyDailyVersesKey) ?? false)) {
+      dailyVerses = await _preferLegacyDailyVerseRowsForSameDates(
+        dbClient,
+        dailyVerses,
+      );
+    }
 
     final today = DateTime.now();
     final todayString = DateFormat('yyyy-MM-dd').format(today);
@@ -1410,35 +1575,35 @@ class DownloadProvider with ChangeNotifier {
     final verseRows =
         result.isNotEmpty ? result : List<Map<String, dynamic>>.from(dailyVerses);
 
-    // Fetch book names (single query — same titles as per-verse lookups).
-    final bookRows = await dbClient.rawQuery("SELECT book_num, title FROM book");
-    final bookTitleByNum = <int, String>{
-      for (final row in bookRows)
-        int.parse(row['book_num'].toString()): row['title'] as String,
-    };
-
     final List<DailyVerseList> enrichedList = [];
 
     for (var verse in verseRows) {
-      final bookIdStored = int.parse(verse['Book_Id'].toString());
-      final bookNum = bookIdStored > 0 ? bookIdStored - 1 : bookIdStored;
-      final storedBook = verse['Book']?.toString().trim() ?? '';
-      // Prefer selected Bible language title so reference matches verse text
-      // (e.g. Portuguese content → Filipenses, not English Philippians).
-      final bookName =
-          _resolveDailyVerseBookTitle(bookTitleByNum, bookNum) ??
-              _resolveDailyVerseBookTitle(bookTitleByNum, bookIdStored) ??
-              (storedBook.isNotEmpty ? storedBook : 'Unknown');
+      final source = Map<String, dynamic>.from(verse);
+      source['_table'] = verse['_table'] ?? table;
+      final fixed = await _canonicalDailyVerseDbRow(dbClient, source);
+      final bookIdStored = int.parse(fixed['Book_Id'].toString());
+      final storedBook = fixed['Book']?.toString().trim() ?? '';
+      final bookNum = await BibleBookResolve.bookNumForDailyVerse(
+        bookName: storedBook,
+        bookId: bookIdStored,
+        db: dbClient,
+      );
+      final bookName = await BibleBookResolve.titleForBookNum(
+            bookNum,
+            db: dbClient,
+          ) ??
+          (storedBook.isNotEmpty ? storedBook : 'Unknown');
 
       enrichedList.add(DailyVerseList(
-        categoryName: verse['Category_Name'],
-        categoryId: int.parse(verse['Category_Id'].toString()),
+        id: int.tryParse('${fixed['id']}'),
+        categoryName: fixed['Category_Name'],
+        categoryId: int.parse(fixed['Category_Id'].toString()),
         book: bookName,
-        bookId: int.parse(verse['Book_Id'].toString()),
-        chapter: int.parse(verse['Chapter'].toString()),
-        verse: verse['Verse'],
-        date: verse['Date'],
-        verseNum: int.parse(verse['Verse_Num'].toString()),
+        bookId: bookIdStored,
+        chapter: int.parse(fixed['Chapter'].toString()),
+        verse: fixed['Verse'],
+        date: fixed['Date'],
+        verseNum: int.parse(fixed['Verse_Num'].toString()),
       ));
     }
 
