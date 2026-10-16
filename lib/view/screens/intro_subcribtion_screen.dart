@@ -4347,6 +4347,9 @@ class _SubscriptionScreenState extends State<SubscriptionScreen>
     if (fakeOfferPercentage != null) {
       final fakePrice =
           calculateOriginalPrice(fakeOfferPercentage, product.rawPrice);
+      if (_isOneYearProductId(product.id)) {
+        return '${product.currencySymbol}${fakePrice.toStringAsFixed(0)}';
+      }
       return '${product.currencySymbol}${fakePrice.toStringAsFixed(2)}';
     }
     return '';

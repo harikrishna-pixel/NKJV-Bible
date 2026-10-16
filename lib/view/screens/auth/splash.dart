@@ -191,7 +191,7 @@ class _SplashScreenState extends State<SplashScreen>
     }
 
     await SharPreferences.setString('test', 'test');
-    // Splash can finish before the ad finishes loading. Wait up to 3.5s.
+    // If the open ad is not ready, wait at most 3.5s then go Home.
     if (_appOpenAd == null) {
       final pending = _splashOpenAdPreloadCompleter;
       if (pending != null && !pending.isCompleted) {
@@ -199,6 +199,10 @@ class _SplashScreenState extends State<SplashScreen>
           await pending.future.timeout(const Duration(milliseconds: 3500));
         } catch (_) {}
       }
+    }
+    if (_appOpenAd == null) {
+      await prefs.setString("showopenad", "false");
+      return false;
     }
     final shown = await loadOpenAd();
     await prefs.setString("showopenad", "false");
@@ -356,14 +360,16 @@ class _SplashScreenState extends State<SplashScreen>
   }
 
   Future<bool> loadOpenAd() async {
-    final trackingAllowed = await isTrackingAllowed();
-    debugPrint('ad pop loadOpenAd -  ${!trackingAllowed}');
-
     // Splash is 4s. Use only the ad already preloaded. Do not wait again.
     if (_appOpenAd == null) {
       debugPrint('AppOpenAd not ready at splash leave');
       return false;
     }
+    try {
+      final trackingAllowed = await isTrackingAllowed()
+          .timeout(const Duration(milliseconds: 3500));
+      debugPrint('ad pop loadOpenAd -  ${!trackingAllowed}');
+    } catch (_) {}
 
     final adToShow = _appOpenAd;
     if (adToShow == null) {

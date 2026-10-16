@@ -364,12 +364,7 @@ class DownloadProvider with ChangeNotifier {
         }
       } else {
         final placeholders = List.filled(categories.length, '?').join(',');
-        if (keepLegacyToday) {
-          await dbClient.rawDelete(
-            'DELETE FROM dailyVersesnew WHERE Category_Name NOT IN ($placeholders) AND Date NOT LIKE ?',
-            [...categories, '$todayKey%'],
-          );
-        } else {
+        if (!keepLegacyToday) {
           await dbClient.rawDelete(
             'DELETE FROM dailyVersesnew WHERE Category_Name NOT IN ($placeholders)',
             categories,
@@ -449,7 +444,7 @@ class DownloadProvider with ChangeNotifier {
         .map<String>((r) => r['Category_Name']?.toString() ?? '')
         .where((String name) => name.isNotEmpty)
         .toSet();
-    final categories = pastLegacy
+    var categories = pastLegacy
         .map<String>((r) => r['Category_Name']?.toString() ?? '')
         .where(mainCategories.contains)
         .toSet()
@@ -466,8 +461,6 @@ class DownloadProvider with ChangeNotifier {
       await _savePinnedLegacyVerseFromRow(prefs, pastLegacy);
     }
 
-    await prefs.setStringList('selected_categories', categories);
-
     if (pastLegacy.isNotEmpty) {
       await dbClient.transaction((txn) async {
         final batch = txn.batch();
@@ -478,15 +471,27 @@ class DownloadProvider with ChangeNotifier {
       });
     }
 
-    final filteredData = await compute(_filterVerses, {
+    var filteredData = await compute(_filterVerses, {
       'data': rawData,
       'selectedCategories': categories,
     });
+    if (filteredData.isEmpty && mainCategories.isNotEmpty) {
+      categories = mainCategories.toList();
+      filteredData = await compute(_filterVerses, {
+        'data': rawData,
+        'selectedCategories': categories,
+      });
+    }
+    await prefs.setStringList('selected_categories', categories);
     final usedKeys =
         pastLegacy.map(_dailyVerseScheduleKeyFromInserted).toSet();
-    final toSchedule = _interleaveDailyVersesByCategory(filteredData, categories)
+    var toSchedule = _interleaveDailyVersesByCategory(filteredData, categories)
         .where((row) => !usedKeys.contains(_dailyVerseScheduleKeyFromMain(row)))
         .toList();
+    if (toSchedule.isEmpty) {
+      toSchedule =
+          _interleaveDailyVersesByCategory(filteredData, categories);
+    }
 
     if (pastLegacy.isEmpty) {
       await _insertDailyVersesFromMainList(
@@ -497,7 +502,8 @@ class DownloadProvider with ChangeNotifier {
       return false;
     }
 
-    // Today shows the old verses, so the new schedule is not needed before tomorrow.
+    // Today shows the old verses. Schedule tomorrow+ in the background so
+    // splash is not held for the full catalog insert.
     unawaited(_insertDailyVersesFromMainList(
       dbClient: dbClient,
       data: toSchedule,
@@ -736,6 +742,22 @@ class DownloadProvider with ChangeNotifier {
       } catch (_) {}
     }
     return categories.any((c) => !represented.contains(c));
+  }
+
+  bool _hasDailyVerseForDate(
+    List<Map<String, dynamic>> rows,
+    DateTime day,
+  ) {
+    final want = _dailyVerseDateOnly(day);
+    for (final row in rows) {
+      try {
+        if (_dailyVerseDateOnly(DateTime.parse(row['Date'].toString())) ==
+            want) {
+          return true;
+        }
+      } catch (_) {}
+    }
+    return false;
   }
 
   /// Rebuilds today-and-future rows so every selected topic (including newly added)
@@ -1326,20 +1348,55 @@ class DownloadProvider with ChangeNotifier {
 
     if (table == 'dailyVersesnew' &&
         selectedCategories.isNotEmpty &&
-        _categoriesMissingFromPastSchedule(dailyVerses, selectedCategories)) {
+        (_categoriesMissingFromPastSchedule(dailyVerses, selectedCategories) ||
+            !_hasDailyVerseForDate(dailyVerses, DateTime.now()))) {
       final rawData =
           await dbClient.rawQuery("SELECT * FROM dailyVersesMainList");
-      final filteredData = await compute(_filterVerses, {
+      var cats = selectedCategories;
+      var filteredData = await compute(_filterVerses, {
         'data': rawData,
-        'selectedCategories': selectedCategories,
+        'selectedCategories': cats,
       });
-      await _rebalanceFutureDailyVerseSchedule(
-        dbClient: dbClient,
-        filteredData: filteredData,
-        categories: selectedCategories,
-        survivingRows: dailyVerses,
-      );
-      dailyVerses = await dbClient.rawQuery("SELECT * FROM $table");
+      if (filteredData.isEmpty) {
+        cats = rawData
+            .map<String>((r) => r['Category_Name']?.toString() ?? '')
+            .where((String name) => name.isNotEmpty)
+            .toSet()
+            .toList();
+        if (cats.isNotEmpty) {
+          await prefs.setStringList('selected_categories', cats);
+          filteredData = await compute(_filterVerses, {
+            'data': rawData,
+            'selectedCategories': cats,
+          });
+        }
+      }
+      if (filteredData.isNotEmpty) {
+        if (_hasDailyVerseForDate(dailyVerses, DateTime.now())) {
+          await _rebalanceFutureDailyVerseSchedule(
+            dbClient: dbClient,
+            filteredData: filteredData,
+            categories: cats,
+            survivingRows: dailyVerses,
+          );
+        } else {
+          final interleaved =
+              _interleaveDailyVersesByCategory(filteredData, cats);
+          await _insertDailyVersesFromMainList(
+            dbClient: dbClient,
+            data: interleaved.take(14).toList(),
+            startDate: DateTime.now(),
+          );
+          unawaited(_rebalanceFutureDailyVerseSchedule(
+            dbClient: dbClient,
+            filteredData: filteredData,
+            categories: cats,
+            survivingRows: await dbClient.rawQuery("SELECT * FROM $table"),
+            firstNewDate: DateTime.now().add(const Duration(days: 1)),
+          ));
+        }
+        dailyVerses = await dbClient.rawQuery("SELECT * FROM $table");
+      }
     }
 
     final today = DateTime.now();

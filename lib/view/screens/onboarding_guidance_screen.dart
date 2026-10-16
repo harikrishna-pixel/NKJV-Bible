@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:biblebookapp/view/constants/colors.dart';
 import 'package:biblebookapp/view/constants/images.dart';
 import 'package:flutter/material.dart';
 
@@ -238,7 +239,7 @@ class _ValueChatBodyState extends State<_ValueChatBody> {
               fontFamily: 'Georgia',
               fontSize: widget.isTablet ? 22 : 20,
               fontWeight: FontWeight.w700,
-              color: const Color(0xFF241A0F),
+              color: CommanColor.whiteBlack(context),
             ),
           ),
           Padding(
@@ -254,7 +255,9 @@ class _ValueChatBodyState extends State<_ValueChatBody> {
               style: TextStyle(
                 fontSize: widget.isTablet ? 14 : 12.5,
                 height: 1.4,
-                color: _inkSoft,
+                color: CommanColor.isDarkTheme(context)
+                    ? Colors.white.withOpacity(0.75)
+                    : _inkSoft,
               ),
             ),
           ),
@@ -277,7 +280,7 @@ class _ValueChatBodyState extends State<_ValueChatBody> {
               fontSize: 11,
               fontWeight: FontWeight.w800,
               letterSpacing: 0.9,
-              color: _goldDeep,
+              color: CommanColor.isDarkTheme(context) ? _gold2 : _goldDeep,
             ),
           ),
           Padding(

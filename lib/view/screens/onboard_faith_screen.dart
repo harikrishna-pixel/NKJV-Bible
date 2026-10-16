@@ -300,8 +300,8 @@ child: Row(
 children: [
 IconButton(
 onPressed: _back,
-icon: const Icon(Icons.arrow_back_ios_new,
-size: 20, color: _ink),
+icon: Icon(Icons.arrow_back_ios_new,
+size: 20, color: CommanColor.whiteBlack(context)),
 ),
 const SizedBox(width: 6),
 Expanded(
@@ -311,7 +311,7 @@ textAlign: TextAlign.center,
 style: TextStyle(
 fontSize: isTablet ? 28 : 19,
 fontWeight: FontWeight.w600,
-color: _ink,
+color: CommanColor.whiteBlack(context),
 ),
 ),
 ),
@@ -544,7 +544,7 @@ textAlign: TextAlign.center,
 style: TextStyle(
 fontSize: isTablet ? 22 : 18,
 fontWeight: FontWeight.w700,
-color: const Color(0xFF2E2C2B),
+color: CommanColor.whiteBlack(context),
 height: 1.3,
 ),
 ),
@@ -556,7 +556,9 @@ textAlign: TextAlign.center,
 style: TextStyle(
 fontSize: isTablet ? 16 : 14,
 fontWeight: FontWeight.w500,
-color: const Color(0xFF5C4033).withOpacity(0.85),
+color: CommanColor.isDarkTheme(context)
+? Colors.white.withOpacity(0.75)
+: const Color(0xFF5C4033).withOpacity(0.85),
 height: 1.3,
 ),
 ),
@@ -615,7 +617,7 @@ textAlign: TextAlign.center,
 style: TextStyle(
 fontSize: isTablet ? 22 : 18,
 fontWeight: FontWeight.w700,
-color: const Color(0xFF2E2C2B),
+color: CommanColor.whiteBlack(context),
 height: 1.3,
 ),
 ),
@@ -1069,7 +1071,8 @@ return Container(
 width: double.infinity,
 padding: EdgeInsets.fromLTRB(12, isTablet ? 20 : 16, 12, 16),
 decoration: BoxDecoration(
-color: Colors.white.withValues(alpha: 0.55),
+color: Colors.white.withValues(
+alpha: CommanColor.isDarkTheme(context) ? 0.88 : 0.55),
 borderRadius: BorderRadius.circular(16),
 border: Border.all(
 color: const Color(0xFFB08D6E).withValues(alpha: 0.75),
@@ -1180,11 +1183,14 @@ child: previewText,
 }
 
 Widget _buildPreviewDivider(bool isTablet) {
+final dividerColor = CommanColor.isDarkTheme(context)
+? const Color(0xFFD4B89E)
+: const Color(0xFF7A5435);
 return Row(
 children: [
 Expanded(
 child: Divider(
-color: const Color(0xFF7A5435).withValues(alpha: 0.35),
+color: dividerColor.withValues(alpha: 0.45),
 thickness: 1,
 ),
 ),
@@ -1195,13 +1201,13 @@ child: Text(
 style: TextStyle(
 fontSize: isTablet ? 16 : 14,
 fontWeight: FontWeight.w600,
-color: const Color(0xFF7A5435),
+color: dividerColor,
 ),
 ),
 ),
 Expanded(
 child: Divider(
-color: const Color(0xFF7A5435).withValues(alpha: 0.35),
+color: dividerColor.withValues(alpha: 0.45),
 thickness: 1,
 ),
 ),
@@ -1239,8 +1245,8 @@ child: Row(
 children: [
 IconButton(
 onPressed: () => Get.back(),
-icon: const Icon(Icons.arrow_back_ios_new,
-size: 20, color: Color(0xFF2E2C2B)),
+icon: Icon(Icons.arrow_back_ios_new,
+size: 20, color: CommanColor.whiteBlack(context)),
 ),
 const SizedBox(width: 6),
 Expanded(
@@ -1250,7 +1256,7 @@ textAlign: TextAlign.center,
 style: TextStyle(
 fontSize: isTablet ? 28 : 19,
 fontWeight: FontWeight.w600,
-color: const Color(0xFF2E2C2B),
+color: CommanColor.whiteBlack(context),
 ),
 ),
 ),
@@ -1577,22 +1583,23 @@ final mq = MediaQuery.of(context);
 final isTablet = mq.size.width >= 600;
 
 final borderRadius = BorderRadius.circular(7);
+final isDark = CommanColor.isDarkTheme(context);
 // Border with increased thickness when selected
 final baseBorder = Border.all(
 color: selected
 ? const Color(0xFF805531)
-    : const Color(
-0xFF9E9E9E), // Border color: #805531 when selected, 9E9E9E when not
+    : (isDark
+        ? Colors.white.withOpacity(0.45)
+        : const Color(
+0xFF9E9E9E)), // Border color: #805531 when selected, 9E9E9E when not
 width: selected ? 2.0 : 1.0, // Increase thickness when selected
 );
 
 // Selected option: background color 805531 with 20% opacity
 final bg = selected
-? const Color(0xFF805531).withOpacity(0.2)
-    : Colors.transparent;
-final fg = selected
-? const Color(0xFF2E2C2B)
-    : const Color(0xFF2E2C2B); // Keep text color same for both states
+? const Color(0xFF805531).withOpacity(isDark ? 0.45 : 0.2)
+    : (isDark ? Colors.white.withOpacity(0.12) : Colors.transparent);
+final fg = CommanColor.whiteBlack(context);
 
 return Material(
 color: Colors.transparent,
