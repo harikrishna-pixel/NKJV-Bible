@@ -519,11 +519,6 @@ class _SplashScreenState extends State<SplashScreen>
         await reconcilePersistedBibleStateWithDatabase();
         await DBMigrationHelper.copyUserDataFromLegacyIfNeeded(password);
         await loadDailyVerseData();
-        // Load Verse for You only after daily-verse tables are seeded (first install).
-        if (mounted) {
-          await Provider.of<DownloadProvider>(context, listen: false)
-              .loadDailyVerses();
-        }
 
         // Essential: Set default book if not set + preserve legacy user data
         await Future.wait<void>([
@@ -574,6 +569,11 @@ class _SplashScreenState extends State<SplashScreen>
         print('SPLASH before navigation');
 
         await _markInitCompleteAndTryLeave();
+        // Schedule rebuild must not keep the splash loader on screen.
+        if (mounted) {
+          unawaited(Provider.of<DownloadProvider>(context, listen: false)
+              .loadDailyVerses());
+        }
       } catch (e) {
         print('SPLASH init error - $e');
         // Even if there's an error, try to navigate

@@ -917,6 +917,15 @@ class _SubscriptionScreenState extends State<SubscriptionScreen>
     await _addLifetimeWalletBonus();
   }
 
+  /// Receipt upload and StoreKit finish must not hold the reading screen.
+  Future<void> _awaitPurchaseStep(Future<void> step) async {
+    try {
+      await step.timeout(const Duration(seconds: 8));
+    } catch (e) {
+      debugPrint('Purchase step continued: $e');
+    }
+  }
+
   /// UI only: drop Buy Processing/toast before Get.offAll so Home is not frozen.
   Future<void> _releasePurchaseUiLock() async {
     try {
@@ -2482,9 +2491,9 @@ class _SubscriptionScreenState extends State<SubscriptionScreen>
                 // final data = parseHtmlAndExtractJson(response.body);
                 await Future.delayed(Duration(seconds: 1));
                 // DebugConsole.log(" purchases sucess - $data");
-                await purchaseSubmit(
+                await _awaitPurchaseStep(purchaseSubmit(
                     receiptData:
-                        '${purchaseDetails.purchaseID}-productId:${purchaseDetails.productID}-date:${DateTime.now()}');
+                        '${purchaseDetails.purchaseID}-productId:${purchaseDetails.productID}-date:${DateTime.now()}'));
                 await SharPreferences.setBoolean("downloadreward", true);
                 // Additive: remember Buy product across reinstall Restore.
                 await _rememberLastIapProduct(
@@ -2514,7 +2523,8 @@ class _SubscriptionScreenState extends State<SubscriptionScreen>
                   }
                   await Future.delayed(Duration(seconds: 2));
                   if (Platform.isIOS) {
-                    await _inAppPurchase.completePurchase(purchaseDetails);
+                    await _awaitPurchaseStep(
+                        _inAppPurchase.completePurchase(purchaseDetails));
                   }
                   EasyLoading.dismiss();
                   Constants.showToast('Purchase Successful');
@@ -2542,7 +2552,8 @@ class _SubscriptionScreenState extends State<SubscriptionScreen>
                   await Future.delayed(Duration(seconds: 2));
                   // Complete the purchase for iOS - critical to prevent infinite loading
                   if (Platform.isIOS) {
-                    await _inAppPurchase.completePurchase(purchaseDetails);
+                    await _awaitPurchaseStep(
+                        _inAppPurchase.completePurchase(purchaseDetails));
                   }
                   EasyLoading.dismiss();
                   Constants.showToast('Purchase Successful');
@@ -2570,7 +2581,8 @@ class _SubscriptionScreenState extends State<SubscriptionScreen>
                   await Future.delayed(Duration(seconds: 2));
                   // Complete the purchase for iOS - critical to prevent infinite loading
                   if (Platform.isIOS) {
-                    await _inAppPurchase.completePurchase(purchaseDetails);
+                    await _awaitPurchaseStep(
+                        _inAppPurchase.completePurchase(purchaseDetails));
                   }
                   EasyLoading.dismiss();
                   Constants.showToast('Purchase Successful');
@@ -2597,7 +2609,8 @@ class _SubscriptionScreenState extends State<SubscriptionScreen>
                   }
                   await Future.delayed(Duration(seconds: 2));
                   if (Platform.isIOS) {
-                    await _inAppPurchase.completePurchase(purchaseDetails);
+                    await _awaitPurchaseStep(
+                        _inAppPurchase.completePurchase(purchaseDetails));
                   }
                   EasyLoading.dismiss();
                   Constants.showToast('Purchase Successful');
@@ -2625,7 +2638,8 @@ class _SubscriptionScreenState extends State<SubscriptionScreen>
                   await Future.delayed(Duration(seconds: 2));
                   // Complete the purchase for iOS - critical to prevent infinite loading
                   if (Platform.isIOS) {
-                    await _inAppPurchase.completePurchase(purchaseDetails);
+                    await _awaitPurchaseStep(
+                        _inAppPurchase.completePurchase(purchaseDetails));
                   }
                   EasyLoading.dismiss();
                   await _addLifetimeWalletBonusOnce();
@@ -2662,7 +2676,8 @@ class _SubscriptionScreenState extends State<SubscriptionScreen>
                     await Future.delayed(Duration(seconds: 2));
                     // Complete the purchase for iOS - critical to prevent infinite loading
                     if (Platform.isIOS) {
-                      await _inAppPurchase.completePurchase(purchaseDetails);
+                      await _awaitPurchaseStep(
+                          _inAppPurchase.completePurchase(purchaseDetails));
                     }
                     EasyLoading.dismiss();
                     await _addLifetimeWalletBonusOnce();
@@ -2682,7 +2697,8 @@ class _SubscriptionScreenState extends State<SubscriptionScreen>
                     await Future.delayed(Duration(seconds: 2));
                     // Complete the purchase for iOS - critical to prevent infinite loading
                     if (Platform.isIOS) {
-                      await _inAppPurchase.completePurchase(purchaseDetails);
+                      await _awaitPurchaseStep(
+                          _inAppPurchase.completePurchase(purchaseDetails));
                     }
                     EasyLoading.dismiss();
                     await _addLifetimeWalletBonusOnce();
