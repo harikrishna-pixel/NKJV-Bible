@@ -135,10 +135,19 @@ class PreferenceSelectionScreenState extends State<PreferenceSelectionScreen> {
 
     final prefs = await SharedPreferences.getInstance();
     final saved = prefs.getStringList('selected_categories') ?? [];
+    var selected = saved.toSet();
+    // Onboarding only: a saved list of every topic is the automatic fill.
+    // Start with none selected so the user chooses. Settings keeps the save.
+    if (!widget.isSetting &&
+        categoryIcons.isNotEmpty &&
+        selected.length >= categoryIcons.length &&
+        categoryIcons.keys.every(selected.contains)) {
+      selected = {};
+    }
     if (!mounted) return;
     setState(() {
       _iconNames = categoryIcons;
-      _selectedCategories = saved.toSet();
+      _selectedCategories = selected;
     });
     debugPrint('PreferenceSelection: categories count ${_iconNames.length}');
   }
