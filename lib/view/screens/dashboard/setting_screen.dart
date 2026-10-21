@@ -7,7 +7,7 @@ import 'package:biblebookapp/view/screens/dashboard/about.dart';
 import 'package:biblebookapp/view/screens/dashboard/constants.dart';
 import 'package:biblebookapp/view/screens/dashboard/home_screen.dart';
 import 'package:biblebookapp/view/screens/dashboard/preference_selection_screen.dart';
-import 'package:biblebookapp/view/screens/chat_support/chat_support_screen.dart';
+import 'package:biblebookapp/view/screens/chat_support/support_home_screen.dart';
 import 'package:biblebookapp/view/screens/prayer_wall/prayer_wall_screen.dart';
 import 'package:biblebookapp/view/screens/intro_subcribtion_screen.dart';
 import 'package:biblebookapp/view/screens/paywall_navigation.dart';
@@ -1436,7 +1436,7 @@ class _SettingScreenState extends State<SettingScreen>
                     onTap: () {
                       SharPreferences.setString('OpenAd', '1');
                       Get.to(
-                        () => const ChatSupportScreen(),
+                        () => const SupportHomeScreen(),
                         transition: Transition.cupertino,
                         duration: const Duration(milliseconds: 250),
                       );

@@ -165,6 +165,7 @@ flutter:
     - assets/paywall_icons/crown_icon.png
     - assets/paywall_icons/shield_icon.png
     - assets/gold-premium-icons/
+    - assets/support_content.v1.4.json
     - assets/leave_rating/
     - assets/social_links/
     - assets/splash_welcome_icons/

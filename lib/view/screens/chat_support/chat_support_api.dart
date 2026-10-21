@@ -20,8 +20,9 @@ class ChatSupportApi {
 
   /// Same id every time: the login id, or one stored on the device.
   static Future<String> resolveUserId() async {
-    final cached =
-        (await CacheNotifier().readCache(key: 'userid') ?? '').toString().trim();
+    final cached = (await CacheNotifier().readCache(key: 'userid') ?? '')
+        .toString()
+        .trim();
     if (cached.isNotEmpty) return cached;
 
     final firebase = FirebaseAuth.instance.currentUser?.uid.trim() ?? '';
@@ -65,9 +66,9 @@ class ChatSupportApi {
       final uri = Uri.parse('$baseUrl/api/questions').replace(
         queryParameters: {'userId': userId},
       );
-      final response = await http
-          .get(uri, headers: const {'Authorization': _authorization})
-          .timeout(const Duration(seconds: 20));
+      final response = await http.get(uri, headers: const {
+        'Authorization': _authorization
+      }).timeout(const Duration(seconds: 20));
       final body = _asMap(response.body);
       if (response.statusCode != 200) {
         throw ChatSupportException(_message(body, 'Could not load questions'));
@@ -253,6 +254,7 @@ class SupportQuestion {
     required this.answeredBy,
     required this.imageUrl,
     this.resolvedBy = '',
+    this.createdAt,
   });
 
   final String id;
@@ -262,6 +264,7 @@ class SupportQuestion {
   final String answeredBy;
   final String imageUrl;
   final String resolvedBy;
+  final DateTime? createdAt;
 
   bool get showAiAnswer =>
       status == 'closed' && answeredBy == 'ai' && answer.trim().isNotEmpty;
@@ -283,6 +286,9 @@ class SupportQuestion {
       answeredBy: json['answeredBy']?.toString() ?? '',
       imageUrl: json['imageUrl']?.toString() ?? '',
       resolvedBy: resolvedBy,
+      createdAt: DateTime.tryParse(
+              (json['createdAt'] ?? json['updatedAt'] ?? '').toString())
+          ?.toLocal(),
     );
   }
 }
