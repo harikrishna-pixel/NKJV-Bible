@@ -40,6 +40,7 @@ import '../../widget/notification_service.dart';
 
 import 'FontType.dart';
 
+
 enum NotificationTime { morning, afternoon, evening }
 
 class SettingScreen extends StatefulWidget {
