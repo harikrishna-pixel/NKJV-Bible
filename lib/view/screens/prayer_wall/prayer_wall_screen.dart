@@ -18,6 +18,7 @@ import 'package:biblebookapp/view/screens/prayer_wall/prayer_wall_status_dialog.
 import 'package:biblebookapp/view/screens/prayer_wall/prayer_wall_user_profile_screen.dart';
 import 'package:biblebookapp/view/screens/profile/view/edit_profile_screen.dart';
 import 'package:biblebookapp/view/screens/profile/view/profile_screen.dart';
+import 'package:biblebookapp/view/screens/milestones/milestone_celebration_coordinator.dart';
 import 'package:biblebookapp/utils/network_error_message.dart';
 import 'package:biblebookapp/view/constants/constant.dart';
 import 'package:flutter/material.dart';
@@ -1002,6 +1003,8 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
           _likeCounts[pid] = n < 0 ? 0 : n;
         });
       } else {
+        // Seed before earn so unlock can show on this screen.
+        await MilestoneCelebrationCoordinator.seedBaselineIfNeeded();
         final newId = await PrayerWallService.postLike(pid);
         if (newId != null && newId.isNotEmpty) {
           _likeIdByPrayerId[pid] = newId;
@@ -1013,6 +1016,8 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
         setState(() {
           _likeCounts[pid] = (_likeCounts[pid] ?? 0) + 1;
         });
+        // Show unlock on this screen when a Prayer milestone is newly earned.
+        await MilestoneCelebrationCoordinator.checkAndShow(context);
       }
     } catch (e) {
       if (!mounted) return;

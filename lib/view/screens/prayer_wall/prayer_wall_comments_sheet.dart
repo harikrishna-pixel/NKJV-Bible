@@ -6,6 +6,7 @@ import 'package:biblebookapp/view/constants/theme_provider.dart';
 import 'package:biblebookapp/view/constants/images.dart';
 import 'package:biblebookapp/view/screens/prayer_wall/prayer_wall_local_store.dart';
 import 'package:biblebookapp/view/screens/prayer_wall/prayer_wall_service.dart';
+import 'package:biblebookapp/view/screens/milestones/milestone_celebration_coordinator.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -122,7 +123,13 @@ class _PrayerWallCommentsSheetState extends State<PrayerWallCommentsSheet> {
         isAnonymous: loginName.isEmpty,
         userName: loginName.isEmpty ? null : loginName,
       );
+      // Seed before earn so unlock can show on this screen.
+      await MilestoneCelebrationCoordinator.seedBaselineIfNeeded();
       await PrayerWallLocalStore.addMyCommentId(id);
+      // Unlock popup when a Community milestone is newly earned.
+      if (mounted) {
+        await MilestoneCelebrationCoordinator.checkAndShow(context);
+      }
       _input.clear();
       if (!mounted) return;
       final posted = <String, dynamic>{
@@ -708,7 +715,7 @@ class _PrayerWallCommentsSheetState extends State<PrayerWallCommentsSheet> {
                   ),
                 ),
                   Expanded(
-                    child: _loading
+                    child: _loading && !_posting
                         ? const Center(child: CircularProgressIndicator())
                         : RefreshIndicator(
                         onRefresh: _reload,
@@ -1349,8 +1356,13 @@ class _PrayerWallCommentsSheetState extends State<PrayerWallCommentsSheet> {
             child: Text(_error!, style: const TextStyle(color: Colors.redAccent)),
           ),
         Expanded(
-          child: _loading
-              ? const Center(child: CircularProgressIndicator())
+          // While sending, only the send button shows a loader.
+          child: _loading && !_posting
+              ? Center(
+                  child: CircularProgressIndicator(
+                    color: isDark ? Colors.white : brown,
+                  ),
+                )
               : ListView.separated(
                   controller: widget.scrollController,
                   keyboardDismissBehavior:
@@ -1425,12 +1437,15 @@ class _PrayerWallCommentsSheetState extends State<PrayerWallCommentsSheet> {
                 ),
                 const SizedBox(width: 10),
                 _posting
-                    ? const Padding(
-                        padding: EdgeInsets.all(12),
+                    ? Padding(
+                        padding: const EdgeInsets.all(12),
                         child: SizedBox(
                           width: 22,
                           height: 22,
-                          child: CircularProgressIndicator(strokeWidth: 2),
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: isDark ? Colors.white : brown,
+                          ),
                         ),
                       )
                     : Material(

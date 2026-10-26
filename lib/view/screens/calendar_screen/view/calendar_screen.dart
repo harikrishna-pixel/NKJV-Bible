@@ -224,16 +224,19 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
                       )
                     : ColoredBox(color: themeProvider.backgroundColor),
               ),
-              Column(
+              // Shrink the content (not the background) above the keyboard so
+              // the focused field is auto-scrolled into view.
+              Padding(
+              padding: EdgeInsets.only(
+                bottom: MediaQuery.of(context).viewInsets.bottom,
+              ),
+              child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 Expanded(
                   child: SingleChildScrollView(
                     keyboardDismissBehavior:
                         ScrollViewKeyboardDismissBehavior.onDrag,
-                    padding: EdgeInsets.only(
-                      bottom: MediaQuery.of(context).viewInsets.bottom,
-                    ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
@@ -388,6 +391,8 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
                     child: TextFormField(
                       controller: calendarBloc.fieldCon,
                       focusNode: calendarBloc.fieldNode,
+                      // Keep the Save / Cancel row visible too.
+                      scrollPadding: const EdgeInsets.fromLTRB(20, 20, 20, 100),
                       style: TextStyle(
                         fontFamily: 'Georgia',
                         color: textColor,
@@ -498,6 +503,7 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
                     child: _buildLegend(context),
                   ),
               ],
+            ),
             ),
             ],
           ),

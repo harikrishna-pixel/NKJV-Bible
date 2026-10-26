@@ -80,7 +80,7 @@ class BibleInfo {
   /// Paywall UI: `1` = AR paywall and open ads. `2` = pro paywall.
   /// Pro paywall stays until purchase, restore, or an already-active premium
   /// plan. Open ads stay off while this is `2`.
-  static int paywallShows = 2;
+  static int paywallShows = 1;
 
   static bool get isProPaywall => paywallShows == 2;
 

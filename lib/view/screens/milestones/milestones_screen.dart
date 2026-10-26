@@ -1,6 +1,5 @@
 import 'package:biblebookapp/view/screens/connection_paths/widgets/parchment_ui.dart';
 import 'package:biblebookapp/view/screens/milestones/data/milestones_data.dart';
-import 'package:biblebookapp/view/screens/milestones/milestone_celebration_coordinator.dart';
 import 'package:biblebookapp/view/screens/milestones/milestone_detail_screen.dart';
 import 'package:biblebookapp/view/screens/milestones/milestones_progress.dart';
 import 'package:biblebookapp/view/screens/milestones/models/milestone_model.dart';
@@ -33,7 +32,7 @@ IconData _tabIcon(MilestoneCategory c) {
   }
 }
 
-/// Screen 13 — Milestones (Connection / Prayer / Community tabs).
+/// Mockup 13 — Milestones (Connection / Prayer / Community).
 class MilestonesScreen extends StatefulWidget {
   const MilestonesScreen({
     super.key,
@@ -84,10 +83,6 @@ class _MilestonesScreenState extends State<MilestonesScreen>
         ..addAll(map);
       _loading = false;
     });
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      MilestoneCelebrationCoordinator.checkAndShow(context);
-    });
   }
 
   Future<void> _open(MilestoneProgress p) async {
@@ -98,30 +93,48 @@ class _MilestonesScreenState extends State<MilestonesScreen>
     await _load();
   }
 
-  /// Opens the next milestone the user is working toward in this tab.
   void _openNext() {
     final cat = MilestoneCategory.values[_tabs.index];
     final list = _byCat[cat] ?? const <MilestoneProgress>[];
     if (list.isEmpty) return;
-    final next = list.firstWhere((p) => !p.isComplete, orElse: () => list.last);
+    final next =
+        list.firstWhere((p) => !p.isComplete, orElse: () => list.last);
     _open(next);
   }
 
   @override
   Widget build(BuildContext context) {
     final cat = MilestoneCategory.values[_tabs.index];
+    final list = _byCat[cat] ?? const <MilestoneProgress>[];
+    final done = list.where((p) => p.isComplete).length;
     return ParchmentScaffold(
       title: 'Milestones',
+      backgroundAsset: 'assets/peace-bg.png',
+      scrim: true,
       body: Column(
         children: [
-          const SizedBox(height: 8),
+          const SizedBox(height: 6),
+          const Padding(
+            padding: EdgeInsets.symmetric(horizontal: 24),
+            child: Text(
+              'Celebrate your spiritual journey\nand growth with God.',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontFamily: Pc.serif,
+                fontSize: 14,
+                height: 1.35,
+                color: Pc.muted,
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
             child: Container(
-              height: 40,
+              height: 42,
               decoration: BoxDecoration(
-                color: Pc.card.withValues(alpha: 0.85),
-                borderRadius: BorderRadius.circular(8),
+                color: Pc.card.withValues(alpha: 0.9),
+                borderRadius: BorderRadius.circular(10),
                 border: Border.all(color: Pc.border),
               ),
               child: TabBar(
@@ -133,17 +146,17 @@ class _MilestonesScreenState extends State<MilestonesScreen>
                 indicatorPadding: const EdgeInsets.all(3),
                 indicator: BoxDecoration(
                   color: Pc.brown,
-                  borderRadius: BorderRadius.circular(6),
+                  borderRadius: BorderRadius.circular(8),
                 ),
                 labelStyle: const TextStyle(
                   fontFamily: Pc.serif,
                   fontWeight: FontWeight.w700,
-                  fontSize: 13.5,
+                  fontSize: 13,
                 ),
                 unselectedLabelStyle: const TextStyle(
                   fontFamily: Pc.serif,
                   fontWeight: FontWeight.w500,
-                  fontSize: 13.5,
+                  fontSize: 13,
                 ),
                 tabs: MilestoneCategory.values
                     .map((c) => Tab(text: MilestonesData.tabTitle(c)))
@@ -151,9 +164,23 @@ class _MilestonesScreenState extends State<MilestonesScreen>
               ),
             ),
           ),
+          if (!_loading)
+            Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: Text(
+                '$done / ${list.length} unlocked',
+                style: const TextStyle(
+                  fontFamily: Pc.serif,
+                  fontSize: 12.5,
+                  color: Pc.muted,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
           Expanded(
             child: _loading
-                ? const Center(child: CircularProgressIndicator(color: Pc.brown))
+                ? const Center(
+                    child: CircularProgressIndicator(color: Pc.brown))
                 : TabBarView(
                     controller: _tabs,
                     children: MilestoneCategory.values
@@ -168,10 +195,10 @@ class _MilestonesScreenState extends State<MilestonesScreen>
         ],
       ),
       bottom: ParchmentButton(
-        label: cat == MilestoneCategory.connection
-            ? 'View All Milestones'
-            : 'View ${MilestonesData.tabTitle(cat)} Milestones',
+        label: 'View ${MilestonesData.tabTitle(cat)} Milestones',
         onPressed: _loading ? null : _openNext,
+        gold: true,
+        showArrow: true,
       ),
     );
   }
@@ -191,19 +218,20 @@ class _CategoryList extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ListView(
-      padding: const EdgeInsets.fromLTRB(16, 14, 16, 12),
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
       children: [
         Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Icon(_tabIcon(category), color: Pc.bronze, size: 30),
-            const SizedBox(width: 12),
+            Icon(_tabIcon(category), color: Pc.bronze, size: 28),
+            const SizedBox(width: 10),
             Expanded(
               child: Text(
                 MilestonesData.tabIntro(category),
                 style: const TextStyle(
                   fontFamily: Pc.serif,
                   fontSize: 14,
-                  height: 1.35,
+                  height: 1.4,
                   color: Pc.ink,
                 ),
               ),
@@ -211,70 +239,154 @@ class _CategoryList extends StatelessWidget {
           ],
         ),
         const SizedBox(height: 14),
-        ...items.map((p) {
-          final isConnection = category == MilestoneCategory.connection;
-          return Padding(
-            padding: const EdgeInsets.only(bottom: 10),
-            child: ParchmentCard(
-              onTap: () => onOpen(p),
-              padding: const EdgeInsets.fromLTRB(12, 12, 14, 12),
-              child: Row(
-                children: [
-                  BronzeBadge(
-                    icon: milestoneIconFor(p.def.icon),
-                    size: 50,
-                    label: isConnection ? '${p.def.target}' : null,
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          p.def.title,
-                          style: const TextStyle(
-                            fontFamily: Pc.serif,
-                            fontSize: 16,
-                            fontWeight: FontWeight.w700,
-                            color: Pc.ink,
-                          ),
-                        ),
-                        const SizedBox(height: 3),
-                        Text(
-                          p.def.subtitle,
-                          style: const TextStyle(
-                            fontFamily: Pc.serif,
-                            fontSize: 13,
-                            height: 1.3,
-                            color: Pc.muted,
-                          ),
-                        ),
-                        if (!p.isComplete) ...[
-                          const SizedBox(height: 8),
-                          ParchmentProgressBar(value: p.fraction, height: 4),
-                        ],
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  if (p.isComplete)
-                    const CheckCircle(size: 30)
-                  else
-                    Text(
-                      '${p.current.clamp(0, p.def.target)}/${p.def.target}',
-                      style: const TextStyle(
-                        fontFamily: Pc.serif,
-                        fontSize: 13,
-                        fontWeight: FontWeight.w700,
-                        color: Pc.brown,
-                      ),
-                    ),
-                ],
+        ...items.map((p) => Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: _MilestoneCard(
+                progress: p,
+                showTargetOnBadge: category == MilestoneCategory.connection &&
+                    !p.def.id.startsWith('path_'),
+                onTap: () => onOpen(p),
               ),
-            ),
-          );
-        }),
+            )),
+        const SizedBox(height: 8),
+        const Text(
+          'Every milestone reminds you that your small steps in connection with God and others create lasting impact.',
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            fontFamily: Pc.serif,
+            fontSize: 12.5,
+            height: 1.4,
+            color: Pc.muted,
+            fontStyle: FontStyle.italic,
+          ),
+        ),
       ],
     );
   }
+}
+
+/// Mockup-style card with corner marks, seal, title, status.
+class _MilestoneCard extends StatelessWidget {
+  const _MilestoneCard({
+    required this.progress,
+    required this.onTap,
+    this.showTargetOnBadge = false,
+  });
+
+  final MilestoneProgress progress;
+  final VoidCallback onTap;
+  final bool showTargetOnBadge;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = progress;
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(14),
+        child: CustomPaint(
+          painter: _CornerFramePainter(color: Pc.border),
+          child: Container(
+            padding: const EdgeInsets.fromLTRB(12, 14, 12, 14),
+            decoration: BoxDecoration(
+              color: Pc.card.withValues(alpha: 0.92),
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: Pc.border.withValues(alpha: 0.7)),
+            ),
+            child: Row(
+              children: [
+                BronzeBadge(
+                  icon: milestoneIconFor(p.def.icon),
+                  size: 52,
+                  label: showTargetOnBadge ? '${p.def.target}' : null,
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        p.def.title,
+                        style: const TextStyle(
+                          fontFamily: Pc.serif,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w700,
+                          color: Pc.ink,
+                        ),
+                      ),
+                      const SizedBox(height: 3),
+                      Text(
+                        p.def.subtitle,
+                        style: const TextStyle(
+                          fontFamily: Pc.serif,
+                          fontSize: 13,
+                          height: 1.3,
+                          color: Pc.muted,
+                        ),
+                      ),
+                      if (!p.isComplete) ...[
+                        const SizedBox(height: 8),
+                        ParchmentProgressBar(value: p.fraction, height: 5),
+                      ],
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 10),
+                if (p.isComplete)
+                  const CheckCircle(size: 30)
+                else
+                  Text(
+                    '${p.current.clamp(0, p.def.target)}/${p.def.target}',
+                    style: const TextStyle(
+                      fontFamily: Pc.serif,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                      color: Pc.brown,
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _CornerFramePainter extends CustomPainter {
+  _CornerFramePainter({required this.color});
+  final Color color;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color
+      ..strokeWidth = 1.4
+      ..style = PaintingStyle.stroke;
+    const len = 12.0;
+    const inset = 4.0;
+    // Top-left
+    canvas.drawLine(const Offset(inset, inset + len), const Offset(inset, inset), paint);
+    canvas.drawLine(const Offset(inset, inset), const Offset(inset + len, inset), paint);
+    // Top-right
+    canvas.drawLine(
+        Offset(size.width - inset - len, inset), Offset(size.width - inset, inset), paint);
+    canvas.drawLine(
+        Offset(size.width - inset, inset), Offset(size.width - inset, inset + len), paint);
+    // Bottom-left
+    canvas.drawLine(Offset(inset, size.height - inset - len),
+        Offset(inset, size.height - inset), paint);
+    canvas.drawLine(Offset(inset, size.height - inset),
+        Offset(inset + len, size.height - inset), paint);
+    // Bottom-right
+    canvas.drawLine(Offset(size.width - inset - len, size.height - inset),
+        Offset(size.width - inset, size.height - inset), paint);
+    canvas.drawLine(Offset(size.width - inset, size.height - inset - len),
+        Offset(size.width - inset, size.height - inset), paint);
+  }
+
+  @override
+  bool shouldRepaint(covariant _CornerFramePainter oldDelegate) =>
+      oldDelegate.color != color;
 }

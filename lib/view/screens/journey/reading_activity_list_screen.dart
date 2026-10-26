@@ -1,4 +1,5 @@
 import 'package:biblebookapp/services/reading_activity_service.dart';
+import 'package:biblebookapp/view/constants/colors.dart';
 import 'package:biblebookapp/view/screens/journey/journey_parchment.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
@@ -19,6 +20,10 @@ class ReadingActivityListScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final ordered = List<ReadingActivity>.from(items)
       ..sort(ReadingActivity.compareNewestCompletedFirst);
+    // Header / empty text sit on the theme background (dark in Dark Mode).
+    final isDark = CommanColor.isDarkTheme(context);
+    final headerInk = isDark ? Colors.white : const Color(0xFF3D2E24);
+    final emptyInk = isDark ? Colors.white70 : const Color(0xFF8A7A6C);
     return Container(
       decoration: journeyParchmentDecoration(context),
       child: Scaffold(
@@ -27,13 +32,13 @@ class ReadingActivityListScreen extends StatelessWidget {
           backgroundColor: Colors.transparent,
           elevation: 0,
           leading: IconButton(
-            icon: const Icon(Icons.arrow_back_ios_new, size: 20, color: Color(0xFF3D2E24)),
+            icon: Icon(Icons.arrow_back_ios_new, size: 20, color: headerInk),
             onPressed: () => Get.back(),
           ),
-          title: const Text(
+          title: Text(
             'Recent Activity',
             style: TextStyle(
-              color: Color(0xFF3D2E24),
+              color: headerInk,
               fontSize: 18,
               fontWeight: FontWeight.w600,
             ),
@@ -41,10 +46,10 @@ class ReadingActivityListScreen extends StatelessWidget {
           centerTitle: true,
         ),
         body: items.isEmpty
-            ? const Center(
+            ? Center(
                 child: Text(
                   'No reading activity yet.',
-                  style: TextStyle(color: Color(0xFF8A7A6C)),
+                  style: TextStyle(color: emptyInk),
                 ),
               )
             : ListView.separated(

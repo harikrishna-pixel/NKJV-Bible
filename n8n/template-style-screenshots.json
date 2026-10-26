@@ -1,0 +1,885 @@
+{
+  "name": "Template Style -> App Store Screenshots",
+  "nodes": [
+    {
+      "parameters": {
+        "formTitle": "Template Style -> App Store Screenshots",
+        "formDescription": "Upload ONE finished screenshot as the style reference, not a side-by-side sheet. Then enter a new title, subtitle, and the version text inside the frame for each screen. Leave unused screens blank. For a first test, fill Screen 1 only and use Run Mode 1.",
+        "formFields": {
+          "values": [
+            {
+              "fieldLabel": "Template Image",
+              "fieldType": "file",
+              "multipleFiles": false,
+              "acceptFileTypes": ".png, .jpg, .jpeg, .webp",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "App Name",
+              "placeholder": "e.g. VerseDeep",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Run Mode",
+              "fieldType": "dropdown",
+              "defaultValue": "1 - Generate only (preview the OpenAI redraws)",
+              "fieldOptions": {
+                "values": [
+                  {
+                    "option": "1 - Generate only (preview the OpenAI redraws)"
+                  },
+                  {
+                    "option": "2 - Generate + Claude review (auto-retry on FAIL)"
+                  },
+                  {
+                    "option": "3 - Full: review + export App Store sizes"
+                  }
+                ]
+              },
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Devices",
+              "fieldType": "checkbox",
+              "fieldOptions": {
+                "values": [
+                  {
+                    "option": "iPhone 6.9in (1320x2868)"
+                  },
+                  {
+                    "option": "iPhone 6.5in (1284x2778)"
+                  },
+                  {
+                    "option": "iPad 13in (2064x2752)"
+                  },
+                  {
+                    "option": "iPad 11in (1668x2420)"
+                  }
+                ]
+              }
+            },
+            {
+              "fieldLabel": "Screen 1 Title",
+              "placeholder": "e.g. Daily Verse",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Screen 1 Subtitle",
+              "placeholder": "e.g. A quiet start to the day",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Screen 1 Frame Text",
+              "fieldType": "textarea",
+              "placeholder": "Version text inside the phone, e.g. In the beginning God created the heavens and the earth.",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Screen 2 Title",
+              "placeholder": "Leave blank to skip this screen"
+            },
+            {
+              "fieldLabel": "Screen 2 Subtitle"
+            },
+            {
+              "fieldLabel": "Screen 2 Frame Text",
+              "fieldType": "textarea",
+              "placeholder": "Version text inside the frame"
+            },
+            {
+              "fieldLabel": "Screen 3 Title",
+              "placeholder": "Leave blank to skip this screen"
+            },
+            {
+              "fieldLabel": "Screen 3 Subtitle"
+            },
+            {
+              "fieldLabel": "Screen 3 Frame Text",
+              "fieldType": "textarea",
+              "placeholder": "Version text inside the frame"
+            },
+            {
+              "fieldLabel": "Screen 4 Title",
+              "placeholder": "Leave blank to skip this screen"
+            },
+            {
+              "fieldLabel": "Screen 4 Subtitle"
+            },
+            {
+              "fieldLabel": "Screen 4 Frame Text",
+              "fieldType": "textarea",
+              "placeholder": "Version text inside the frame"
+            },
+            {
+              "fieldLabel": "Screen 5 Title",
+              "placeholder": "Leave blank to skip this screen"
+            },
+            {
+              "fieldLabel": "Screen 5 Subtitle"
+            },
+            {
+              "fieldLabel": "Screen 5 Frame Text",
+              "fieldType": "textarea",
+              "placeholder": "Version text inside the frame"
+            },
+            {
+              "fieldLabel": "Screen 6 Title",
+              "placeholder": "Leave blank to skip this screen"
+            },
+            {
+              "fieldLabel": "Screen 6 Subtitle"
+            },
+            {
+              "fieldLabel": "Screen 6 Frame Text",
+              "fieldType": "textarea",
+              "placeholder": "Version text inside the frame"
+            },
+            {
+              "fieldLabel": "Extra Notes",
+              "fieldType": "textarea",
+              "placeholder": "Optional. e.g. keep the sky background brighter"
+            }
+          ]
+        },
+        "options": {
+          "buttonLabel": "Start",
+          "respondWithOptions": {
+            "values": {
+              "formSubmittedText": "Started. Generation takes a few minutes. Open the n8n Executions tab and download the zip from Zip Files."
+            }
+          }
+        }
+      },
+      "id": "b8b5206d-0984-4943-8372-c1ee6259d5b1",
+      "name": "Upload Form",
+      "type": "n8n-nodes-base.formTrigger",
+      "typeVersion": 2.2,
+      "position": [
+        32,
+        304
+      ],
+      "webhookId": "cf384c61-92fc-497f-a17b-067a854f69e2"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "7d01bdcc-3d69-5691-9a6c-ecb48389531b",
+              "name": "openai_model",
+              "value": "gpt-image-2",
+              "type": "string"
+            },
+            {
+              "id": "d7c58a2b-c93c-50af-a420-89900c89ed54",
+              "name": "openai_quality",
+              "value": "high",
+              "type": "string"
+            },
+            {
+              "id": "963bdad9-7f66-5b10-9af3-e65edec79bdf",
+              "name": "gen_scale",
+              "value": 1,
+              "type": "number"
+            },
+            {
+              "id": "44f0b0ea-985d-5d40-8580-936ec4c5da8a",
+              "name": "claude_model",
+              "value": "claude-sonnet-5-5",
+              "type": "string"
+            },
+            {
+              "id": "efc97290-8ae6-50c5-a0f6-9e16ae2afe22",
+              "name": "max_attempts",
+              "value": 2,
+              "type": "number"
+            },
+            {
+              "id": "46a62227-adf1-5ff5-bb4b-2496ca4112e9",
+              "name": "strip_number_badge",
+              "value": false,
+              "type": "boolean"
+            },
+            {
+              "id": "efe3ed35-88d0-51d7-b1d8-a8da94fad5ac",
+              "name": "export_format",
+              "value": "jpeg",
+              "type": "string"
+            },
+            {
+              "id": "bc485559-acc6-5b92-8255-1c71e4d955ef",
+              "name": "export_quality",
+              "value": 95,
+              "type": "number"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "id": "13c8c6e2-2ab9-4461-b57c-8ce796ad5b89",
+      "name": "Config",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        280,
+        304
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const j = $json;\nconst bin = $input.item.binary || {};\nconst key = Object.keys(bin)[0];\nif (!key) throw new Error('Upload one template screenshot. It is the style reference only.');\n\nconst runMode = parseInt(String(j['Run Mode'] || '1').trim().charAt(0), 10) || 1;\n\nlet picked = j['Devices'];\nif (typeof picked === 'string') picked = picked.split(',').map(s => s.trim()).filter(Boolean);\nif (!Array.isArray(picked)) picked = [];\n\nlet devices = picked.map(label => {\n  const m = String(label).match(/(\\d{3,5})\\s*x\\s*(\\d{3,5})/i);\n  if (!m) return null;\n  return {\n    label,\n    key: String(label).replace(/\\(.*\\)/, '').trim().replace(/[^A-Za-z0-9.]+/g, '-'),\n    kind: /ipad/i.test(label) ? 'iPad' : 'iPhone',\n    w: parseInt(m[1], 10),\n    h: parseInt(m[2], 10),\n  };\n}).filter(Boolean);\n\nif (devices.length === 0) {\n  devices = [\n    { label: 'iPhone 6.9in (1320x2868)', key: 'iPhone-6.9in', kind: 'iPhone', w: 1320, h: 2868 },\n    { label: 'iPad 13in (2064x2752)', key: 'iPad-13in', kind: 'iPad', w: 2064, h: 2752 },\n  ];\n}\n\nconst screens = [];\nfor (let i = 1; i <= 6; i++) {\n  const title = String(j['Screen ' + i + ' Title'] || '').trim();\n  const subtitle = String(j['Screen ' + i + ' Subtitle'] || '').trim();\n  const frame = String(j['Screen ' + i + ' Frame Text'] || '').trim();\n  if (!title && !subtitle && !frame) continue;\n  if (!title) throw new Error('Screen ' + i + ' needs a title.');\n  if (!frame) throw new Error('Screen ' + i + ' needs the version text that goes inside the frame.');\n  screens.push({ index: screens.length + 1, title, subtitle, frame });\n}\nif (screens.length === 0) {\n  throw new Error('Fill Screen 1 Title, Subtitle, and Frame Text. The template image is only the style reference.');\n}\n\nconst appName = String(j['App Name'] || 'App').trim() || 'App';\nconst drop = new Set([\n  'Template Image', 'App Name', 'Run Mode', 'Devices', 'Extra Notes',\n  'Group Image', 'Panel Count', 'Screens',\n]);\nfor (let i = 1; i <= 6; i++) {\n  drop.add('Screen ' + i + ' Title');\n  drop.add('Screen ' + i + ' Subtitle');\n  drop.add('Screen ' + i + ' Frame Text');\n}\nconst rest = {};\nObject.keys(j).forEach(k => { if (!drop.has(k)) rest[k] = j[k]; });\n\nreturn {\n  json: Object.assign({}, rest, {\n    appName,\n    runMode,\n    devices,\n    screens,\n    notes: String(j['Extra Notes'] || '').trim(),\n  }),\n  binary: { data: bin[key] },\n};"
+      },
+      "id": "31855d6a-d344-4e09-95eb-b3f0ffe67fb4",
+      "name": "Read Form",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        520,
+        304
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const cfg = $('Read Form').first().json;\nconst img = items[0];\nif (!img.binary || !img.binary.data) throw new Error('Template image was lost before planning screens.');\n\nconst screens = cfg.screens || [];\nif (!screens.length) throw new Error('No screens to generate. Fill the screen fields on the form.');\n\nconst devices = cfg.runMode >= 3 ? cfg.devices : cfg.devices.slice(0, 1);\nconst r16 = v => Math.max(16, Math.round(v * (cfg.gen_scale || 1) / 16) * 16);\nconst out = [];\n\nscreens.forEach(screen => {\n  devices.forEach(d => {\n    out.push({\n      json: Object.assign({}, cfg, {\n        devices: undefined,\n        screens: undefined,\n        device: d,\n        genW: r16(d.w),\n        genH: r16(d.h),\n        panelIndex: screen.index,\n        screen,\n      }),\n      binary: { source: img.binary.data },\n      pairedItem: { item: 0 },\n    });\n  });\n});\n\nreturn out;"
+      },
+      "id": "f0edc900-a72a-4791-b0c0-2e250f51bbed",
+      "name": "Plan Screens",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        760,
+        304
+      ]
+    },
+    {
+      "parameters": {
+        "batchSize": 1,
+        "options": {}
+      },
+      "id": "dca4d345-52e9-4492-b2b9-03f14436a50f",
+      "name": "Loop Over Panels",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        1000,
+        304
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const j = $json;\nconst d = j.device;\nconst s = j.screen || { title: '', subtitle: '', frame: '' };\nconst attempt = j.attempt || 1;\nconst src = $input.item.binary.source;\nconst mime = String(src.mimeType || '');\nlet ext = 'png';\nif (/jpe?g/i.test(mime) || /jpe?g/i.test(src.fileName || '')) ext = 'jpg';\nelse if (/webp/i.test(mime) || /webp/i.test(src.fileName || '')) ext = 'webp';\nsrc.fileName = 'template_reference.' + ext;\nsrc.fileExtension = ext;\nif (ext === 'jpg') src.mimeType = 'image/jpeg';\nelse if (ext === 'webp') src.mimeType = 'image/webp';\nelse src.mimeType = 'image/png';\n\nconst deviceLine = d.kind === 'iPad'\n  ? 'Show the device as a modern iPad with thin even bezels and no dynamic island. Adapt the same layout to the wider tablet canvas.'\n  : 'Show the device as a modern iPhone with a dynamic island, in the same device style as the template.';\n\nconst badgeLine = j.strip_number_badge\n  ? 'Do not include a numbered circle badge.'\n  : 'If the template has a numbered circle badge, keep one in the same place and number it ' + j.panelIndex + '.';\n\nconst lines = [\n  'You are designing ONE App Store screenshot from a style template.',\n  'The attached image is a STYLE reference only. Match its layout, colours, background, typography, device mockup, icons, and spacing.',\n  'Replace the words. Do not keep the template headline, subtitle, or the old text inside the device, unless those exact words are in the new copy below.',\n  'Do not restyle the artwork, do not add decorations, and do not invent extra marketing lines.',\n  '',\n  'NEW COPY. Spell every word exactly and keep the frame line breaks:',\n  'Headline: ' + (s.title || ''),\n  'Subtitle: ' + (s.subtitle ? s.subtitle : '(none - do not add a subtitle)'),\n  'Version text inside the device frame:',\n  s.frame || '',\n  '',\n  'Output canvas: ' + j.genW + 'x' + j.genH + ' pixels. This is an App Store ' + d.kind + ' screenshot. Reflow the same style so it fills this canvas.',\n  'Keep this vertical order: headline, subtitle, device mockup, then any caption that is part of the style.',\n  'Make every word crisp, fully legible, and not cut off. Keep comfortable margins.',\n  deviceLine,\n  badgeLine,\n];\n\nif (j.appName) lines.push('The app is called \"' + j.appName + '\". Keep that name wherever the template shows the product name.');\nif (j.notes) lines.push('Extra notes from the user: ' + j.notes);\nif (attempt > 1 && j.feedback) lines.push('IMPORTANT. Fix these problems from the previous attempt: ' + j.feedback);\n\nreturn {\n  json: Object.assign({}, j, { attempt, prompt: lines.join('\\n') }),\n  binary: { source: src },\n};"
+      },
+      "id": "42e24ed2-4bb5-4170-88fc-1d627f3f7e8a",
+      "name": "Build Prompt",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1240,
+        304
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.openai.com/v1/images/edits",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "openAiApi",
+        "sendBody": true,
+        "contentType": "multipart-form-data",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "parameterType": "formBinaryData",
+              "name": "image",
+              "inputDataFieldName": "source"
+            },
+            {
+              "name": "model",
+              "value": "={{ $json.openai_model }}"
+            },
+            {
+              "name": "prompt",
+              "value": "={{ $json.prompt }}"
+            },
+            {
+              "name": "size",
+              "value": "={{ $json.genW + 'x' + $json.genH }}"
+            },
+            {
+              "name": "quality",
+              "value": "={{ $json.openai_quality }}"
+            },
+            {
+              "name": "n",
+              "value": "1"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 600000
+        }
+      },
+      "id": "4764b349-9d03-4804-a9a6-037e86454f37",
+      "name": "OpenAI Redraw",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1480,
+        304
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 8000,
+      "credentials": {
+        "openAiApi": {
+          "id": "AhhJA625oJmQvIPU",
+          "name": "OpenAi account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const prev = $('Build Prompt').first();\nconst res = $json;\nconst b64 = res && res.data && res.data[0] && res.data[0].b64_json;\nif (!b64) throw new Error('OpenAI returned no image: ' + JSON.stringify(res).slice(0, 600));\n\nconst idx = String(prev.json.panelIndex).padStart(2, '0');\nconst bin = await this.helpers.prepareBinaryData(\n  Buffer.from(b64, 'base64'),\n  'panel_' + idx + '_' + prev.json.device.key + '_try' + prev.json.attempt + '.png',\n  'image/png'\n);\nreturn { json: prev.json, binary: { source: prev.binary.source, data: bin } };"
+      },
+      "id": "ecff89e2-1f3a-4918-9745-d3ded1033bc8",
+      "name": "Image to Binary",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1720,
+        304
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "4db5e804-ae9a-5f81-b302-ca8732cd656b",
+              "leftValue": "={{ $json.runMode }}",
+              "rightValue": 2,
+              "operator": {
+                "type": "number",
+                "operation": "gte"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "52dc604c-8174-4169-9417-23376e4e2b7c",
+      "name": "Run Review?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1960,
+        304
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const j = $json;\nconst s = j.screen || { title: '', subtitle: '', frame: '' };\n\nfunction mediaType(bin) {\n  const m = String((bin && bin.mimeType) || '').toLowerCase();\n  const n = String((bin && bin.fileName) || '').toLowerCase();\n  if (m.includes('png') || n.endsWith('.png')) return 'image/png';\n  if (m.includes('webp') || n.endsWith('.webp')) return 'image/webp';\n  if (m.includes('gif') || n.endsWith('.gif')) return 'image/gif';\n  if (m.includes('jpeg') || m.includes('jpg') || n.endsWith('.jpg') || n.endsWith('.jpeg')) return 'image/jpeg';\n  return 'image/png';\n}\n\nconst srcBin = $input.item.binary.source;\nconst genBin = $input.item.binary.data;\nconst srcBuf = await this.helpers.getBinaryDataBuffer($itemIndex, 'source');\nconst genBuf = await this.helpers.getBinaryDataBuffer($itemIndex, 'data');\n\nconst subtitleRule = s.subtitle\n  ? 'Expected subtitle: ' + s.subtitle\n  : 'Expected subtitle: none. The redraw must not add a subtitle.';\n\nconst rubric = [\n  'IMAGE 1 is a STYLE TEMPLATE. Its old headline, subtitle, and in-frame text are supposed to be replaced.',\n  'IMAGE 2 is the new App Store screenshot. Judge the new copy and whether the style still matches the template.',\n  'Expected headline: ' + (s.title || ''),\n  subtitleRule,\n  'Expected version text inside the device:',\n  s.frame || '',\n  'Check, in this order:',\n  '1. TEXT: headline, subtitle, and the version text inside the device match the expected copy word for word. List wrong, missing, garbled, invented, or leftover template text.',\n  '2. STYLE: same layout structure, colours, background, device mockup, and typography as the template. No new decorative elements.',\n  '3. FRAME: the version text is inside the device, readable, and not cut off.',\n  '4. TECHNICAL: nothing important is cut off at the canvas edge, and there are no obvious image artefacts.',\n  'The output aspect ratio may differ from the template. Ignore exact proportions.',\n  'Reply with ONLY one JSON object, no markdown, in this shape:',\n  '{\"verdict\":\"PASS\" or \"FAIL\",\"score\":0-10,\"text_errors\":[\"...\"],\"issues\":[\"...\"],\"fix_instructions\":\"one short paragraph telling the image model exactly what to fix, or empty if PASS\"}',\n  'Use PASS only if score >= 8 and text_errors is empty.',\n].join('\\n');\n\nconst body = {\n  model: j.claude_model,\n  max_tokens: 1200,\n  system: 'You are a strict QA reviewer for App Store screenshot artwork. You check that a new screenshot keeps the template style and uses the requested title, subtitle, and in-frame version text. You never rewrite the design.',\n  messages: [{\n    role: 'user',\n    content: [\n      { type: 'text', text: 'IMAGE 1 = STYLE TEMPLATE (old words should not be copied):' },\n      { type: 'image', source: { type: 'base64', media_type: mediaType(srcBin), data: srcBuf.toString('base64') } },\n      { type: 'text', text: 'IMAGE 2 = NEW SCREENSHOT:' },\n      { type: 'image', source: { type: 'base64', media_type: mediaType(genBin), data: genBuf.toString('base64') } },\n      { type: 'text', text: rubric },\n    ],\n  }],\n};\n\nreturn { json: Object.assign({}, j, { claudeBody: body }), binary: $input.item.binary };"
+      },
+      "id": "a98bbf09-2941-40df-bcd0-4d0690298ec2",
+      "name": "Build Claude Request",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2200,
+        140
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "anthropicApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "anthropic-version",
+              "value": "2023-06-01"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.claudeBody) }}",
+        "options": {
+          "timeout": 180000
+        }
+      },
+      "id": "379271aa-51ef-478a-ba46-89723af625fb",
+      "name": "Claude Review",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2440,
+        140
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000,
+      "credentials": {
+        "anthropicApi": {
+          "id": "QdyButwQZU5xuQe4",
+          "name": "Anthropic account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const prev = $('Build Claude Request').first();\nconst base = Object.assign({}, prev.json);\ndelete base.claudeBody;\n\nconst text = (($json.content || []).filter(c => c.type === 'text').map(c => c.text)).join('\\n');\nlet review = null;\ntry {\n  const m = text.match(/\\{[\\s\\S]*\\}/);\n  review = JSON.parse(m[0]);\n} catch (e) {\n  review = null;\n}\n\nconst attempt = base.attempt || 1;\nconst max = base.max_attempts || 2;\nconst s = base.screen || { title: '', subtitle: '', frame: '' };\n\nlet verdict = 'UNREVIEWED';\nlet score = null;\nlet issues = [];\nlet feedback = '';\nif (review) {\n  verdict = String(review.verdict || '').toUpperCase() === 'PASS' ? 'PASS' : 'FAIL';\n  score = typeof review.score === 'number' ? review.score : null;\n  issues = [].concat(review.text_errors || [], review.issues || []);\n  const expected = [\n    'Headline must read exactly: \"' + s.title + '\".',\n    s.subtitle ? 'Subtitle must read exactly: \"' + s.subtitle + '\".' : 'Do not add a subtitle.',\n    'Version text inside the frame must read exactly: \"' + s.frame + '\".',\n  ].join(' ');\n  const textFix = (review.text_errors || []).length ? 'Text fixes: ' + review.text_errors.join('; ') : '';\n  feedback = [expected, review.fix_instructions || '', textFix].join(' ').trim();\n}\n\nconst needsRetry = verdict === 'FAIL' && attempt < max;\n\nreturn {\n  json: Object.assign({}, base, {\n    reviewVerdict: verdict,\n    reviewScore: score,\n    reviewIssues: issues,\n    needsRetry,\n    attemptsUsed: attempt,\n    attempt: needsRetry ? attempt + 1 : attempt,\n    feedback: needsRetry ? feedback : '',\n    reviewRaw: review ? undefined : text.slice(0, 400),\n  }),\n  binary: prev.binary,\n};"
+      },
+      "id": "24ab7532-2fb5-48e8-8128-2e942ff72147",
+      "name": "Parse Review",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2680,
+        140
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "e9d4edc1-7c22-52db-8eec-561204ee7a1a",
+              "leftValue": "={{ $json.needsRetry }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "ff0d9b9d-09a6-41a0-a1fa-253160f52e31",
+      "name": "Needs Retry?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        2920,
+        140
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "c6488ffd-41aa-579c-9291-e01d8d884543",
+              "leftValue": "={{ $json.runMode }}",
+              "rightValue": 3,
+              "operator": {
+                "type": "number",
+                "operation": "gte"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "492ed0fe-44d4-46ee-8a62-c4d2f3064d88",
+      "name": "Export Sizes?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        3160,
+        304
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "resize",
+        "width": "={{ $json.device.w }}",
+        "height": "={{ $json.device.h }}",
+        "resizeOption": "ignoreAspectRatio",
+        "options": {
+          "format": "={{ $json.export_format }}",
+          "quality": "={{ $json.export_quality }}"
+        }
+      },
+      "id": "0ce2dcc3-d58e-4094-afb6-1e76239810ab",
+      "name": "Resize To Exact",
+      "type": "n8n-nodes-base.editImage",
+      "typeVersion": 1,
+      "position": [
+        3400,
+        160
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const incomingJson = ($json && $json.device) ? $json : $('Export Sizes?').first().json;\nconst j = incomingJson;\nconst idx = String(j.panelIndex).padStart(2, '0');\nconst app = String(j.appName || 'App').replace(/[^A-Za-z0-9]+/g, '') || 'App';\nconst titleSlug = String((j.screen && j.screen.title) || 'screen').replace(/[^A-Za-z0-9]+/g, '').slice(0, 28) || 'screen';\nconst ext = (String(j.export_format || 'jpeg').toLowerCase() === 'png' ? 'png' : 'jpg');\nconst mime = ext === 'png' ? 'image/png' : 'image/jpeg';\nconst name = app + '_' + j.device.key + '_panel' + idx + '_' + titleSlug + '.' + ext;\nconst incoming = $input.item.binary || {};\nconst binKey = incoming.data ? 'data' : Object.keys(incoming)[0];\nif (!binKey) throw new Error('No image was returned for ' + name);\nconst bin = Object.assign({}, incoming[binKey], { fileName: name, fileExtension: ext, mimeType: mime });\nreturn {\n  json: {\n    appName: j.appName,\n    panel: j.panelIndex,\n    title: j.screen ? j.screen.title : '',\n    subtitle: j.screen ? j.screen.subtitle : '',\n    frame: j.screen ? j.screen.frame : '',\n    device: j.device.label,\n    file: name,\n    verdict: j.reviewVerdict || 'not reviewed (mode 1)',\n    score: j.reviewScore == null ? null : j.reviewScore,\n    attemptsUsed: j.attemptsUsed || j.attempt || 1,\n    issues: j.reviewIssues || [],\n    reviewRaw: j.reviewRaw || null,\n  },\n  binary: { data: bin },\n};"
+      },
+      "id": "c3a91f07-6e2d-4b18-9f44-0a7d2e8b61c5",
+      "name": "Name Export",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3640,
+        160
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const incomingJson = ($json && $json.device) ? $json : $('Export Sizes?').first().json;\nconst j = incomingJson;\nconst idx = String(j.panelIndex).padStart(2, '0');\nconst app = String(j.appName || 'App').replace(/[^A-Za-z0-9]+/g, '') || 'App';\nconst titleSlug = String((j.screen && j.screen.title) || 'screen').replace(/[^A-Za-z0-9]+/g, '').slice(0, 28) || 'screen';\nconst ext = 'png';\nconst mime = ext === 'png' ? 'image/png' : 'image/jpeg';\nconst name = app + '_' + j.device.key + '_panel' + idx + '_' + titleSlug + '_draft.' + ext;\nconst incoming = $input.item.binary || {};\nconst binKey = incoming.data ? 'data' : Object.keys(incoming)[0];\nif (!binKey) throw new Error('No image was returned for ' + name);\nconst bin = Object.assign({}, incoming[binKey], { fileName: name, fileExtension: ext, mimeType: mime });\nreturn {\n  json: {\n    appName: j.appName,\n    panel: j.panelIndex,\n    title: j.screen ? j.screen.title : '',\n    subtitle: j.screen ? j.screen.subtitle : '',\n    frame: j.screen ? j.screen.frame : '',\n    device: j.device.label,\n    file: name,\n    verdict: j.reviewVerdict || 'not reviewed (mode 1)',\n    score: j.reviewScore == null ? null : j.reviewScore,\n    attemptsUsed: j.attemptsUsed || j.attempt || 1,\n    issues: j.reviewIssues || [],\n    reviewRaw: j.reviewRaw || null,\n  },\n  binary: { data: bin },\n};"
+      },
+      "id": "f3c8c96b-4252-4467-87e0-ca36899cf756",
+      "name": "Name Draft",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3400,
+        460
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "if (items.length === 0) throw new Error('Nothing was generated.');\nconst binary = {};\nconst keys = [];\nconst report = [];\nitems.forEach((it, i) => {\n  const k = 'f' + i;\n  binary[k] = it.binary.data;\n  keys.push(k);\n  report.push(it.json);\n});\nconst reportBin = await this.helpers.prepareBinaryData(\n  Buffer.from(JSON.stringify({ files: report }, null, 2)),\n  'report.json',\n  'application/json'\n);\nbinary.report = reportBin;\nkeys.push('report');\nconst app = String(items[0].json.appName || 'App').replace(/[^A-Za-z0-9]+/g, '') || 'App';\nreturn [{\n  json: {\n    fileKeys: keys.join(','),\n    zipName: app + '_screenshots.zip',\n    fileCount: items.length,\n    report,\n  },\n  binary,\n}];"
+      },
+      "id": "7968c3bd-8954-407a-8e24-b57cfec9bec3",
+      "name": "Collect Files",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1240,
+        560
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "compress",
+        "binaryPropertyName": "={{ $json.fileKeys }}",
+        "fileName": "={{ $json.zipName }}"
+      },
+      "id": "901129a7-6930-415c-b45a-756812fb4553",
+      "name": "Zip Files",
+      "type": "n8n-nodes-base.compression",
+      "typeVersion": 1.1,
+      "position": [
+        1480,
+        560
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## How to run\n1. Credentials are already selected on **OpenAI Redraw** and **Claude Review**.\n2. Open the form. Upload **one** screenshot as the style template.\n3. Enter the app name, then each screen Title, Subtitle, and Frame Text (the version text inside the phone).\n4. Leave unused screen fields blank.\n5. Run Mode **1** previews the first ticked device. **2** adds Claude review and one retry. **3** reviews every ticked device and exports the exact App Store size.\n6. Download the zip from **Zip Files** in Executions. report.json lists the verdict for each file.\n\nModels, quality, and export settings stay in **Config**.",
+        "height": 280,
+        "width": 560,
+        "color": 4
+      },
+      "id": "2390fca5-22df-454c-a246-31e9a7603c44",
+      "name": "Note - Start Here",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## What each run mode does\n**1** New copy, first ticked device only, preview size.\n**2** Claude checks that the new title, subtitle, and frame text are exact and the style still matches. A fail regenerates once, using the review notes.\n**3** Same review, every ticked device, then resize to the exact pixel size and zip.\n\nThe template is not sliced and its old words are not copied. Test with one screen in mode 1 first. Lower gen_scale in Config if a full run is too expensive.",
+        "height": 250,
+        "width": 520,
+        "color": 6
+      },
+      "id": "bb31d356-786e-4a21-8587-684433fe4b0d",
+      "name": "Note - Phases",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        1000,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "content": "Screen 1 is required. Screens 2 to 6 are optional.\n\nFrame Text is the version text inside the device. The image model keeps the template look and replaces the headline, subtitle, and that in-frame text.",
+        "height": 140,
+        "width": 420,
+        "color": 5
+      },
+      "id": "ad3f271b-e840-4e2a-a50a-098c7547d5e6",
+      "name": "Note - Screens",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        520,
+        520
+      ]
+    }
+  ],
+  "connections": {
+    "Upload Form": {
+      "main": [
+        [
+          {
+            "node": "Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Config": {
+      "main": [
+        [
+          {
+            "node": "Read Form",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Form": {
+      "main": [
+        [
+          {
+            "node": "Plan Screens",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Plan Screens": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Panels",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Over Panels": {
+      "main": [
+        [
+          {
+            "node": "Collect Files",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Build Prompt",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Prompt": {
+      "main": [
+        [
+          {
+            "node": "OpenAI Redraw",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Redraw": {
+      "main": [
+        [
+          {
+            "node": "Image to Binary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Image to Binary": {
+      "main": [
+        [
+          {
+            "node": "Run Review?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Run Review?": {
+      "main": [
+        [
+          {
+            "node": "Build Claude Request",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Export Sizes?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Claude Request": {
+      "main": [
+        [
+          {
+            "node": "Claude Review",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Claude Review": {
+      "main": [
+        [
+          {
+            "node": "Parse Review",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Review": {
+      "main": [
+        [
+          {
+            "node": "Needs Retry?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Needs Retry?": {
+      "main": [
+        [
+          {
+            "node": "Build Prompt",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Export Sizes?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Export Sizes?": {
+      "main": [
+        [
+          {
+            "node": "Resize To Exact",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Name Draft",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Resize To Exact": {
+      "main": [
+        [
+          {
+            "node": "Name Export",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Name Export": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Panels",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Name Draft": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Panels",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Collect Files": {
+      "main": [
+        [
+          {
+            "node": "Zip Files",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "meta": {
+    "instanceId": "35a5f669cd6a7c1323e975b192883a5afa0549ebd3500df28f70a700c9811e94"
+  }
+}

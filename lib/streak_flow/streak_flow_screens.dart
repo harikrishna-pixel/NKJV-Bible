@@ -9,6 +9,7 @@ import 'package:biblebookapp/streak_flow/leave_rating_screen.dart';
 import 'package:biblebookapp/streak_flow/mood_prayer_data.dart';
 import 'package:biblebookapp/streak_flow/streak_saved_storage.dart';
 import 'package:biblebookapp/streak/streak_service.dart';
+import 'package:biblebookapp/view/screens/milestones/milestone_celebration_coordinator.dart';
 import 'package:biblebookapp/home_widget/bible_home_widget.dart';
 import 'package:biblebookapp/home_widget/widget_prompt_cards.dart';
 import 'package:biblebookapp/home_widget/widget_prompt_service.dart';
@@ -4537,11 +4538,17 @@ class _StreakPrayerScreenState extends State<StreakPrayerScreen> {
 // Restore completes a past day — record that day first.
 // recordActivity() always writes today and breaks the
 // consecutive count across the missed gap.
+                            // Seed before earn so unlock can show on this flow.
+                            await MilestoneCelebrationCoordinator
+                                .seedBaselineIfNeeded();
                             if (isRestoreRun) {
                               await _recordStreakActivityForDay(completionDate);
                             } else {
                               await StreakService.recordActivity();
                             }
+                            // Show milestone unlock on this completion flow,
+                            // not later when opening the Milestones list.
+                            await MilestoneCelebrationCoordinator.checkAndShow();
                             final lastAwarded = await SharPreferences.getString(
                                 SharPreferences.streakFlowCreditsAwardedDate);
                             if (lastAwarded != today) {

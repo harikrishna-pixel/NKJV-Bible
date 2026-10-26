@@ -79,24 +79,10 @@ class MilestoneUnlockedDialog extends StatelessWidget {
                   ),
                 ],
               ),
-              child: Stack(
-                alignment: Alignment.center,
-                children: [
-                  Icon(
-                    Icons.workspace_premium_outlined,
-                    size: 78,
-                    color: _gold.withOpacity(0.35),
-                  ),
-                  Text(
-                    '${def.target}',
-                    style: const TextStyle(
-                      fontFamily: 'Georgia',
-                      fontSize: 34,
-                      fontWeight: FontWeight.w700,
-                      color: _ink,
-                    ),
-                  ),
-                ],
+              child: const Icon(
+                Icons.workspace_premium_outlined,
+                size: 78,
+                color: _gold,
               ),
             ),
             const SizedBox(height: 14),

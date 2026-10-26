@@ -1,0 +1,3767 @@
+{
+  "schema_version": "1.4",
+  "content_version": "1.4.0",
+  "language": "en",
+  "fallback_language": "en",
+  "last_reviewed": "2026-10-07",
+  "implementation_rules": {
+    "routing_contract": {
+      "faq_answer": "local_json",
+      "bug_report_form": "backend_submission",
+      "feature_request_form": "backend_submission",
+      "unmatched_support_question": "support_backend",
+      "scripture_prayer_personal_guidance": "redirect_to_dedicated_experience"
+    },
+    "content_rules": [
+      "This file never contains prices, currency amounts, trial durations, discount figures, credit quantities or Premium feature lists. Answers always point to the in-app Premium or Wallet screen or to the store purchase sheet.",
+      "This file and the support chat never contain Scripture text, Scripture interpretation, prayer text or personal guidance. Those requests are redirected.",
+      "Placeholders may only come from the variables block. An unresolved placeholder must never be shown to the user; use variables.fallbacks instead.",
+      "FAQ ids are permanent. Never rename or reuse an id. Locale files, analytics and support history depend on them.",
+      "If an action target does not exist in the app, hide that action. Never show a dead button.",
+      "Locale files are named support_content.<locale>.json, keep identical ids, and fall back to fallback_language for any missing key.",
+      "Visibility: an item (category, subcategory, FAQ, issue type, action, suggested prompt) is shown only if ALL of its requires_feature flags are on, AND at least one of its requires_any_feature flags is on (when present), AND none of its excludes_feature flags is on. A category or subcategory with no visible FAQ is hidden. Hidden FAQs are not matched locally and are not indexed for the support AI.",
+      "Routes: action_registry.route_requirements lists the feature flags each action target needs. An action whose target requirement is not met is hidden automatically, even if the FAQ itself is visible.",
+      "Conditional text: answer.append_if_feature holds extra text that is appended to the answer (as an extra paragraph, or as an extra final step when the answer uses steps) only when its feature flag is on. Use it instead of mentioning optional features in the base text.",
+      "Base text of an FAQ may only mention features that the FAQ's own visibility rules guarantee. Mention anything else through append_if_feature.",
+      "Related articles: related_faq_ids lists FAQ ids for the Related Articles block on the answer screen. Show only visible FAQs, up to faq_detail.related_limit.",
+      "Credit and quota values (cost of a feature, size of a free allowance, timer intervals, ad rewards) are never written in this file. The app shows the real values on its own screens before the user spends or earns anything.",
+      "Restore Purchases applies to Premium purchases only. Consumable credit packs are not restored, so credit problems use the credits_missing flow instead.",
+      "AI answer pricing by length: apps with ai_length_credits charge credits for every AI answer, from the first one, based on the length the user picks (short, medium or long). The file describes this without amounts. The app shows the credit cost for each length before the user confirms.",
+      "Daily content: apps with offline_daily_content provide the daily verse, prayer and devotion for the user's connection level, and the daily streak, without internet. They are free: no credits, no AI and no Premium.",
+      "Prayer Wall: posts are shared with other users. Help text tells users not to post private details. Reports use the report_problem flow, and support chat never writes, answers or comments on prayer requests."
+    ],
+    "resolution_order": [
+      "Filter by feature flags and platform", "Resolve platform_overrides for the current platform",
+      "Resolve placeholders from variables", "Render"
+    ]
+  },
+  "variables": {
+    "supplied_by_app": {
+      "APP_NAME": "Display name of the app, for example NLT Bible, Tamil Bible, Spanish Bible",
+      "STORE_NAME": "App Store or Google Play, chosen by platform"
+    },
+    "supplied_by_server": {
+      "SUPPORT_EMAIL": "Optional. Support contact address",
+      "RESPONSE_TIME": "Optional. Human-readable expected reply time, maintained server-side",
+      "CRISIS_RESOURCES": "Regional crisis-line text, maintained and verified server-side"
+    },
+    "fallbacks": {
+      "APP_NAME": "the app",
+      "STORE_NAME": "your app store",
+      "SUPPORT_EMAIL": "",
+      "RESPONSE_TIME": "",
+      "CRISIS_RESOURCES": "Please contact your local emergency services."
+    }
+  },
+  "app": { "product_family": "Holy Bible", "display_name_key": "{{APP_NAME}}", "support_scope": "app_only" },
+  "feature_flags": [
+    { "id": "multiple_versions", "description": "App offers more than one Bible version to switch between" },
+    { "id": "parallel_versions", "description": "Two versions can be shown side by side" },
+    { "id": "downloadable_content", "description": "Bible versions or other content can be downloaded" },
+    { "id": "resume_position", "description": "App remembers the last reading position" },
+    { "id": "in_app_language", "description": "App interface language can be changed inside the app" },
+    { "id": "audio", "description": "Audio Bible is available" },
+    { "id": "audio_download", "description": "Audio can be downloaded for offline listening" },
+    { "id": "audio_playback_controls", "description": "Playback speed and or sleep timer are available" },
+    { "id": "verse_images", "description": "Verse images can be created" },
+    { "id": "daily_verse", "description": "Daily verse feature" },
+    { "id": "reading_plans", "description": "Reading plans feature" },
+    { "id": "widgets", "description": "Home screen widgets" },
+    { "id": "wallpapers", "description": "Verse wallpapers" },
+    { "id": "streaks", "description": "Reading streaks" },
+    { "id": "account", "description": "App has sign-in accounts" },
+    { "id": "backup_sync", "description": "In-app backup or sync of saved content" },
+    { "id": "credits", "description": "Credits or wallet for paid features" },
+    { "id": "premium", "description": "App sells Premium or other paid access" },
+    { "id": "subscriptions", "description": "Premium or paid access is sold as a renewing subscription" },
+    { "id": "free_trial", "description": "A free trial is offered" },
+    { "id": "multi_platform", "description": "App is sold on more than one platform" },
+    { "id": "bible_assistant", "description": "Dedicated Bible Assistant experience exists" },
+    { "id": "prayer", "description": "Dedicated Prayer experience exists" },
+    { "id": "ads", "description": "App shows ads" },
+    { "id": "generated_or_shared_content", "description": "App shows generated or user-shared content that users can report" },
+    { "id": "verse_challenge", "description": "Verse Challenge: create, play, share, invite and track quizzes" },
+    { "id": "daily_free_quiz", "description": "A free daily quiz creation allowance" },
+    { "id": "quiz_lifelines", "description": "Credit-based helpers while playing a quiz (50/50, hint, skip)" },
+    { "id": "free_credit_timer", "description": "Free credits can be collected from the Wallet on a timer" },
+    { "id": "rewarded_ads", "description": "Credits can be earned by watching an ad (not the same as the ads flag)" },
+    { "id": "credit_purchase", "description": "Credit packs can be bought in the Wallet" },
+    { "id": "daily_ai_allowance", "description": "AI features include a free daily allowance" },
+    { "id": "ai_chat", "description": "AI chat feature" },
+    { "id": "unlimited_ai", "description": "A plan offers unlimited use of AI features" },
+    { "id": "brightness_control", "description": "In-app screen brightness control" },
+    { "id": "reading_view_modes", "description": "Alternative reading views such as single column" },
+    { "id": "custom_fonts", "description": "More than one reading font" },
+    { "id": "verse_numbers_toggle", "description": "Verse numbers can be shown or hidden" },
+    { "id": "keep_screen_awake", "description": "Option to keep the screen awake while reading" },
+    {
+      "id": "ai_length_credits",
+      "description": "Every AI answer costs credits based on the answer length the user chooses (short, medium, long); no free daily allowance"
+    },
+    { "id": "verse_explanation", "description": "AI verse explanation feature" },
+    { "id": "chapter_summary", "description": "AI chapter summary feature" },
+    { "id": "ai_prayer", "description": "Prayers are written by AI on request" },
+    { "id": "prayer_wall", "description": "Prayer Wall where users post and read shared prayer requests" },
+    { "id": "block_users", "description": "Users can block other users; blocking hides each other's posts and profile (mutual)" },
+    {
+      "id": "offline_daily_content",
+      "description": "Daily verse, prayer and devotion by connection level, and the daily streak, work offline and are free"
+    }
+  ],
+  "action_registry": {
+    "note": "Every target used in this file must exist here and be implemented by the app. Hide the action if the app does not implement it.",
+    "app_route": [
+      "bible_version_selector", "book_chapter_selector", "bookmarks", "notes", "appearance_settings",
+      "search", "audio_player", "downloads_manager", "notification_settings", "language_settings",
+      "daily_verse", "reading_plans", "wallpapers", "streaks", "backup_settings", "account_settings",
+      "premium", "wallet", "challenge_create", "challenge_results", "bible_assistant", "prayer",
+      "prayer_wall"
+    ],
+    "system_action": [
+      "subscription_management", "store_purchase_support", "app_store_update",
+      "device_notification_settings", "privacy_policy", "terms_of_use"
+    ],
+    "native_action": ["restore_purchase"],
+    "support_form": ["report_problem", "suggest_feature"],
+    "support_chat": ["support_chat", "human_handoff"],
+    "route_requirements": {
+      "bible_version_selector": { "requires_feature": ["multiple_versions"] },
+      "audio_player": { "requires_feature": ["audio"] },
+      "downloads_manager": { "requires_any_feature": ["downloadable_content", "audio_download"] },
+      "language_settings": { "requires_feature": ["in_app_language"] },
+      "daily_verse": { "requires_feature": ["daily_verse"] },
+      "reading_plans": { "requires_feature": ["reading_plans"] },
+      "wallpapers": { "requires_feature": ["wallpapers"] },
+      "streaks": { "requires_feature": ["streaks"] },
+      "backup_settings": { "requires_feature": ["backup_sync"] },
+      "account_settings": { "requires_feature": ["account"] },
+      "premium": { "requires_feature": ["premium"] },
+      "wallet": { "requires_feature": ["credits"] },
+      "subscription_management": { "requires_feature": ["subscriptions"] },
+      "store_purchase_support": { "requires_any_feature": ["premium", "credits"] },
+      "restore_purchase": { "requires_feature": ["premium"] },
+      "challenge_create": { "requires_feature": ["verse_challenge"] },
+      "challenge_results": { "requires_feature": ["verse_challenge"] },
+      "bible_assistant": { "requires_feature": ["bible_assistant"] },
+      "prayer": { "requires_feature": ["prayer"] },
+      "prayer_wall": { "requires_feature": ["prayer_wall"] }
+    }
+  },
+  "support_home": {
+    "header_title": "App Support",
+    "header_subtitle": "Get help with your {{APP_NAME}}.",
+    "title": "How can we help you?",
+    "subtitle": "Get quick answers, solve issues, or share your feedback, all in one place.",
+    "search_placeholder": "Ask your question about the app...",
+    "popular_title": "Popular Questions",
+    "view_all_label": "View All",
+    "popular_limit": 5,
+    "popular_note": "Home shows the first popular_limit visible FAQs by popular_rank. View All shows every visible FAQ that has a popular_rank.",
+    "all_questions_search_placeholder": "Search help topics...",
+    "cant_find_title": "Can't find your answer?",
+    "cant_find_subtitle": "Ask our support assistant. We'll help with any question about your {{APP_NAME}}.",
+    "cant_find_cta": "Ask App Support",
+    "human_link_label": "Prefer to talk to a person?",
+    "history_icon_label": "Support History"
+  },
+  "categories": [
+    {
+      "id": "using_app",
+      "title": "Using the App",
+      "subtitle": "Features, settings, reading, audio and more.",
+      "home_subtitle": "Features, settings, reading, audio and more.",
+      "icon": "book",
+      "order": 1,
+      "subcategories": [
+        {
+          "id": "verse_challenges",
+          "title": "Verse Challenges",
+          "subtitle": "Create, play, share and invite",
+          "icon": "trophy",
+          "order": 1,
+          "requires_feature": ["verse_challenge"]
+        },
+        {
+          "id": "challenge_results",
+          "title": "Results & Managing",
+          "subtitle": "Track plays, edit or delete",
+          "icon": "chart",
+          "order": 2,
+          "requires_feature": ["verse_challenge"]
+        },
+        { "id": "getting_started", "title": "Getting Started", "subtitle": "First time setup, navigation", "icon": "document", "order": 3 },
+        { "id": "reading_display", "title": "Reading & Display", "subtitle": "Themes, text size, night mode", "icon": "book_open", "order": 4 },
+        { "id": "bible_versions", "title": "Bible Versions", "subtitle": "Change or manage versions", "icon": "books", "order": 5 },
+        {
+          "id": "audio",
+          "title": "Audio Bible",
+          "subtitle": "Play, download, sleep timer",
+          "icon": "headphones",
+          "order": 6,
+          "requires_feature": ["audio"]
+        },
+        { "id": "bookmarks_notes", "title": "Bookmarks & Notes", "subtitle": "Save, find and manage", "icon": "bookmark", "order": 7 },
+        { "id": "search", "title": "Search", "subtitle": "Find verses and keywords", "icon": "search", "order": 8 },
+        { "id": "offline", "title": "Offline Access", "subtitle": "Download for offline use", "icon": "cloud_download", "order": 9 },
+        { "id": "sharing", "title": "Sharing", "subtitle": "Share verses, images and more", "icon": "share", "order": 10 },
+        { "id": "daily_features", "title": "Daily Features", "subtitle": "Daily verse, plans, widgets, streaks", "icon": "sun", "order": 11 },
+        {
+          "id": "prayer",
+          "title": "Prayer",
+          "subtitle": "Prayers and the Prayer Wall",
+          "icon": "heart",
+          "requires_any_feature": ["prayer", "prayer_wall"],
+          "order": 12
+        },
+        {
+          "id": "ai_usage",
+          "title": "AI Features",
+          "subtitle": "Explanations, summaries, chat and credits",
+          "icon": "sparkle",
+          "order": 13,
+          "requires_any_feature": [
+            "daily_ai_allowance", "ai_length_credits", "verse_explanation", "chapter_summary", "ai_chat",
+            "ai_prayer"
+          ]
+        },
+        {
+          "id": "settings_account",
+          "title": "Settings & Account",
+          "subtitle": "Notifications, language, data and privacy",
+          "icon": "gear",
+          "order": 14
+        }
+      ]
+    },
+    {
+      "id": "premium_billing",
+      "title": "Premium & Billing",
+      "subtitle": "Subscription, payments and refunds.",
+      "home_subtitle": "Subscription, payments, refunds and purchases.",
+      "icon": "crown",
+      "order": 2,
+      "subcategories": [
+        {
+          "id": "about_premium",
+          "title": "About Premium",
+          "subtitle": "What's included in Premium",
+          "icon": "document",
+          "order": 1,
+          "requires_feature": ["premium"]
+        },
+        {
+          "id": "purchase_premium",
+          "title": "Purchase Premium",
+          "subtitle": "How to upgrade",
+          "icon": "card",
+          "order": 2,
+          "requires_feature": ["premium"]
+        },
+        {
+          "id": "restore_purchase",
+          "title": "Restore Purchase",
+          "subtitle": "Recover previous purchase",
+          "icon": "restore",
+          "order": 3,
+          "requires_feature": ["premium"]
+        },
+        {
+          "id": "manage_subscription",
+          "title": "Manage Subscription",
+          "subtitle": "View, change or cancel",
+          "icon": "calendar",
+          "order": 4,
+          "requires_feature": ["subscriptions"]
+        },
+        {
+          "id": "refund_request",
+          "title": "Refund Request",
+          "subtitle": "Request a refund",
+          "icon": "clock",
+          "order": 5,
+          "requires_any_feature": ["premium", "credits"]
+        },
+        {
+          "id": "payment_issues",
+          "title": "Payment Issues",
+          "subtitle": "Failed or pending payments",
+          "icon": "card_alert",
+          "order": 6,
+          "requires_any_feature": ["premium", "credits"]
+        },
+        {
+          "id": "credits",
+          "title": "Credits & Wallet",
+          "subtitle": "How credits work",
+          "icon": "wallet",
+          "order": 7,
+          "requires_feature": ["credits"]
+        },
+        { "id": "platform_help", "title": "Subscription on iOS / Android", "subtitle": "Platform-specific help", "icon": "devices", "order": 8 }
+      ],
+      "requires_any_feature": ["premium", "credits"]
+    },
+    {
+      "id": "report_problem",
+      "title": "Report a Problem",
+      "subtitle": "Let us know what's not working. We'll help you troubleshoot.",
+      "home_subtitle": "Bugs, crashes, not working as expected.",
+      "icon": "warning",
+      "order": 3,
+      "screen_type": "bug_report",
+      "subcategory_source": "report_problem.issue_types",
+      "flow": "Tapping an issue type first shows its quick_fix_faq_ids under 'Try these quick fixes', then a 'Still not working? Report it' button that opens the form with the issue type pre-selected."
+    },
+    {
+      "id": "suggest_feature",
+      "title": "Suggest a Feature",
+      "subtitle": "Share your ideas to help us make {{APP_NAME}} even better.",
+      "home_subtitle": "Share ideas to help us make the app better.",
+      "icon": "lightbulb",
+      "order": 4,
+      "screen_type": "feature_request",
+      "subcategory_source": "feature_request.feature_types"
+    }
+  ],
+  "faq": [
+    {
+      "id": "create_challenge",
+      "category_id": "using_app",
+      "subcategory_id": "verse_challenges",
+      "order": 1,
+      "popular_rank": 1,
+      "question": "How do I create a Verse Challenge?",
+      "preview": "Make a quiz from Scripture and share it.",
+      "answer": {
+        "title": "Create a Verse Challenge",
+        "steps": [
+          "Open the Verse Challenge section.", "Choose to create a new challenge.",
+          "Follow the steps to choose your verses and quiz type.",
+          "Create it, then share the link with the people you want to invite."
+        ]
+      },
+      "keywords": [
+        "create challenge", "make challenge", "new challenge", "verse challenge", "create quiz",
+        "make a quiz", "start challenge", "build quiz"
+      ],
+      "actions": [
+        { "type": "app_route", "label": "Create a Challenge", "target": "challenge_create" }
+      ],
+      "related_faq_ids": ["share_challenge", "challenge_results", "daily_free_quiz_limit"]
+    },
+    {
+      "id": "daily_free_quiz_limit",
+      "category_id": "using_app",
+      "subcategory_id": "verse_challenges",
+      "order": 2,
+      "requires_feature": ["daily_free_quiz"],
+      "question": "How many challenges can I create for free each day?",
+      "preview": "Understand your free daily creation.",
+      "answer": {
+        "title": "Free Daily Creation",
+        "body": "Creating a quiz includes a free daily allowance. The create screen shows what you have available today, and what your options are once the free creation has been used."
+      },
+      "keywords": [
+        "daily free quiz", "free quiz limit", "one quiz per day", "quiz limit", "create limit",
+        "daily limit quiz", "create another quiz"
+      ],
+      "actions": [
+        { "type": "app_route", "label": "Create a Challenge", "target": "challenge_create" }
+      ],
+      "related_faq_ids": ["create_challenge", "challenge_wont_create"]
+    },
+    {
+      "id": "share_challenge",
+      "category_id": "using_app",
+      "subcategory_id": "verse_challenges",
+      "order": 3,
+      "popular_rank": 2,
+      "question": "How do I share my challenge?",
+      "preview": "Send your challenge to anyone, anywhere.",
+      "answer": {
+        "title": "Share Your Challenge",
+        "body": "After you create a challenge, choose Share and pick any messaging or social app on your device. There is no restriction on where or how many times you share it."
+      },
+      "keywords": [
+        "share challenge", "share quiz", "send quiz", "share link", "share on whatsapp",
+        "share on social media", "post quiz", "share to instagram"
+      ],
+      "related_faq_ids": ["invite_friends", "challenge_results", "edit_challenge"]
+    },
+    {
+      "id": "invite_friends",
+      "category_id": "using_app",
+      "subcategory_id": "verse_challenges",
+      "order": 4,
+      "question": "How do I invite friends or family to play?",
+      "preview": "Let others take your challenge.",
+      "answer": {
+        "title": "Invite Others",
+        "body": "Share your challenge link in any messaging or social app. Anyone who opens the link can play right away. They don't need to install {{APP_NAME}} or create an account."
+      },
+      "keywords": [
+        "invite friends", "invite family", "invite others", "ask friends to play", "play with friends",
+        "invite to quiz"
+      ],
+      "related_faq_ids": ["share_challenge", "challenge_limits"]
+    },
+    {
+      "id": "players_can_reshare",
+      "category_id": "using_app",
+      "subcategory_id": "verse_challenges",
+      "order": 5,
+      "question": "Can the people I invite share the challenge too?",
+      "preview": "Passing a challenge along.",
+      "answer": { "title": "Sharing by Players", "body": "Yes. Anyone who plays a challenge can share its link with others, with no restriction." },
+      "keywords": ["friend share quiz", "forward quiz", "reshare challenge", "share someone's challenge", "pass it on"],
+      "related_faq_ids": ["invite_friends", "challenge_limits"]
+    },
+    {
+      "id": "play_challenge",
+      "category_id": "using_app",
+      "subcategory_id": "verse_challenges",
+      "order": 6,
+      "question": "How do I play a challenge someone sent me?",
+      "preview": "Open the link and start playing.",
+      "answer": {
+        "title": "Play a Challenge",
+        "steps": [
+          "Open the link you received.", "The challenge opens and you can start answering right away.",
+          "You don't need to install {{APP_NAME}} or create an account.",
+          "Playing is free, and you can play again as often as you like."
+        ]
+      },
+      "keywords": [
+        "play challenge", "take quiz", "join challenge", "received quiz link", "open quiz link",
+        "attend quiz", "play shared challenge", "need app to play", "need account to play"
+      ],
+      "related_faq_ids": ["challenge_link_not_opening", "challenge_limits", "quiz_lifelines"]
+    },
+    {
+      "id": "challenge_limits",
+      "category_id": "using_app",
+      "subcategory_id": "verse_challenges",
+      "order": 7,
+      "question": "Is there a limit on players, plays or how long a link works?",
+      "preview": "Players, plays and link validity.",
+      "answer": {
+        "title": "No Limits on Playing",
+        "body": "No. Any number of people can play, they can play as many times as they like, and a shared challenge link does not expire."
+      },
+      "keywords": [
+        "how many can play", "unlimited players", "link expire", "quiz link expires", "play again",
+        "retake", "play multiple times", "limit on players"
+      ],
+      "related_faq_ids": ["share_challenge", "invite_friends"]
+    },
+    {
+      "id": "quiz_lifelines",
+      "category_id": "using_app",
+      "subcategory_id": "verse_challenges",
+      "order": 8,
+      "requires_feature": ["quiz_lifelines", "credits"],
+      "question": "What are the 50/50, hint and skip options in a quiz?",
+      "preview": "Use credits for extra help while you play.",
+      "answer": {
+        "title": "Quiz Helpers",
+        "body": "While playing a quiz you can use helpers such as 50/50, a hint, or skipping a question. Each one uses credits, and the cost is shown before you confirm. If you don't have enough credits, you can get more from the Wallet."
+      },
+      "keywords": [
+        "50/50", "fifty fifty", "hint", "skip question", "lifeline", "use credits in quiz", "quiz help",
+        "skip"
+      ],
+      "actions": [
+        { "type": "app_route", "label": "Open Wallet", "target": "wallet" }
+      ],
+      "related_faq_ids": ["not_enough_credits", "how_credits_work", "lifeline_credit_lost"]
+    },
+    {
+      "id": "challenge_results",
+      "category_id": "using_app",
+      "subcategory_id": "challenge_results",
+      "order": 1,
+      "popular_rank": 3,
+      "question": "Where can I see how many people played my challenge?",
+      "preview": "Track plays and results.",
+      "answer": {
+        "title": "Challenge Results",
+        "body": "Open your challenge from your list and view its results. You can see how many people have played and the percentage figures for your challenge."
+      },
+      "keywords": [
+        "results", "how many played", "challenge results", "quiz results", "percentage", "players count",
+        "who played", "track quiz", "stats"
+      ],
+      "actions": [
+        { "type": "app_route", "label": "Open Challenge Results", "target": "challenge_results" }
+      ],
+      "related_faq_ids": ["results_not_updating", "edit_challenge"]
+    },
+    {
+      "id": "edit_challenge",
+      "category_id": "using_app",
+      "subcategory_id": "challenge_results",
+      "order": 2,
+      "question": "How do I edit my challenge?",
+      "preview": "Change your questions or verses.",
+      "answer": {
+        "title": "Edit a Challenge",
+        "steps": [
+          "Open your challenge from your list and choose Edit.", "Make your changes and save them.",
+          "Share the challenge again so people see the updated content. The link stays the same."
+        ]
+      },
+      "keywords": [
+        "edit challenge", "edit quiz", "change quiz", "change questions", "modify challenge", "update quiz",
+        "edit questions"
+      ],
+      "related_faq_ids": ["friends_see_old_version", "delete_challenge"]
+    },
+    {
+      "id": "friends_see_old_version",
+      "category_id": "using_app",
+      "subcategory_id": "challenge_results",
+      "order": 3,
+      "question": "I edited my challenge, but people still see the old version.",
+      "preview": "Update what people see.",
+      "answer": {
+        "title": "Old Version Still Showing",
+        "body": "Changes you make in the app only update what people see once you share the challenge again. Open the challenge and share it again. The link stays the same and will show the updated content."
+      },
+      "keywords": [
+        "old version", "still sees old quiz", "changes not showing", "edited but not updated",
+        "update shared link", "reshare after edit"
+      ],
+      "related_faq_ids": ["edit_challenge", "share_challenge"]
+    },
+    {
+      "id": "delete_challenge",
+      "category_id": "using_app",
+      "subcategory_id": "challenge_results",
+      "order": 4,
+      "question": "How do I delete a challenge?",
+      "preview": "Remove a challenge from your list.",
+      "answer": {
+        "title": "Delete a Challenge",
+        "body": "Open your challenge and choose Delete. This removes it from your list in the app. A link you already shared can keep working, because shared challenges are served from our servers. If you need help with a link you already shared, contact App Support."
+      },
+      "keywords": [
+        "delete challenge", "delete quiz", "remove challenge", "remove quiz", "link still works",
+        "stop sharing"
+      ],
+      "actions": [
+        { "type": "support_chat", "label": "Talk to a Person", "target": "human_handoff" }
+      ],
+      "related_faq_ids": ["edit_challenge", "challenge_results"],
+      "escalation": { "offer_human": true }
+    },
+    {
+      "id": "getting_started_basics",
+      "category_id": "using_app",
+      "subcategory_id": "getting_started",
+      "order": 1,
+      "question": "How do I get started with {{APP_NAME}}?",
+      "preview": "A quick tour of the basics.",
+      "answer": {
+        "title": "Getting Started",
+        "body": "Choose what to read from the book and chapter selector, then scroll to move through the chapter. Select a verse to see actions such as bookmark, highlight, note, copy and share. Reading options are in the appearance settings."
+      },
+      "keywords": ["get started", "how to use", "beginner", "tutorial", "guide", "new user", "first time"],
+      "actions": [
+        { "type": "app_route", "label": "Open Book & Chapter Selector", "target": "book_chapter_selector" }
+      ]
+    },
+    {
+      "id": "navigate_books",
+      "category_id": "using_app",
+      "subcategory_id": "getting_started",
+      "order": 2,
+      "question": "How do I go to a specific book, chapter or verse?",
+      "preview": "Jump straight to the passage you want.",
+      "answer": {
+        "title": "Go to a Passage",
+        "steps": [
+          "Open the book and chapter selector.", "Choose a book, then a chapter.",
+          "Or open Search and type a reference, such as a book name followed by a chapter and verse number."
+        ]
+      },
+      "keywords": ["go to chapter", "jump to verse", "find book", "navigate", "open chapter", "go to book"],
+      "actions": [
+        { "type": "app_route", "label": "Open Book & Chapter Selector", "target": "book_chapter_selector" }
+      ]
+    },
+    {
+      "id": "resume_reading",
+      "category_id": "using_app",
+      "subcategory_id": "getting_started",
+      "order": 3,
+      "requires_feature": ["resume_position"],
+      "question": "How do I continue where I left off?",
+      "preview": "Return to your last reading position.",
+      "answer": {
+        "title": "Continue Reading",
+        "body": "{{APP_NAME}} remembers your last reading position and opens there when you return. If it opens somewhere else, use the book and chapter selector or your bookmarks to go back."
+      },
+      "keywords": ["continue reading", "last read", "left off", "resume", "where I stopped", "last position"]
+    },
+    {
+      "id": "change_text_size",
+      "category_id": "using_app",
+      "subcategory_id": "reading_display",
+      "order": 1,
+      "popular_rank": 14,
+      "question": "How do I change the Bible text size or font?",
+      "preview": "Make Scripture comfortable to read.",
+      "answer": { "title": "Adjust Text Size", "steps": ["Open the reading or appearance settings.", "Adjust the text size until it is comfortable."] },
+      "media_key": "faq_change_text_size",
+      "keywords": ["text size", "font size", "bigger text", "smaller text", "large font", "small font"],
+      "actions": [
+        { "type": "app_route", "label": "Open Appearance Settings", "target": "appearance_settings" }
+      ],
+      "related_faq_ids": ["change_theme", "custom_fonts", "adjust_brightness"]
+    },
+    {
+      "id": "change_theme",
+      "category_id": "using_app",
+      "subcategory_id": "reading_display",
+      "order": 2,
+      "question": "How do I change the reading theme or use dark mode?",
+      "preview": "Choose a comfortable look for reading.",
+      "answer": {
+        "title": "Change Reading Theme",
+        "body": "Open the appearance settings and choose from the themes available in {{APP_NAME}}. If your app has a night or dark option, you will find it there too."
+      },
+      "keywords": ["theme", "reading theme", "dark mode", "night mode", "appearance", "background", "colour", "color"],
+      "actions": [
+        { "type": "app_route", "label": "Open Appearance Settings", "target": "appearance_settings" }
+      ],
+      "related_faq_ids": ["change_text_size", "adjust_brightness"]
+    },
+    {
+      "id": "copy_verse",
+      "category_id": "using_app",
+      "subcategory_id": "reading_display",
+      "order": 3,
+      "question": "How do I copy a verse?",
+      "preview": "Copy Scripture to paste elsewhere.",
+      "answer": {
+        "title": "Copy a Verse",
+        "body": "Select the verse you want and choose Copy from the verse actions. You can then paste it into any other app."
+      },
+      "keywords": ["copy verse", "copy text", "paste verse", "copy scripture", "select text"]
+    },
+    {
+      "id": "parallel_versions",
+      "category_id": "using_app",
+      "subcategory_id": "reading_display",
+      "order": 4,
+      "requires_feature": ["parallel_versions"],
+      "question": "How do I read two versions side by side?",
+      "preview": "Compare Bible versions while you read.",
+      "answer": {
+        "title": "Read Versions Together",
+        "body": "Open the reading options and choose the option to show a second version. Pick the version you want to compare, and turn it off the same way when you are done."
+      },
+      "keywords": ["parallel", "compare versions", "two versions", "side by side", "dual", "second version"]
+    },
+    {
+      "id": "adjust_brightness",
+      "category_id": "using_app",
+      "subcategory_id": "reading_display",
+      "order": 5,
+      "requires_feature": ["brightness_control"],
+      "question": "How do I adjust the screen brightness in the app?",
+      "preview": "Control brightness for comfortable reading.",
+      "answer": {
+        "title": "Adjust Brightness",
+        "body": "Open the reading settings and use the brightness control. Your device brightness settings also affect how bright the screen is."
+      },
+      "keywords": ["brightness", "screen brightness", "too bright", "too dark", "dim screen", "brighter"],
+      "related_faq_ids": ["change_theme", "change_text_size"]
+    },
+    {
+      "id": "verse_numbers_toggle",
+      "category_id": "using_app",
+      "subcategory_id": "reading_display",
+      "order": 6,
+      "requires_feature": ["verse_numbers_toggle"],
+      "question": "Can I show or hide verse numbers?",
+      "preview": "Choose how Scripture looks while you read.",
+      "answer": { "title": "Show or Hide Verse Numbers", "body": "Open the reading settings and use the verse number option to show or hide verse numbers." },
+      "keywords": ["verse numbers", "hide numbers", "show numbers", "verse number", "numbers in text"],
+      "related_faq_ids": ["reading_view_modes"]
+    },
+    {
+      "id": "reading_view_modes",
+      "category_id": "using_app",
+      "subcategory_id": "reading_display",
+      "order": 7,
+      "requires_feature": ["reading_view_modes"],
+      "question": "How do I change the reading view, such as single column?",
+      "preview": "Choose a reading layout.",
+      "answer": { "title": "Reading View Options", "body": "Open the reading settings and choose a reading view from the options offered." },
+      "keywords": ["reading view", "single column", "reading mode", "paragraph view", "verse by verse"],
+      "related_faq_ids": ["verse_numbers_toggle", "change_text_size"]
+    },
+    {
+      "id": "keep_screen_awake",
+      "category_id": "using_app",
+      "subcategory_id": "reading_display",
+      "order": 8,
+      "requires_feature": ["keep_screen_awake"],
+      "question": "How do I stop the screen from sleeping while I read?",
+      "preview": "Keep the display on while reading.",
+      "answer": {
+        "title": "Keep the Screen Awake",
+        "body": "Turn on the keep-screen-awake option in the reading settings. Your device's own auto-lock settings can also affect when the screen turns off."
+      },
+      "keywords": ["screen awake", "screen turns off", "screen sleeps", "auto lock", "display timeout", "keep screen on"],
+      "related_faq_ids": ["adjust_brightness"]
+    },
+    {
+      "id": "custom_fonts",
+      "category_id": "using_app",
+      "subcategory_id": "reading_display",
+      "order": 9,
+      "requires_feature": ["custom_fonts"],
+      "question": "How do I change the font?",
+      "preview": "Choose a reading font.",
+      "answer": { "title": "Change the Font", "body": "Open the reading or appearance settings and choose a font from the ones offered." },
+      "keywords": ["change font", "font style", "customize fonts", "different font", "reading font", "typeface"],
+      "related_faq_ids": ["change_text_size", "change_theme"]
+    },
+    {
+      "id": "change_bible_version",
+      "category_id": "using_app",
+      "subcategory_id": "bible_versions",
+      "order": 1,
+      "popular_rank": 9,
+      "requires_feature": ["multiple_versions"],
+      "question": "How do I change the Bible version?",
+      "preview": "Switch to another available translation.",
+      "answer": {
+        "title": "Change Bible Version",
+        "steps": ["Open the Bible version selector from the reading screen.", "Select the version you want to read."],
+        "append_if_feature": [
+          {
+            "feature": "downloadable_content",
+            "text": "If the version needs to be downloaded first, wait for the download to finish before opening it."
+          }
+        ]
+      },
+      "media_key": "faq_change_bible_version",
+      "keywords": [
+        "change bible", "bible version", "translation", "switch bible", "different version",
+        "change translation", "another version"
+      ],
+      "actions": [
+        { "type": "app_route", "label": "Choose Bible Version", "target": "bible_version_selector" }
+      ],
+      "related_faq_ids": ["download_bible_version", "offline_usage", "version_not_found"]
+    },
+    {
+      "id": "download_bible_version",
+      "category_id": "using_app",
+      "subcategory_id": "bible_versions",
+      "order": 2,
+      "requires_feature": ["multiple_versions", "downloadable_content"],
+      "question": "How do I download a Bible version?",
+      "preview": "Download a version to read it anytime.",
+      "answer": {
+        "title": "Download a Bible Version",
+        "steps": [
+          "Open the Bible version selector.", "Find the version you want and tap Download.",
+          "Keep the app open until the download completes."
+        ]
+      },
+      "keywords": [
+        "download bible", "download version", "offline bible", "install bible", "save bible",
+        "get translation"
+      ],
+      "actions": [
+        { "type": "app_route", "label": "Open Downloads", "target": "downloads_manager" }
+      ],
+      "related_faq_ids": ["change_bible_version", "free_up_storage", "offline_usage"]
+    },
+    {
+      "id": "version_not_found",
+      "category_id": "using_app",
+      "subcategory_id": "bible_versions",
+      "order": 3,
+      "question": "Why can't I find a Bible version, book or language?",
+      "preview": "What to check if something is missing.",
+      "answer": {
+        "title": "Can't Find a Version or Book",
+        "body": "{{APP_NAME}} includes only the content shown in its own version list and book list. If something you expect is missing, check that you are looking at the right version. You can also ask us to add it.",
+        "append_if_feature": [
+          { "feature": "downloadable_content", "text": "If you were downloading it, wait for the download to finish." }
+        ]
+      },
+      "keywords": [
+        "missing book", "version missing", "not available", "cannot find bible", "language missing",
+        "apocrypha", "missing version"
+      ],
+      "actions": [
+        { "type": "support_form", "label": "Request Content", "target": "suggest_feature", "prefill_type": "content_request" }
+      ]
+    },
+    {
+      "id": "request_new_version",
+      "category_id": "using_app",
+      "subcategory_id": "bible_versions",
+      "order": 4,
+      "question": "Can you add another Bible translation or language?",
+      "preview": "Tell us which content you would like.",
+      "answer": {
+        "title": "Request New Content",
+        "body": "We'd like to hear what you need. Send a content request with the translation or language you want, and our team will review it. We can't promise every request, but each one is read."
+      },
+      "keywords": ["add translation", "new version", "add language", "request bible", "more versions", "add bible"],
+      "actions": [
+        { "type": "support_form", "label": "Request Content", "target": "suggest_feature", "prefill_type": "content_request" }
+      ]
+    },
+    {
+      "id": "audio_how_to",
+      "category_id": "using_app",
+      "subcategory_id": "audio",
+      "order": 1,
+      "requires_feature": ["audio"],
+      "question": "How do I listen to the Bible audio?",
+      "preview": "Play audio for the chapter you are reading.",
+      "answer": {
+        "title": "Listen to Audio",
+        "steps": [
+          "Open the chapter you want to hear.", "Tap the audio or play button.",
+          "Use the player controls to pause, skip or go back."
+        ]
+      },
+      "keywords": ["listen", "play audio", "audio bible", "hear bible", "narration", "read aloud", "play chapter"],
+      "actions": [
+        { "type": "app_route", "label": "Open Audio Player", "target": "audio_player" }
+      ]
+    },
+    {
+      "id": "audio_download",
+      "category_id": "using_app",
+      "subcategory_id": "audio",
+      "order": 2,
+      "popular_rank": 10,
+      "requires_feature": ["audio", "audio_download"],
+      "question": "How do I download audio?",
+      "preview": "Save audio to listen without internet.",
+      "answer": {
+        "title": "Download Audio",
+        "steps": [
+          "Open the audio player or the downloads screen.", "Choose the book or chapter you want to save.",
+          "Tap Download and keep the app open until it finishes."
+        ]
+      },
+      "keywords": ["download audio", "offline audio", "save audio", "audio offline", "listen offline"],
+      "actions": [
+        { "type": "app_route", "label": "Open Downloads", "target": "downloads_manager" }
+      ]
+    },
+    {
+      "id": "audio_playback_controls",
+      "category_id": "using_app",
+      "subcategory_id": "audio",
+      "order": 3,
+      "requires_feature": ["audio", "audio_playback_controls"],
+      "question": "Can I change the audio speed or set a sleep timer?",
+      "preview": "Control how and how long audio plays.",
+      "answer": {
+        "title": "Audio Speed and Sleep Timer",
+        "body": "Open the audio player and look for the speed and timer controls. A sleep timer stops the audio after the time you choose."
+      },
+      "keywords": ["audio speed", "playback speed", "sleep timer", "faster audio", "slower audio", "timer", "auto stop"],
+      "actions": [
+        { "type": "app_route", "label": "Open Audio Player", "target": "audio_player" }
+      ]
+    },
+    {
+      "id": "audio_background",
+      "category_id": "using_app",
+      "subcategory_id": "audio",
+      "order": 4,
+      "requires_feature": ["audio"],
+      "question": "Will audio keep playing when my screen is locked?",
+      "preview": "Listen while using other apps or with the screen off.",
+      "answer": {
+        "title": "Audio in the Background",
+        "body": "Audio can keep playing when you lock your screen or switch to another app. If it stops, check that low-power or battery-saving modes are not restricting {{APP_NAME}} in your device settings."
+      },
+      "keywords": ["background audio", "screen locked", "audio stops when locked", "play in background", "lock screen"]
+    },
+    {
+      "id": "audio_not_available",
+      "category_id": "using_app",
+      "subcategory_id": "audio",
+      "order": 5,
+      "requires_feature": ["audio"],
+      "question": "Why is audio not available for my Bible version?",
+      "preview": "Audio is not offered for every version.",
+      "answer": {
+        "title": "Audio Availability",
+        "body": "Audio is not available for every version or language. If the audio button is missing for the version you are reading, audio is not offered for it in {{APP_NAME}} right now. You can send us a content request."
+      },
+      "keywords": [
+        "no audio for version", "audio missing", "audio not available", "audio button missing",
+        "audio language"
+      ],
+      "actions": [
+        { "type": "support_form", "label": "Request Content", "target": "suggest_feature", "prefill_type": "content_request" }
+      ]
+    },
+    {
+      "id": "add_bookmark",
+      "category_id": "using_app",
+      "subcategory_id": "bookmarks_notes",
+      "order": 1,
+      "question": "How do I add or remove a bookmark?",
+      "preview": "Save a verse to find it later.",
+      "answer": {
+        "title": "Bookmark a Verse",
+        "steps": [
+          "Select the verse you want to save.", "Choose the bookmark option from the verse actions.",
+          "To remove it, select the bookmarked verse and choose the bookmark option again, or remove it from your bookmarks list."
+        ]
+      },
+      "keywords": [
+        "add bookmark", "save verse", "bookmark verse", "remove bookmark", "delete bookmark",
+        "favourite verse", "favorite verse"
+      ],
+      "related_faq_ids": ["find_bookmarks", "saved_content_missing"]
+    },
+    {
+      "id": "find_bookmarks",
+      "category_id": "using_app",
+      "subcategory_id": "bookmarks_notes",
+      "order": 2,
+      "popular_rank": 11,
+      "question": "Where are my bookmarks and notes?",
+      "preview": "Find verses and notes you have saved.",
+      "answer": {
+        "title": "Find Your Bookmarks and Notes",
+        "body": "Open the saved content section to see your bookmarks, notes and highlights. Select an item to return to its passage."
+      },
+      "media_key": "faq_find_bookmarks",
+      "keywords": [
+        "bookmark", "bookmarks", "saved verse", "saved verses", "find bookmark", "my notes", "saved notes",
+        "find notes", "where are my notes"
+      ],
+      "actions": [
+        { "type": "app_route", "label": "Open Bookmarks", "target": "bookmarks" },
+        { "type": "app_route", "label": "Open Notes", "target": "notes" }
+      ],
+      "related_faq_ids": ["add_bookmark", "add_note", "highlight_verse"]
+    },
+    {
+      "id": "add_note",
+      "category_id": "using_app",
+      "subcategory_id": "bookmarks_notes",
+      "order": 3,
+      "question": "How do I add or edit a note?",
+      "preview": "Write your own thoughts beside a verse.",
+      "answer": {
+        "title": "Add or Edit a Note",
+        "steps": [
+          "Select the verse you want to write about.", "Choose the note option from the verse actions.",
+          "Type your note and save it. To change it later, open it from your notes list."
+        ]
+      },
+      "keywords": ["add note", "write note", "edit note", "delete note", "verse note", "journal"],
+      "actions": [
+        { "type": "app_route", "label": "Open Notes", "target": "notes" }
+      ]
+    },
+    {
+      "id": "highlight_verse",
+      "category_id": "using_app",
+      "subcategory_id": "bookmarks_notes",
+      "order": 4,
+      "question": "How do I highlight a verse?",
+      "preview": "Mark important verses while you read.",
+      "answer": {
+        "title": "Highlight a Verse",
+        "body": "Select the verse and choose the highlight option from the verse actions. Pick a colour or style if your app offers them."
+      },
+      "media_key": "faq_highlight_verse",
+      "keywords": ["highlight", "highlight verse", "verse color", "verse colour", "mark verse", "underline"],
+      "related_faq_ids": ["remove_highlight", "find_bookmarks"]
+    },
+    {
+      "id": "remove_highlight",
+      "category_id": "using_app",
+      "subcategory_id": "bookmarks_notes",
+      "order": 5,
+      "question": "How do I remove a highlight?",
+      "preview": "Clear highlighting from a verse.",
+      "answer": {
+        "title": "Remove a Highlight",
+        "body": "Select the highlighted verse, open its highlight options, and choose the option to remove or clear the highlight."
+      },
+      "keywords": ["remove highlight", "delete highlight", "clear highlight", "unhighlight"]
+    },
+    {
+      "id": "search_bible",
+      "category_id": "using_app",
+      "subcategory_id": "search",
+      "order": 1,
+      "question": "How do I search for a verse or passage?",
+      "preview": "Find Scripture by word, phrase or reference.",
+      "answer": {
+        "title": "Search the Bible",
+        "body": "Open Search and enter a word, a phrase, or a reference made of a book, chapter and verse. Select a result to open that passage."
+      },
+      "keywords": [
+        "search", "find verse", "find passage", "search bible", "find scripture", "look up verse",
+        "keyword search"
+      ],
+      "actions": [
+        { "type": "app_route", "label": "Open Search", "target": "search" }
+      ]
+    },
+    {
+      "id": "search_no_results",
+      "category_id": "using_app",
+      "subcategory_id": "search",
+      "order": 2,
+      "question": "Why is Search not finding what I typed?",
+      "preview": "Tips to get better results.",
+      "answer": {
+        "title": "Search Not Finding Results",
+        "steps": [
+          "Check your spelling and try fewer or simpler words.",
+          "Make sure the Bible version you are searching is the one you expect, because wording differs between versions."
+        ],
+        "append_if_feature": [
+          { "feature": "downloadable_content", "text": "If a version is still downloading, wait for it to finish and search again." }
+        ]
+      },
+      "keywords": [
+        "search no results", "search not working", "cannot find word", "no results", "search empty",
+        "wrong results"
+      ],
+      "actions": [
+        { "type": "support_form", "label": "Report a Problem", "target": "report_problem", "prefill_type": "other" }
+      ]
+    },
+    {
+      "id": "offline_usage",
+      "category_id": "using_app",
+      "subcategory_id": "offline",
+      "order": 1,
+      "popular_rank": 16,
+      "question": "Can I use the app without internet?",
+      "preview": "What works while you're offline.",
+      "answer": {
+        "title": "Using the App Offline",
+        "body": "Content already stored on your device can be used without an internet connection. Features that need online services, such as the support assistant, need an active connection.",
+        "append_if_feature": [
+          { "feature": "offline_daily_content", "text": "Your daily verse, prayer and devotion, and your daily streak, also work without internet." },
+          { "feature": "ai_chat", "text": "AI features, including the Bible Assistant, need an internet connection." }
+        ]
+      },
+      "keywords": [
+        "offline", "without internet", "no internet", "offline reading", "use offline", "no wifi",
+        "no network"
+      ],
+      "related_faq_ids": ["download_bible_version", "audio_download", "free_up_storage", "daily_streak_offline"]
+    },
+    {
+      "id": "free_up_storage",
+      "category_id": "using_app",
+      "subcategory_id": "offline",
+      "order": 2,
+      "question": "The app is using too much storage. How do I free up space?",
+      "preview": "Remove content you no longer need.",
+      "answer": {
+        "title": "Free Up Storage",
+        "body": "Remove downloaded content you no longer use from the downloads screen. You can also review storage in your device settings. You can download removed content again later."
+      },
+      "keywords": [
+        "storage", "free space", "delete downloads", "remove download", "memory full", "app size",
+        "clear space", "too much storage", "app is large", "takes too much space"
+      ],
+      "actions": [
+        { "type": "app_route", "label": "Open Downloads", "target": "downloads_manager" }
+      ],
+      "requires_any_feature": ["downloadable_content", "audio_download"]
+    },
+    {
+      "id": "share_verse",
+      "category_id": "using_app",
+      "subcategory_id": "sharing",
+      "order": 1,
+      "popular_rank": 17,
+      "question": "How do I share a Bible verse?",
+      "preview": "Share Scripture with friends and family.",
+      "answer": {
+        "title": "Share a Verse",
+        "body": "Select the verse you want to share and tap Share. Then choose any sharing method available on your device."
+      },
+      "keywords": ["share verse", "send verse", "share scripture", "send scripture", "share bible", "whatsapp verse"],
+      "related_faq_ids": ["share_verse_image", "copy_verse"]
+    },
+    {
+      "id": "share_verse_image",
+      "category_id": "using_app",
+      "subcategory_id": "sharing",
+      "order": 2,
+      "requires_feature": ["verse_images"],
+      "question": "How do I create and share a verse image?",
+      "preview": "Turn a verse into a shareable picture.",
+      "answer": {
+        "title": "Create a Verse Image",
+        "steps": [
+          "Select the verse you want.", "Choose the image option from the verse actions.",
+          "Pick a design, then save or share the image.",
+          "If saving fails, allow {{APP_NAME}} to access your photos in device settings."
+        ]
+      },
+      "keywords": ["verse image", "verse picture", "share image", "create image", "verse card", "save image"]
+    },
+    {
+      "id": "daily_verse",
+      "category_id": "using_app",
+      "subcategory_id": "daily_features",
+      "order": 1,
+      "requires_feature": ["daily_verse"],
+      "question": "Where do I find the daily verse and how do I get reminders?",
+      "preview": "See today's verse and manage its reminder.",
+      "answer": {
+        "title": "Daily Verse",
+        "body": "Open the daily verse section to see today's verse. To get a reminder, turn on its notification in the notification settings and allow notifications for {{APP_NAME}} in your device settings."
+      },
+      "keywords": ["daily verse", "verse of the day", "today's verse", "daily reminder", "morning verse"],
+      "actions": [
+        { "type": "app_route", "label": "Open Daily Verse", "target": "daily_verse" },
+        { "type": "app_route", "label": "Notification Settings", "target": "notification_settings" }
+      ]
+    },
+    {
+      "id": "reading_plans",
+      "category_id": "using_app",
+      "subcategory_id": "daily_features",
+      "order": 2,
+      "requires_feature": ["reading_plans"],
+      "question": "How do reading plans work?",
+      "preview": "Follow a plan day by day.",
+      "answer": {
+        "title": "Reading Plans",
+        "steps": [
+          "Open Reading Plans and choose a plan.", "Start the plan and open each day's reading.",
+          "Mark a day complete to track your progress.",
+          "To stop a plan, open it and choose the option to leave or reset it."
+        ]
+      },
+      "keywords": [
+        "reading plan", "plans", "plan progress", "start plan", "stop plan", "daily reading",
+        "bible in a year"
+      ],
+      "actions": [
+        { "type": "app_route", "label": "Open Reading Plans", "target": "reading_plans" }
+      ]
+    },
+    {
+      "id": "add_widget",
+      "category_id": "using_app",
+      "subcategory_id": "daily_features",
+      "order": 3,
+      "requires_feature": ["widgets"],
+      "question": "How do I add the widget to my home screen?",
+      "preview": "Show a verse on your home screen.",
+      "answer": { "title": "Add a Widget", "body": "Widgets are added from your device home screen, not from inside the app." },
+      "platform_overrides": {
+        "ios": {
+          "steps": [
+            "Touch and hold an empty area of your home screen until the icons move.",
+            "Tap the plus button at the top.",
+            "Search for {{APP_NAME}}, choose a widget size and tap Add Widget."
+          ]
+        },
+        "android": {
+          "steps": [
+            "Touch and hold an empty area of your home screen.", "Tap Widgets.",
+            "Find {{APP_NAME}}, then drag the widget you want onto your home screen."
+          ]
+        }
+      },
+      "keywords": ["widget", "home screen", "add widget", "lock screen widget", "verse widget"]
+    },
+    {
+      "id": "wallpapers",
+      "category_id": "using_app",
+      "subcategory_id": "daily_features",
+      "order": 4,
+      "requires_feature": ["wallpapers"],
+      "question": "How do I use or save a verse wallpaper?",
+      "preview": "Save a verse design to your phone.",
+      "answer": {
+        "title": "Verse Wallpapers",
+        "body": "Open Wallpapers, choose a design, and save or share it. If saving does not work, allow {{APP_NAME}} to access your photos in device settings."
+      },
+      "keywords": ["wallpaper", "verse wallpaper", "save wallpaper", "background image", "phone wallpaper"],
+      "actions": [
+        { "type": "app_route", "label": "Open Wallpapers", "target": "wallpapers" }
+      ]
+    },
+    {
+      "id": "streaks",
+      "category_id": "using_app",
+      "subcategory_id": "daily_features",
+      "order": 5,
+      "requires_feature": ["streaks"],
+      "question": "How do streaks work, and why did mine reset?",
+      "preview": "Understand how your streak is counted.",
+      "answer": {
+        "title": "Reading Streaks",
+        "body": "A streak counts consecutive days on which you complete the activity shown on the streak screen. If your streak reset, check that the activity was completed that day, and that your device date and time are set to update automatically.",
+        "append_if_feature": [
+          { "feature": "offline_daily_content", "text": "You can complete your daily streak without internet." }
+        ]
+      },
+      "keywords": ["streak", "streak reset", "lost streak", "daily streak", "streak not counting", "reading streak"],
+      "actions": [
+        { "type": "app_route", "label": "Open Streaks", "target": "streaks" },
+        { "type": "support_form", "label": "Report a Problem", "target": "report_problem", "prefill_type": "other" }
+      ],
+      "related_faq_ids": ["daily_streak_offline", "daily_verse"]
+    },
+    {
+      "id": "daily_streak_offline",
+      "category_id": "using_app",
+      "subcategory_id": "daily_features",
+      "order": 6,
+      "popular_rank": 6,
+      "requires_feature": ["streaks", "offline_daily_content"],
+      "question": "Can I complete my daily streak without internet?",
+      "preview": "Your streak works offline.",
+      "answer": {
+        "title": "Daily Streak Offline",
+        "body": "Yes. The daily verse, prayer and devotion for your connection level, and your daily streak, work without an internet connection. They are free. Keep your device date and time set to update automatically so your streak is counted correctly.",
+        "append_if_feature": [
+          { "feature": "credits", "text": "They do not use credits." },
+          { "feature": "premium", "text": "They do not need Premium." }
+        ]
+      },
+      "keywords": [
+        "streak offline", "streak without internet", "complete streak offline", "offline streak",
+        "daily streak offline", "streak no internet"
+      ],
+      "actions": [
+        { "type": "app_route", "label": "Open Streaks", "target": "streaks" }
+      ],
+      "related_faq_ids": ["streaks", "daily_content_free", "offline_usage"]
+    },
+    {
+      "id": "daily_content_free",
+      "category_id": "using_app",
+      "subcategory_id": "daily_features",
+      "order": 7,
+      "requires_feature": ["offline_daily_content"],
+      "question": "Is the daily verse, prayer and devotion free?",
+      "preview": "What the daily content costs.",
+      "answer": {
+        "title": "Daily Content Is Free",
+        "body": "Yes. The daily verse, prayer and devotion for your connection level are free, and they work offline.",
+        "append_if_feature": [
+          { "feature": "credits", "text": "They do not use credits." },
+          { "feature": "premium", "text": "No Premium is needed." },
+          { "feature": "ai_length_credits", "text": "They are not AI answers, so there is no AI charge." }
+        ]
+      },
+      "keywords": [
+        "daily content free", "is daily verse free", "free daily devotion", "daily prayer free",
+        "free daily prayer", "daily devotion cost", "connection level"
+      ],
+      "related_faq_ids": ["daily_streak_offline", "daily_verse"]
+    },
+    {
+      "id": "create_prayer",
+      "category_id": "using_app",
+      "subcategory_id": "prayer",
+      "order": 1,
+      "popular_rank": 7,
+      "requires_feature": ["prayer", "ai_prayer"],
+      "question": "How do I create a prayer?",
+      "preview": "Create a prayer for what is on your heart.",
+      "answer": {
+        "title": "Create a Prayer",
+        "steps": [
+          "Open the Prayer section.", "Tell us what you would like to pray about.",
+          "Choose the prayer length you want.", "Confirm to create your prayer."
+        ],
+        "append_if_feature": [
+          { "feature": "ai_length_credits", "text": "Longer prayers use more credits, and the cost for each length is shown before you confirm." }
+        ]
+      },
+      "keywords": [
+        "create prayer", "write prayer", "ai prayer", "generate prayer", "prayer length", "make a prayer",
+        "personal prayer"
+      ],
+      "actions": [
+        { "type": "app_route", "label": "Open Prayer", "target": "prayer" }
+      ],
+      "related_faq_ids": ["ai_answer_length", "prayer_wall_about", "ai_not_responding"]
+    },
+    {
+      "id": "prayer_wall_about",
+      "category_id": "using_app",
+      "subcategory_id": "prayer",
+      "order": 2,
+      "popular_rank": 8,
+      "requires_feature": ["prayer_wall"],
+      "question": "What is the Prayer Wall?",
+      "preview": "Share requests and pray with others.",
+      "answer": {
+        "title": "The Prayer Wall",
+        "body": "The Prayer Wall is a shared space where {{APP_NAME}} users can post prayer requests and read requests from others. Posts can be seen by other users, so please do not include personal details."
+      },
+      "keywords": [
+        "prayer wall", "what is prayer wall", "community prayer", "prayer requests", "other users prayers",
+        "prayer wall posts"
+      ],
+      "actions": [
+        { "type": "app_route", "label": "Open Prayer Wall", "target": "prayer_wall" }
+      ],
+      "related_faq_ids": ["post_prayer_request", "report_prayer_post", "delete_prayer_post"]
+    },
+    {
+      "id": "post_prayer_request",
+      "category_id": "using_app",
+      "subcategory_id": "prayer",
+      "order": 3,
+      "requires_feature": ["prayer_wall"],
+      "question": "How do I post a prayer request?",
+      "preview": "Add a request to the Prayer Wall.",
+      "answer": {
+        "title": "Post a Prayer Request",
+        "steps": [
+          "Open the Prayer Wall.", "Choose to add a new prayer request.",
+          "Write your request. Do not include private details such as your full name, phone number, address or other personal information.",
+          "Post it."
+        ]
+      },
+      "keywords": [
+        "post prayer", "add prayer request", "write on prayer wall", "submit prayer request",
+        "post on prayer wall", "new prayer request"
+      ],
+      "actions": [
+        { "type": "app_route", "label": "Open Prayer Wall", "target": "prayer_wall" }
+      ],
+      "related_faq_ids": ["prayer_wall_about", "delete_prayer_post", "prayer_post_not_showing"]
+    },
+    {
+      "id": "delete_prayer_post",
+      "category_id": "using_app",
+      "subcategory_id": "prayer",
+      "order": 4,
+      "requires_feature": ["prayer_wall"],
+      "question": "How do I remove my prayer request?",
+      "preview": "Take down a request you posted.",
+      "answer": {
+        "title": "Remove a Prayer Request",
+        "steps": [
+          "Open the Prayer Wall and find your request.", "Open its options and choose Delete.",
+          "If you cannot remove it, contact App Support and tell us which request it is."
+        ]
+      },
+      "keywords": [
+        "delete prayer", "remove prayer request", "delete my post", "remove my post", "take down prayer",
+        "delete prayer post"
+      ],
+      "actions": [
+        { "type": "support_chat", "label": "Talk to a Person", "target": "human_handoff" }
+      ],
+      "related_faq_ids": ["post_prayer_request", "report_prayer_post", "block_prayer_user"],
+      "escalation": { "offer_human": true }
+    },
+    {
+      "id": "report_prayer_post",
+      "category_id": "using_app",
+      "subcategory_id": "prayer",
+      "order": 5,
+      "requires_feature": ["prayer_wall", "generated_or_shared_content"],
+      "question": "How do I report a Prayer Wall post?",
+      "preview": "Report a post that concerns you.",
+      "answer": {
+        "title": "Report a Prayer Wall Post",
+        "steps": [
+          "Open the post you are concerned about.", "Open its options and choose Report.",
+          "If you cannot report it that way, use Report a Problem below and tell us which post it is."
+        ],
+        "body": "If you believe someone is in immediate danger, please contact your local emergency services."
+      },
+      "keywords": [
+        "report prayer post", "offensive prayer", "inappropriate prayer post", "report wall post",
+        "abusive prayer", "hide prayer post"
+      ],
+      "actions": [
+        { "type": "support_form", "label": "Report This Problem", "target": "report_problem", "prefill_type": "inappropriate_content" }
+      ],
+      "related_faq_ids": ["block_prayer_user", "prayer_wall_about", "report_inappropriate_content"]
+    },
+    {
+      "id": "block_prayer_user",
+      "category_id": "using_app",
+      "subcategory_id": "prayer",
+      "order": 6,
+      "requires_feature": ["prayer_wall", "block_users"],
+      "question": "How do I block someone on the Prayer Wall?",
+      "preview": "Stop seeing a person's posts.",
+      "answer": {
+        "title": "Block a Person",
+        "steps": [
+          "Open a post or profile from the person you want to block.", "Open its options and choose Block.",
+          "Confirm that you want to block them."
+        ],
+        "body": "Blocking works both ways. You will not see their posts or profile, and they will not see yours."
+      },
+      "keywords": [
+        "block user", "block person", "block on prayer wall", "blocked user", "stop seeing posts",
+        "block profile"
+      ],
+      "actions": [
+        { "type": "support_form", "label": "Report This Problem", "target": "report_problem", "prefill_type": "inappropriate_content" }
+      ],
+      "related_faq_ids": ["report_prayer_post", "prayer_wall_about"]
+    },
+    {
+      "id": "verse_explanation_how",
+      "category_id": "using_app",
+      "subcategory_id": "ai_usage",
+      "order": 1,
+      "requires_feature": ["verse_explanation"],
+      "question": "How do I get an AI explanation of a verse?",
+      "preview": "Understand a verse with AI.",
+      "answer": {
+        "title": "Verse Explanation",
+        "steps": [
+          "Open the verse you want to understand.", "Select the verse and choose the explanation option.",
+          "Make sure you have an internet connection, because explanations are created online.",
+          "Wait for the explanation to appear."
+        ],
+        "append_if_feature": [
+          {
+            "feature": "ai_length_credits",
+            "text": "Before you confirm, choose how long you want the explanation to be. The credit cost for that length is shown first."
+          },
+          { "feature": "daily_ai_allowance", "text": "Your free daily use of this feature is shown on the screen." }
+        ]
+      },
+      "keywords": [
+        "verse explanation", "explain verse", "explain this verse", "verse meaning", "ai explanation",
+        "understand verse", "what does this verse mean"
+      ],
+      "related_faq_ids": ["chapter_summary_how", "ai_credit_cost", "ai_not_responding"]
+    },
+    {
+      "id": "chapter_summary_how",
+      "category_id": "using_app",
+      "subcategory_id": "ai_usage",
+      "order": 2,
+      "requires_feature": ["chapter_summary"],
+      "question": "How do I get an AI summary of a chapter?",
+      "preview": "Get the main points of a chapter.",
+      "answer": {
+        "title": "Chapter Summary",
+        "steps": [
+          "Open the chapter you want summarized.", "Choose the summary option.",
+          "Make sure you have an internet connection, because summaries are created online.",
+          "Wait for the summary to appear."
+        ],
+        "append_if_feature": [
+          {
+            "feature": "ai_length_credits",
+            "text": "Before you confirm, choose how long you want the summary to be. The credit cost for that length is shown first."
+          },
+          { "feature": "daily_ai_allowance", "text": "Your free daily use of this feature is shown on the screen." }
+        ]
+      },
+      "keywords": [
+        "chapter summary", "summarize chapter", "summary of chapter", "ai summary", "chapter overview",
+        "summarise chapter"
+      ],
+      "related_faq_ids": ["verse_explanation_how", "ai_credit_cost", "ai_not_responding"]
+    },
+    {
+      "id": "ai_chat_how",
+      "category_id": "using_app",
+      "subcategory_id": "ai_usage",
+      "order": 3,
+      "requires_feature": ["ai_chat"],
+      "question": "How do I ask the Bible Assistant a question?",
+      "preview": "Chat with the Bible Assistant.",
+      "answer": {
+        "title": "Bible Assistant Chat",
+        "steps": ["Open the Bible Assistant.", "Type your question.", "Send it and wait for the answer."],
+        "body": "App Support is separate from the Bible Assistant. Support can help with using the app, but Bible questions are answered in the Bible Assistant.",
+        "append_if_feature": [
+          {
+            "feature": "ai_length_credits",
+            "text": "Choose your answer length before you send. Each message uses credits based on that length, and the cost is shown first."
+          },
+          { "feature": "daily_ai_allowance", "text": "Your free daily chats are shown on the screen." }
+        ]
+      },
+      "keywords": [
+        "bible assistant", "ask bible question", "ai chat", "chat with ai", "ask ai", "how to chat",
+        "bible chat"
+      ],
+      "actions": [
+        { "type": "app_route", "label": "Open Bible Assistant", "target": "bible_assistant" }
+      ],
+      "related_faq_ids": ["ai_credit_cost", "ai_answer_length", "ai_not_responding"]
+    },
+    {
+      "id": "ai_credit_cost",
+      "category_id": "using_app",
+      "subcategory_id": "ai_usage",
+      "order": 4,
+      "popular_rank": 4,
+      "requires_feature": ["ai_length_credits", "credits"],
+      "question": "How many credits does an AI answer use?",
+      "preview": "How answer length affects the cost.",
+      "answer": {
+        "title": "Credits for AI Answers",
+        "body": "Each AI answer uses credits, and the amount depends on the answer length you choose. The cost for each length is shown before you confirm. This applies to every AI feature in the app that lets you choose a length."
+      },
+      "keywords": [
+        "credits per answer", "how many credits", "ai cost", "ai credit cost", "credit cost",
+        "cost of ai answer", "answer cost", "how much credits"
+      ],
+      "actions": [
+        { "type": "app_route", "label": "Open Wallet", "target": "wallet" }
+      ],
+      "related_faq_ids": ["ai_answer_length", "ai_no_free_use", "earn_free_credits"]
+    },
+    {
+      "id": "ai_answer_length",
+      "category_id": "using_app",
+      "subcategory_id": "ai_usage",
+      "order": 5,
+      "requires_feature": ["ai_length_credits", "credits"],
+      "question": "What do short, medium and long answers mean?",
+      "preview": "Choose the answer length that suits you.",
+      "answer": {
+        "title": "Answer Length",
+        "body": "A short answer is brief, a medium answer gives more detail, and a long answer is the most detailed. Longer answers use more credits. Choose the length before you confirm, and the cost is shown first."
+      },
+      "keywords": [
+        "answer length", "short answer", "medium answer", "long answer", "choose length",
+        "change answer length", "detailed answer", "short medium long"
+      ],
+      "related_faq_ids": ["ai_credit_cost", "ai_no_free_use"]
+    },
+    {
+      "id": "ai_no_free_use",
+      "category_id": "using_app",
+      "subcategory_id": "ai_usage",
+      "order": 6,
+      "requires_feature": ["ai_length_credits"],
+      "excludes_feature": ["daily_ai_allowance"],
+      "question": "Is any AI use free?",
+      "preview": "Why AI uses credits from the start.",
+      "answer": {
+        "title": "Is AI Free?",
+        "body": "AI answers in {{APP_NAME}} use credits from the very first one, based on the answer length you choose. There is no free daily AI allowance in this app.",
+        "append_if_feature": [
+          { "feature": "free_credit_timer", "text": "You can collect free credits in the Wallet and use them for AI answers." },
+          { "feature": "rewarded_ads", "text": "You can also earn credits by watching an ad when one is offered." },
+          {
+            "feature": "offline_daily_content",
+            "text": "Your daily verse, prayer and devotion, and your daily streak, do not use credits and are free."
+          }
+        ]
+      },
+      "keywords": [
+        "is ai free", "free ai", "ai free", "charged first message", "first message charged",
+        "why charge for ai", "ai not free", "pay for ai"
+      ],
+      "actions": [
+        { "type": "app_route", "label": "Open Wallet", "target": "wallet" }
+      ],
+      "related_faq_ids": ["ai_credit_cost", "earn_free_credits", "buy_credits"]
+    },
+    {
+      "id": "daily_ai_allowance",
+      "category_id": "using_app",
+      "subcategory_id": "ai_usage",
+      "order": 7,
+      "question": "What is the free daily AI allowance?",
+      "preview": "How free AI use works.",
+      "answer": {
+        "title": "Free Daily AI Allowance",
+        "body": "AI features in {{APP_NAME}} include a free allowance each day. When the free allowance for a feature has been used, the app shows your options."
+      },
+      "keywords": [
+        "free ai", "daily ai", "ai allowance", "free ai usage", "free daily ai", "ai free limit",
+        "how many ai free"
+      ],
+      "related_faq_ids": ["ai_limit_reached", "how_credits_work"],
+      "requires_feature": ["daily_ai_allowance"]
+    },
+    {
+      "id": "ai_limit_reached",
+      "category_id": "using_app",
+      "subcategory_id": "ai_usage",
+      "order": 8,
+      "question": "I've used my free AI allowance. What can I do?",
+      "preview": "Your options once the free allowance is used.",
+      "answer": {
+        "title": "Free Allowance Used",
+        "body": "You can wait for the free allowance to renew the next day.",
+        "append_if_feature": [
+          { "feature": "credits", "text": "You can also use credits. Open the Wallet to see your balance and how to get more." },
+          { "feature": "unlimited_ai", "text": "Or choose an unlimited plan, if one is available. The Premium screen shows it." }
+        ]
+      },
+      "keywords": [
+        "ai limit reached", "used free ai", "free ai finished", "ai locked", "cannot use ai",
+        "ai daily limit over"
+      ],
+      "actions": [
+        { "type": "app_route", "label": "Open Wallet", "target": "wallet" },
+        { "type": "app_route", "label": "View Premium", "target": "premium" }
+      ],
+      "related_faq_ids": ["how_credits_work", "earn_free_credits", "unlimited_ai_plan"],
+      "requires_feature": ["daily_ai_allowance"]
+    },
+    {
+      "id": "ai_credits_per_message",
+      "category_id": "using_app",
+      "subcategory_id": "ai_usage",
+      "order": 9,
+      "requires_feature": ["ai_chat", "credits", "daily_ai_allowance"],
+      "question": "Why does AI chat ask for credits?",
+      "preview": "How AI chat uses credits.",
+      "answer": {
+        "title": "Credits for AI Chat",
+        "body": "After the free daily allowance for AI chat has been used, each message uses credits. The cost is shown before you send.",
+        "append_if_feature": [
+          { "feature": "unlimited_ai", "text": "If your plan includes unlimited AI chat, messages do not use credits." }
+        ]
+      },
+      "keywords": [
+        "credits per message", "ai chat credits", "why credits for chat", "chat costs credits",
+        "credits for message"
+      ],
+      "actions": [
+        { "type": "app_route", "label": "Open Wallet", "target": "wallet" }
+      ],
+      "related_faq_ids": ["ai_limit_reached", "how_credits_work"]
+    },
+    {
+      "id": "notifications_manage",
+      "category_id": "using_app",
+      "subcategory_id": "settings_account",
+      "order": 1,
+      "question": "How do I manage notifications?",
+      "preview": "Turn reminders on or off.",
+      "answer": {
+        "title": "Manage Notifications",
+        "body": "Open the notification settings in {{APP_NAME}} to choose which reminders you receive. You can also allow or block all notifications for the app in your device settings."
+      },
+      "keywords": [
+        "notification", "notifications", "reminder", "alerts", "turn off notifications",
+        "push notification", "stop notifications"
+      ],
+      "actions": [
+        { "type": "app_route", "label": "Notification Settings", "target": "notification_settings" },
+        { "type": "system_action", "label": "Device Notification Settings", "target": "device_notification_settings" }
+      ]
+    },
+    {
+      "id": "change_app_language",
+      "category_id": "using_app",
+      "subcategory_id": "settings_account",
+      "order": 2,
+      "requires_feature": ["in_app_language"],
+      "question": "How do I change the app language?",
+      "preview": "Change the language of menus and buttons.",
+      "answer": {
+        "title": "Change App Language",
+        "body": "Open the language settings and choose the language you want for menus and buttons. This changes the app interface only. The Bible version you read is chosen separately."
+      },
+      "keywords": ["change language", "app language", "language settings", "interface language", "menu language"],
+      "actions": [
+        { "type": "app_route", "label": "Language Settings", "target": "language_settings" }
+      ]
+    },
+    {
+      "id": "backup_restore",
+      "category_id": "using_app",
+      "subcategory_id": "settings_account",
+      "order": 3,
+      "requires_feature": ["backup_sync"],
+      "question": "How do I back up or restore my bookmarks and notes?",
+      "preview": "Keep your saved content safe.",
+      "answer": {
+        "title": "Back Up and Restore",
+        "steps": [
+          "Open the backup settings.", "Turn on backup or choose Back Up Now.",
+          "On a new device or after reinstalling, open the backup settings again and choose Restore."
+        ]
+      },
+      "keywords": ["backup", "back up", "restore data", "restore notes", "transfer data", "new phone"],
+      "actions": [
+        { "type": "app_route", "label": "Open Backup Settings", "target": "backup_settings" }
+      ]
+    },
+    {
+      "id": "move_to_new_device",
+      "category_id": "using_app",
+      "subcategory_id": "settings_account",
+      "order": 4,
+      "excludes_feature": ["backup_sync"],
+      "question": "How do I move my bookmarks and notes to a new phone?",
+      "preview": "What to expect when changing devices.",
+      "answer": {
+        "title": "Moving to a New Device",
+        "body": "Your saved content is stored on your device. It may be carried over if you restore your new device from your device backup, depending on your device backup settings.",
+        "append_if_feature": [
+          { "feature": "premium", "text": "Premium is linked to your {{STORE_NAME}} account, so on the new device use Restore Purchases." }
+        ]
+      },
+      "keywords": [
+        "new phone", "new device", "transfer data", "switch phone", "move bookmarks", "lost data",
+        "changed phone"
+      ],
+      "actions": [
+        { "type": "native_action", "label": "Restore Purchases", "target": "restore_purchase" }
+      ]
+    },
+    {
+      "id": "sign_in_help",
+      "category_id": "using_app",
+      "subcategory_id": "settings_account",
+      "order": 5,
+      "requires_feature": ["account"],
+      "question": "I can't sign in to my account.",
+      "preview": "Steps to regain access.",
+      "answer": {
+        "title": "Sign-in Problems",
+        "steps": [
+          "Check your internet connection.",
+          "Make sure you are using the same sign-in method you used to create the account.",
+          "Use the password reset option if you have one.",
+          "If you still cannot sign in, contact App Support. Never share your password with anyone."
+        ]
+      },
+      "keywords": [
+        "sign in", "login", "cannot login", "forgot password", "account locked", "log in problem",
+        "cannot sign in"
+      ],
+      "actions": [
+        { "type": "support_chat", "label": "Contact App Support", "target": "support_chat" }
+      ]
+    },
+    {
+      "id": "delete_account",
+      "category_id": "using_app",
+      "subcategory_id": "settings_account",
+      "order": 6,
+      "popular_rank": 18,
+      "requires_feature": ["account"],
+      "question": "How do I delete my account?",
+      "preview": "Remove your account and its data.",
+      "answer": {
+        "title": "Delete Your Account",
+        "steps": ["Open the account settings.", "Choose Delete Account and follow the prompts."],
+        "append_if_feature": [
+          {
+            "feature": "subscriptions",
+            "text": "Deleting your account does not cancel a subscription. Cancel any active subscription separately in {{STORE_NAME}}."
+          }
+        ]
+      },
+      "keywords": ["delete account", "remove account", "close account", "delete my data", "erase data", "deactivate"],
+      "actions": [
+        { "type": "app_route", "label": "Account Settings", "target": "account_settings" },
+        { "type": "system_action", "label": "Manage Subscription", "target": "subscription_management" },
+        { "type": "support_chat", "label": "Talk to a Person", "target": "human_handoff" }
+      ],
+      "escalation": { "offer_human": true }
+    },
+    {
+      "id": "local_data_removal",
+      "category_id": "using_app",
+      "subcategory_id": "settings_account",
+      "order": 7,
+      "excludes_feature": ["account"],
+      "question": "How do I delete my data?",
+      "preview": "Where your data is stored and how to remove it.",
+      "answer": {
+        "title": "Delete Your Data",
+        "body": "{{APP_NAME}} does not need an account, and your saved content is stored on your device. Deleting the app removes it from the device.",
+        "append_if_feature": [
+          { "feature": "subscriptions", "text": "Deleting the app does not cancel a subscription, so cancel it separately in {{STORE_NAME}}." }
+        ]
+      },
+      "keywords": ["delete my data", "erase data", "remove data", "delete app", "uninstall", "clear data"],
+      "actions": [
+        { "type": "system_action", "label": "Manage Subscription", "target": "subscription_management" },
+        { "type": "support_chat", "label": "Talk to a Person", "target": "human_handoff" }
+      ],
+      "escalation": { "offer_human": true }
+    },
+    {
+      "id": "data_privacy",
+      "category_id": "using_app",
+      "subcategory_id": "settings_account",
+      "order": 8,
+      "question": "How is my data used? Where is the privacy policy?",
+      "preview": "Read our privacy policy and terms.",
+      "answer": {
+        "title": "Privacy and Terms",
+        "body": "How {{APP_NAME}} handles your data is described in the privacy policy. The terms of use explain the rules for using the app."
+      },
+      "keywords": [
+        "privacy", "privacy policy", "terms", "terms of use", "my data", "data collection", "gdpr",
+        "permissions"
+      ],
+      "actions": [
+        { "type": "system_action", "label": "Privacy Policy", "target": "privacy_policy" },
+        { "type": "system_action", "label": "Terms of Use", "target": "terms_of_use" }
+      ]
+    },
+    {
+      "id": "app_update",
+      "category_id": "using_app",
+      "subcategory_id": "settings_account",
+      "order": 9,
+      "question": "How do I update the app?",
+      "preview": "Get the latest version of {{APP_NAME}}.",
+      "answer": {
+        "title": "Update the App",
+        "body": "Open {{STORE_NAME}}, find {{APP_NAME}}, and tap Update if an update is available. You can also turn on automatic updates in your device settings. Updating does not remove your saved content.",
+        "append_if_feature": [
+          {
+            "feature": "premium",
+            "text": "Premium stays linked to your {{STORE_NAME}} account. If it looks locked after updating, use Restore Purchases."
+          }
+        ]
+      },
+      "keywords": ["update", "latest version", "update app", "outdated", "upgrade app", "install update"],
+      "actions": [
+        { "type": "system_action", "label": "Check for Update", "target": "app_store_update" }
+      ]
+    },
+    {
+      "id": "contact_support",
+      "category_id": "using_app",
+      "subcategory_id": "settings_account",
+      "order": 10,
+      "question": "How do I contact App Support?",
+      "preview": "Reach our support assistant or team.",
+      "answer": {
+        "title": "Contact App Support",
+        "body": "Ask your question in App Support. Common questions are answered instantly, our support assistant helps with the rest, and a member of our team can step in if needed. You can also ask for a person at any time."
+      },
+      "keywords": [
+        "contact", "contact support", "email support", "speak to someone", "customer service", "help me",
+        "support team", "human"
+      ],
+      "actions": [
+        { "type": "support_chat", "label": "Ask App Support", "target": "support_chat" },
+        { "type": "support_chat", "label": "Talk to a Person", "target": "human_handoff" }
+      ]
+    },
+    {
+      "id": "why_ads",
+      "category_id": "using_app",
+      "subcategory_id": "settings_account",
+      "order": 11,
+      "requires_feature": ["ads"],
+      "question": "Why am I seeing ads?",
+      "preview": "About ads in {{APP_NAME}}.",
+      "answer": {
+        "title": "About Ads",
+        "body": "Some versions of {{APP_NAME}} show ads. Ad content is supplied by third-party ad networks. If you see an ad that is inappropriate, send us a problem report with a screenshot and we will look into it."
+      },
+      "keywords": ["ads", "advertisements", "why ads", "too many ads", "ad popup", "inappropriate ad", "ads annoying"],
+      "actions": [
+        { "type": "support_form", "label": "Report This Problem", "target": "report_problem", "prefill_type": "other" }
+      ]
+    },
+    {
+      "id": "remove_ads",
+      "category_id": "using_app",
+      "subcategory_id": "settings_account",
+      "order": 12,
+      "requires_feature": ["ads"],
+      "question": "How do I remove ads?",
+      "preview": "Find out whether ads can be removed.",
+      "answer": {
+        "title": "Remove Ads",
+        "body": "If {{APP_NAME}} offers a way to remove ads, it is shown inside the app.",
+        "append_if_feature": [
+          {
+            "feature": "premium",
+            "text": "Open the Premium screen to see whether removing ads is part of an option available to you. If you already bought an option that removes ads and still see ads, use Restore Purchases, then contact App Support."
+          }
+        ]
+      },
+      "keywords": [
+        "remove ads", "no ads", "ad free", "stop ads", "disable ads", "get rid of ads",
+        "ads after purchase", "still seeing ads"
+      ],
+      "actions": [
+        { "type": "app_route", "label": "View Premium", "target": "premium" },
+        { "type": "native_action", "label": "Restore Purchases", "target": "restore_purchase" },
+        { "type": "support_chat", "label": "Contact App Support", "target": "support_chat" }
+      ]
+    },
+    {
+      "id": "what_is_premium",
+      "category_id": "premium_billing",
+      "subcategory_id": "about_premium",
+      "order": 1,
+      "question": "What do I get with Premium?",
+      "preview": "See what's included before you upgrade.",
+      "answer": {
+        "title": "About Premium",
+        "body": "Premium unlocks extra features in {{APP_NAME}}. The Premium screen always shows what is currently included, the plans on offer, and the terms, before you confirm anything."
+      },
+      "keywords": [
+        "premium", "premium benefits", "premium features", "what is premium", "paid features",
+        "what do I get", "upgrade benefits"
+      ],
+      "actions": [
+        { "type": "app_route", "label": "View Premium", "target": "premium" }
+      ]
+    },
+    {
+      "id": "free_vs_premium",
+      "category_id": "premium_billing",
+      "subcategory_id": "about_premium",
+      "order": 2,
+      "question": "Which features are free and which need Premium?",
+      "preview": "How to tell what is locked.",
+      "answer": {
+        "title": "Free and Premium Features",
+        "body": "Features that need Premium are marked in the app. Tap a locked feature, or open the Premium screen, to see what is included. What is free and what is paid can change over time."
+      },
+      "keywords": ["free features", "locked", "what is free", "paid only", "free version", "limit", "unlock"],
+      "actions": [
+        { "type": "app_route", "label": "View Premium", "target": "premium" }
+      ]
+    },
+    {
+      "id": "premium_price",
+      "category_id": "premium_billing",
+      "subcategory_id": "about_premium",
+      "order": 3,
+      "question": "How much does Premium cost?",
+      "preview": "Check the price available to you.",
+      "answer": {
+        "title": "Premium Pricing",
+        "body": "Plans and prices are shown on the Premium screen before you purchase. Prices can differ by country, currency, plan and any current offer, and the final amount is always shown by {{STORE_NAME}} before you confirm."
+      },
+      "keywords": ["price", "cost", "premium price", "subscription price", "how much", "pricing", "expensive", "cheaper"],
+      "actions": [
+        { "type": "app_route", "label": "View Current Plans", "target": "premium" }
+      ]
+    },
+    {
+      "id": "subscription_vs_onetime",
+      "category_id": "premium_billing",
+      "subcategory_id": "about_premium",
+      "order": 4,
+      "question": "Is Premium a subscription or a one-time purchase?",
+      "preview": "Know what you are buying.",
+      "answer": {
+        "title": "Subscription or One-Time",
+        "body": "The Premium screen shows each option and whether it renews or is a one-time purchase, along with its length, before you confirm. Read these details carefully before you buy."
+      },
+      "keywords": [
+        "subscription or one time", "lifetime", "one time purchase", "renew", "monthly", "yearly", "annual",
+        "recurring"
+      ],
+      "actions": [
+        { "type": "app_route", "label": "View Current Plans", "target": "premium" }
+      ]
+    },
+    {
+      "id": "free_trial",
+      "category_id": "premium_billing",
+      "subcategory_id": "about_premium",
+      "order": 5,
+      "requires_feature": ["free_trial"],
+      "question": "How does the free trial work?",
+      "preview": "Understand your trial before you start.",
+      "answer": {
+        "title": "About the Free Trial",
+        "body": "When a free trial is offered, its length, the price after the trial, and the renewal terms are shown before you confirm. To avoid being charged, cancel before the trial ends in your {{STORE_NAME}} subscription settings."
+      },
+      "keywords": ["free trial", "trial", "trial period", "trial subscription", "try premium", "cancel trial"],
+      "actions": [
+        { "type": "system_action", "label": "Manage Subscription", "target": "subscription_management" }
+      ]
+    },
+    {
+      "id": "unlimited_ai_plan",
+      "category_id": "premium_billing",
+      "subcategory_id": "about_premium",
+      "order": 6,
+      "requires_feature": ["unlimited_ai"],
+      "question": "What does unlimited AI mean on my plan?",
+      "preview": "Understand the AI access included in a plan.",
+      "answer": {
+        "title": "Unlimited AI",
+        "body": "If your plan includes unlimited use of specific AI features, the Premium screen lists exactly which ones.",
+        "append_if_feature": [
+          { "feature": "subscriptions", "text": "Auto-renewing plans can be managed or cancelled in your {{STORE_NAME}} subscription settings." }
+        ]
+      },
+      "keywords": [
+        "unlimited ai", "unlimited chat", "ai subscription", "unlimited plan", "no ai limit",
+        "unlimited questions"
+      ],
+      "actions": [
+        { "type": "app_route", "label": "View Premium", "target": "premium" }
+      ],
+      "related_faq_ids": ["ai_limit_reached", "cancel_subscription"]
+    },
+    {
+      "id": "upgrade_premium",
+      "category_id": "premium_billing",
+      "subcategory_id": "purchase_premium",
+      "order": 1,
+      "question": "How do I upgrade to Premium?",
+      "preview": "Steps to purchase.",
+      "answer": {
+        "title": "Upgrade to Premium",
+        "steps": [
+          "Open the Premium screen.", "Choose the plan you want and review its terms.",
+          "Confirm the purchase with {{STORE_NAME}}.",
+          "If Premium does not unlock straight away, use Restore Purchases."
+        ]
+      },
+      "keywords": ["upgrade", "buy premium", "purchase premium", "subscribe", "get premium", "go premium", "how to buy"],
+      "actions": [
+        { "type": "app_route", "label": "View Premium", "target": "premium" },
+        { "type": "native_action", "label": "Restore Purchases", "target": "restore_purchase" }
+      ]
+    },
+    {
+      "id": "premium_multiple_devices",
+      "category_id": "premium_billing",
+      "subcategory_id": "purchase_premium",
+      "order": 2,
+      "question": "Can I use Premium on more than one device?",
+      "preview": "How Premium follows your account.",
+      "answer": {
+        "title": "Premium on Other Devices",
+        "body": "Premium is linked to the {{STORE_NAME}} account that made the purchase, not to a single device. On another device signed in to the same account, install {{APP_NAME}} and use Restore Purchases."
+      },
+      "keywords": [
+        "multiple devices", "another device", "ipad", "second phone", "same account", "use on two devices",
+        "tablet"
+      ],
+      "actions": [
+        { "type": "native_action", "label": "Restore Purchases", "target": "restore_purchase" }
+      ]
+    },
+    {
+      "id": "family_sharing",
+      "category_id": "premium_billing",
+      "subcategory_id": "purchase_premium",
+      "order": 3,
+      "question": "Can my family share my Premium?",
+      "preview": "Sharing Premium with family members.",
+      "answer": {
+        "title": "Sharing Premium",
+        "body": "Premium belongs to the {{STORE_NAME}} account that bought it. Whether family sharing applies depends on the purchase and on your store's family settings. The Premium screen and your store's family settings show what is available to you."
+      },
+      "keywords": [
+        "family sharing", "share premium", "family plan", "family members", "share subscription",
+        "give premium"
+      ],
+      "actions": [
+        { "type": "app_route", "label": "View Premium", "target": "premium" }
+      ]
+    },
+    {
+      "id": "restore_purchase",
+      "category_id": "premium_billing",
+      "subcategory_id": "restore_purchase",
+      "order": 1,
+      "popular_rank": 12,
+      "question": "How do I restore my purchase?",
+      "preview": "Get back a purchase you already made.",
+      "answer": {
+        "title": "Restore Your Purchase",
+        "steps": [
+          "Make sure your device is signed in to the {{STORE_NAME}} account used for the original purchase.",
+          "Connect to the internet.", "Tap Restore Purchases below, or on the purchase screen.",
+          "If your purchase is still missing, contact App Support."
+        ]
+      },
+      "media_key": "faq_restore_purchase",
+      "keywords": [
+        "restore", "restore purchase", "already purchased", "already paid", "premium missing", "reinstall",
+        "new phone premium", "lost premium"
+      ],
+      "actions": [
+        { "type": "native_action", "label": "Restore Purchases", "target": "restore_purchase" },
+        { "type": "support_chat", "label": "Contact App Support", "target": "support_chat" }
+      ],
+      "related_faq_ids": ["premium_not_active", "premium_multiple_devices"]
+    },
+    {
+      "id": "premium_not_active",
+      "category_id": "premium_billing",
+      "subcategory_id": "restore_purchase",
+      "order": 2,
+      "popular_rank": 20,
+      "question": "I paid, but Premium is still locked.",
+      "preview": "Unlock Premium after a successful payment.",
+      "answer": {
+        "title": "Premium Still Locked",
+        "steps": [
+          "Confirm you are signed in to the same {{STORE_NAME}} account that paid.", "Tap Restore Purchases.",
+          "Close and reopen {{APP_NAME}}.",
+          "If Premium is still locked, contact App Support and tell us what happened. Never send your password or full payment-card details."
+        ]
+      },
+      "keywords": [
+        "premium locked", "paid but locked", "paid already", "premium not working", "purchase not showing",
+        "charged but no premium", "not unlocked"
+      ],
+      "actions": [
+        { "type": "native_action", "label": "Restore Purchases", "target": "restore_purchase" },
+        { "type": "support_chat", "label": "Contact App Support", "target": "support_chat" }
+      ],
+      "escalation": { "offer_human": true },
+      "requires_feature": ["premium"],
+      "related_faq_ids": ["restore_purchase", "unrecognized_charge"]
+    },
+    {
+      "id": "cancel_subscription",
+      "category_id": "premium_billing",
+      "subcategory_id": "manage_subscription",
+      "order": 1,
+      "popular_rank": 13,
+      "question": "How do I cancel my subscription?",
+      "preview": "Stop your subscription from renewing.",
+      "answer": {
+        "title": "Cancel Your Subscription",
+        "body": "Subscriptions are managed in the {{STORE_NAME}} account that made the purchase, not inside {{APP_NAME}}. Deleting the app does not cancel a subscription. After you cancel, Premium normally stays active until the end of the period you already paid for.",
+        "steps": ["Open your device's subscription settings.", "Select {{APP_NAME}}.", "Choose Cancel and confirm."]
+      },
+      "platform_overrides": {
+        "ios": {
+          "steps": [
+            "Open the Settings app on your iPhone or iPad.",
+            "Tap your name at the top, then tap Subscriptions.", "Select {{APP_NAME}}.",
+            "Tap Cancel Subscription and confirm."
+          ]
+        },
+        "android": {
+          "steps": [
+            "Open the Google Play Store app.",
+            "Tap your profile picture, then Payments & subscriptions, then Subscriptions.",
+            "Select {{APP_NAME}}.", "Tap Cancel subscription and follow the prompts."
+          ]
+        }
+      },
+      "media_key": "faq_cancel_subscription",
+      "keywords": [
+        "cancel", "cancel subscription", "unsubscribe", "stop subscription", "stop renewal",
+        "cancel premium", "stop charging", "end subscription"
+      ],
+      "actions": [
+        { "type": "system_action", "label": "Open Subscription Settings", "target": "subscription_management" }
+      ],
+      "related_faq_ids": ["cancelled_still_active", "manage_subscription", "why_subscription_renewed"]
+    },
+    {
+      "id": "cancelled_still_active",
+      "category_id": "premium_billing",
+      "subcategory_id": "manage_subscription",
+      "order": 2,
+      "question": "I cancelled, but I still have Premium. Why?",
+      "preview": "What happens after you cancel.",
+      "answer": {
+        "title": "Cancelled but Still Active",
+        "body": "When you cancel, the subscription stops renewing but normally stays active until the end of the period you already paid for. Your {{STORE_NAME}} subscription details show the exact end date and whether it is cancelled."
+      },
+      "keywords": [
+        "cancelled but active", "still premium", "after cancel", "still subscribed", "cancel not working",
+        "still charged"
+      ],
+      "actions": [
+        { "type": "system_action", "label": "View Subscription", "target": "subscription_management" }
+      ]
+    },
+    {
+      "id": "manage_subscription",
+      "category_id": "premium_billing",
+      "subcategory_id": "manage_subscription",
+      "order": 3,
+      "question": "Where can I see or manage my subscription?",
+      "preview": "View your plan and renewal date.",
+      "answer": {
+        "title": "Manage Your Subscription",
+        "body": "Your plan, renewal date and controls are in your {{STORE_NAME}} subscription settings, under the account that made the purchase."
+      },
+      "keywords": [
+        "manage subscription", "subscription settings", "my subscription", "renewal date",
+        "subscription status", "billing date", "when renew"
+      ],
+      "actions": [
+        { "type": "system_action", "label": "Manage Subscription", "target": "subscription_management" }
+      ]
+    },
+    {
+      "id": "change_plan",
+      "category_id": "premium_billing",
+      "subcategory_id": "manage_subscription",
+      "order": 4,
+      "question": "How do I change my plan?",
+      "preview": "Switch to a different plan.",
+      "answer": {
+        "title": "Change Your Plan",
+        "body": "Open your {{STORE_NAME}} subscription settings, select {{APP_NAME}}, and look for the other available plans. Options and timing depend on what is offered to your account and on {{STORE_NAME}} rules."
+      },
+      "keywords": [
+        "change plan", "switch plan", "upgrade plan", "downgrade", "different plan", "monthly to yearly",
+        "yearly to monthly"
+      ],
+      "actions": [
+        { "type": "system_action", "label": "Manage Subscription", "target": "subscription_management" }
+      ]
+    },
+    {
+      "id": "why_subscription_renewed",
+      "category_id": "premium_billing",
+      "subcategory_id": "manage_subscription",
+      "order": 5,
+      "question": "Why did my subscription renew?",
+      "preview": "How automatic renewal works.",
+      "answer": {
+        "title": "Why It Renewed",
+        "body": "Subscriptions renew automatically at the end of each period unless they are cancelled before the renewal date. Some stores require cancelling at least a day before. Your {{STORE_NAME}} subscription details show the renewal date and whether auto-renew is on. If you did not mean to renew, you can request a refund from {{STORE_NAME}}."
+      },
+      "keywords": [
+        "subscription renewed", "why renewed", "auto renew", "automatic renewal", "renewed without",
+        "renewal charge", "turn off auto renew"
+      ],
+      "actions": [
+        { "type": "system_action", "label": "Manage Subscription", "target": "subscription_management" },
+        { "type": "system_action", "label": "Get Purchase Help", "target": "store_purchase_support" }
+      ]
+    },
+    {
+      "id": "refund",
+      "category_id": "premium_billing",
+      "subcategory_id": "refund_request",
+      "order": 1,
+      "question": "How do I request a refund?",
+      "preview": "Where to ask for your money back.",
+      "answer": {
+        "title": "Requesting a Refund",
+        "body": "Purchases are processed by {{STORE_NAME}}, and refunds are decided by {{STORE_NAME}} under its own policies. We cannot issue refunds ourselves, but we can point you to the right place."
+      },
+      "platform_overrides": {
+        "ios": {
+          "steps": [
+            "Open Get Purchase Help below and sign in with the Apple ID used for the purchase.",
+            "Choose the option to request a refund.",
+            "Select {{APP_NAME}} from your purchases, choose a reason and submit.",
+            "Apple reviews the request and decides the outcome."
+          ]
+        },
+        "android": {
+          "steps": [
+            "Open Google Play and find the order in your order history.",
+            "Look for the refund or report-a-problem option for that order.",
+            "If no option appears, use Google Play Help to ask about the order."
+          ]
+        }
+      },
+      "keywords": [
+        "refund", "money back", "refund purchase", "refund subscription", "accidental purchase",
+        "get refund", "return"
+      ],
+      "actions": [
+        { "type": "system_action", "label": "Get Purchase Help", "target": "store_purchase_support" },
+        { "type": "support_chat", "label": "Talk to a Person", "target": "human_handoff" }
+      ],
+      "escalation": { "offer_human": true },
+      "related_faq_ids": ["unrecognized_charge", "charged_twice"]
+    },
+    {
+      "id": "charged_after_trial",
+      "category_id": "premium_billing",
+      "subcategory_id": "refund_request",
+      "order": 2,
+      "requires_feature": ["free_trial"],
+      "question": "Why was I charged after my free trial?",
+      "preview": "Understand trial conversion.",
+      "answer": {
+        "title": "Charged After a Trial",
+        "body": "A free trial converts to a paid subscription unless it is cancelled before the trial ends, as explained when the trial started. Your {{STORE_NAME}} subscription details show the renewal date and status. If you want a refund, see how to request one."
+      },
+      "keywords": [
+        "charged after trial", "trial charged", "free trial payment", "trial ended charged",
+        "charged me after trial"
+      ],
+      "actions": [
+        { "type": "system_action", "label": "View Subscription", "target": "subscription_management" },
+        { "type": "system_action", "label": "Get Purchase Help", "target": "store_purchase_support" }
+      ],
+      "escalation": { "offer_human": true }
+    },
+    {
+      "id": "unrecognized_charge",
+      "category_id": "premium_billing",
+      "subcategory_id": "refund_request",
+      "order": 3,
+      "question": "I was charged unexpectedly, or I don't recognize a charge.",
+      "preview": "Find out what a charge is for.",
+      "answer": {
+        "title": "Unrecognized Charge",
+        "steps": [
+          "Check your {{STORE_NAME}} purchase history for the charge and the app it belongs to.",
+          "Check whether the purchase was made on another account or device that you or a family member use.",
+          "If the charge is from {{APP_NAME}} and you did not authorize it, contact App Support. If you think your account was used without permission, also contact {{STORE_NAME}} support."
+        ],
+        "append_if_feature": [
+          { "feature": "subscriptions", "text": "Also check your subscription settings for any active subscription you forgot about." }
+        ]
+      },
+      "keywords": [
+        "unknown charge", "unexpected charge", "unrecognized charge", "didn't buy", "unauthorized", "fraud",
+        "charged me", "wrong charge", "charged unexpectedly"
+      ],
+      "actions": [
+        { "type": "system_action", "label": "View Subscription", "target": "subscription_management" },
+        { "type": "system_action", "label": "Get Purchase Help", "target": "store_purchase_support" },
+        { "type": "support_chat", "label": "Talk to a Person", "target": "human_handoff" }
+      ],
+      "escalation": { "offer_human": true, "force_human_topic": "unauthorized_charge" }
+    },
+    {
+      "id": "charged_twice",
+      "category_id": "premium_billing",
+      "subcategory_id": "refund_request",
+      "order": 4,
+      "question": "I was charged more than once.",
+      "preview": "Check whether the charges are separate or duplicates.",
+      "answer": {
+        "title": "Charged More Than Once",
+        "steps": [
+          "Check your {{STORE_NAME}} purchase history to see each charge and what it was for.",
+          "Check whether you have more than one purchase, for example on different accounts or devices.",
+          "A temporary hold from your bank can look like a second charge and usually disappears by itself.",
+          "If two charges for the same purchase appear in your {{STORE_NAME}} history, request a refund for the duplicate from {{STORE_NAME}}, then contact App Support and tell us what happened. Never send your password or full payment-card details."
+        ]
+      },
+      "keywords": [
+        "charged twice", "double charged", "charged more than once", "duplicate charge", "two charges",
+        "billed twice", "charged again"
+      ],
+      "actions": [
+        { "type": "system_action", "label": "View Subscription", "target": "subscription_management" },
+        { "type": "system_action", "label": "Get Purchase Help", "target": "store_purchase_support" },
+        { "type": "support_chat", "label": "Talk to a Person", "target": "human_handoff" }
+      ],
+      "escalation": { "offer_human": true }
+    },
+    {
+      "id": "payment_failed",
+      "category_id": "premium_billing",
+      "subcategory_id": "payment_issues",
+      "order": 1,
+      "question": "Why did my payment fail?",
+      "preview": "Get help when a purchase won't complete.",
+      "answer": {
+        "title": "Payment Failed",
+        "body": "Payments are handled by {{STORE_NAME}}. Check your payment method and account details there, then try again. If it keeps failing, contact {{STORE_NAME}} payment support."
+      },
+      "keywords": [
+        "payment failed", "purchase failed", "cannot pay", "transaction failed", "card declined",
+        "payment error", "unable to purchase"
+      ],
+      "actions": [
+        { "type": "system_action", "label": "Get Purchase Help", "target": "store_purchase_support" }
+      ]
+    },
+    {
+      "id": "purchase_pending",
+      "category_id": "premium_billing",
+      "subcategory_id": "payment_issues",
+      "order": 2,
+      "question": "My purchase is pending or waiting for approval.",
+      "preview": "Why a purchase may not complete right away.",
+      "answer": {
+        "title": "Purchase Pending",
+        "body": "Some purchases wait for approval, for example when a family organizer must approve them, or for payment confirmation from your bank or carrier. Once it is approved, open {{APP_NAME}} and check again.",
+        "append_if_feature": [
+          { "feature": "premium", "text": "If Premium is still locked, use Restore Purchases." }
+        ]
+      },
+      "keywords": [
+        "pending", "purchase pending", "waiting approval", "ask to buy", "payment processing",
+        "not completed", "processing"
+      ],
+      "actions": [
+        { "type": "native_action", "label": "Restore Purchases", "target": "restore_purchase" }
+      ]
+    },
+    {
+      "id": "plans_not_loading",
+      "category_id": "premium_billing",
+      "subcategory_id": "payment_issues",
+      "order": 3,
+      "question": "The Premium plans won't load or aren't available.",
+      "preview": "Fix an empty or failing Premium screen.",
+      "answer": {
+        "title": "Plans Not Loading",
+        "steps": [
+          "Check your internet connection.", "Make sure you are signed in to {{STORE_NAME}} on your device.",
+          "Close and reopen {{APP_NAME}}, then try again.",
+          "If the plans still don't appear, report the problem and tell us your country."
+        ]
+      },
+      "keywords": [
+        "plans not loading", "premium screen blank", "no plans", "price not showing", "cannot see plans",
+        "purchase unavailable", "not available in my country"
+      ],
+      "actions": [
+        { "type": "app_route", "label": "View Premium", "target": "premium" },
+        { "type": "support_form", "label": "Report This Problem", "target": "report_problem", "prefill_type": "purchase" }
+      ],
+      "requires_feature": ["premium"]
+    },
+    {
+      "id": "how_credits_work",
+      "category_id": "premium_billing",
+      "subcategory_id": "credits",
+      "order": 1,
+      "requires_feature": ["credits"],
+      "question": "How do credits work?",
+      "preview": "Understand your wallet balance.",
+      "answer": {
+        "title": "How Credits Work",
+        "body": "Some features in {{APP_NAME}} use credits. Your Wallet screen shows your balance, what uses credits, and any ways to get more, before anything is spent.",
+        "append_if_feature": [
+          {
+            "feature": "ai_length_credits",
+            "text": "AI answers use credits based on the answer length you choose, and the cost is shown before you confirm."
+          }
+        ]
+      },
+      "keywords": ["credits", "wallet", "coins", "balance", "what are credits", "credit balance", "how credits work"],
+      "actions": [
+        { "type": "app_route", "label": "Open Wallet", "target": "wallet" }
+      ],
+      "related_faq_ids": ["earn_free_credits", "buy_credits", "ai_credit_cost", "quiz_lifelines"]
+    },
+    {
+      "id": "credits_missing",
+      "category_id": "premium_billing",
+      "subcategory_id": "credits",
+      "order": 2,
+      "requires_feature": ["credits"],
+      "question": "I bought credits but they didn't arrive.",
+      "preview": "Recover credits from a purchase.",
+      "answer": {
+        "title": "Credits Not Added",
+        "steps": [
+          "Close and reopen {{APP_NAME}} and check your Wallet balance again.",
+          "Check your {{STORE_NAME}} purchase history to confirm the purchase was completed and charged.",
+          "If you were charged and the credits are still missing, contact App Support and tell us the date and time of the purchase. Never send your password or full payment-card details."
+        ]
+      },
+      "keywords": [
+        "credits missing", "credits not added", "bought credits", "credits not received", "wallet empty",
+        "lost credits", "credits gone"
+      ],
+      "actions": [
+        { "type": "app_route", "label": "Open Wallet", "target": "wallet" },
+        { "type": "system_action", "label": "Get Purchase Help", "target": "store_purchase_support" },
+        { "type": "support_chat", "label": "Talk to a Person", "target": "human_handoff" }
+      ],
+      "escalation": { "offer_human": true },
+      "related_faq_ids": ["credits_after_reinstall", "how_credits_work"]
+    },
+    {
+      "id": "credits_terms",
+      "category_id": "premium_billing",
+      "subcategory_id": "credits",
+      "order": 3,
+      "requires_feature": ["credits"],
+      "question": "Do credits expire, and can they be refunded?",
+      "preview": "Where to find the credit rules.",
+      "answer": {
+        "title": "Credit Rules",
+        "body": "The rules for credits are shown on the Wallet screen and before you buy. Refunds for purchases are decided by {{STORE_NAME}} under its own policies."
+      },
+      "keywords": [
+        "credits expire", "credit expiry", "credits refund", "refund credits", "credits valid",
+        "credits terms"
+      ],
+      "actions": [
+        { "type": "app_route", "label": "Open Wallet", "target": "wallet" },
+        { "type": "system_action", "label": "Get Purchase Help", "target": "store_purchase_support" }
+      ]
+    },
+    {
+      "id": "earn_free_credits",
+      "category_id": "premium_billing",
+      "subcategory_id": "credits",
+      "order": 4,
+      "popular_rank": 5,
+      "requires_feature": ["free_credit_timer"],
+      "question": "How do I get free credits?",
+      "preview": "Collect credits for free.",
+      "answer": {
+        "title": "Free Credits",
+        "body": "Open the Wallet. When a free credit is ready, collect it there.",
+        "append_if_feature": [
+          { "feature": "rewarded_ads", "text": "You can also earn credits by watching an ad when one is offered." }
+        ]
+      },
+      "keywords": [
+        "free credits", "earn credits", "collect credits", "free coins", "timer credits",
+        "get credits free", "wallet free credit"
+      ],
+      "actions": [
+        { "type": "app_route", "label": "Open Wallet", "target": "wallet" }
+      ],
+      "related_faq_ids": ["rewarded_ad_credits", "buy_credits", "free_credit_not_ready", "ai_credit_cost"]
+    },
+    {
+      "id": "rewarded_ad_credits",
+      "category_id": "premium_billing",
+      "subcategory_id": "credits",
+      "order": 5,
+      "requires_feature": ["rewarded_ads"],
+      "question": "How do I earn credits by watching an ad?",
+      "preview": "Turn a short ad into credits.",
+      "answer": {
+        "title": "Earn Credits with an Ad",
+        "body": "In the Wallet, choose the option to watch an ad for credits when one is offered. Watch the ad until it finishes so your credits are added."
+      },
+      "keywords": [
+        "watch ad for credits", "ad credits", "rewarded ad", "earn by watching", "video ad credits",
+        "watch video credits"
+      ],
+      "actions": [
+        { "type": "app_route", "label": "Open Wallet", "target": "wallet" }
+      ],
+      "related_faq_ids": ["earn_free_credits", "rewarded_ad_problem"]
+    },
+    {
+      "id": "buy_credits",
+      "category_id": "premium_billing",
+      "subcategory_id": "credits",
+      "order": 6,
+      "requires_feature": ["credit_purchase"],
+      "question": "How do I buy credits?",
+      "preview": "Add credits to your Wallet.",
+      "answer": {
+        "title": "Buy Credits",
+        "steps": [
+          "Open the Wallet.", "Choose a credit pack. The price is shown before you confirm.",
+          "Confirm the purchase with {{STORE_NAME}}.", "Your credits are added once the purchase completes."
+        ]
+      },
+      "keywords": ["buy credits", "purchase credits", "credit pack", "credit price", "add credits", "top up credits"],
+      "actions": [
+        { "type": "app_route", "label": "Open Wallet", "target": "wallet" }
+      ],
+      "related_faq_ids": ["credits_missing", "how_credits_work"]
+    },
+    {
+      "id": "not_enough_credits",
+      "category_id": "premium_billing",
+      "subcategory_id": "credits",
+      "order": 7,
+      "question": "I don't have enough credits.",
+      "preview": "Ways to get more credits.",
+      "answer": {
+        "title": "Not Enough Credits",
+        "body": "Open the Wallet to see your options for getting more credits.",
+        "append_if_feature": [
+          { "feature": "free_credit_timer", "text": "Free credits can be collected from the Wallet when one is ready." },
+          { "feature": "rewarded_ads", "text": "You can also earn credits by watching an ad when one is offered." },
+          { "feature": "credit_purchase", "text": "Credit packs can be bought in the Wallet, and the price is shown before you confirm." }
+        ]
+      },
+      "keywords": [
+        "not enough credits", "insufficient credits", "out of credits", "no credits left",
+        "need more credits", "credits finished"
+      ],
+      "actions": [
+        { "type": "app_route", "label": "Open Wallet", "target": "wallet" }
+      ],
+      "related_faq_ids": ["earn_free_credits", "buy_credits", "how_credits_work", "ai_credit_cost"]
+    },
+    {
+      "id": "credits_after_reinstall",
+      "category_id": "premium_billing",
+      "subcategory_id": "credits",
+      "order": 8,
+      "question": "My credits are missing after reinstalling or changing phones.",
+      "preview": "Get help with missing credits.",
+      "answer": {
+        "title": "Credits After Reinstalling",
+        "body": "Credits may not carry over automatically after a reinstall or on a new device. Contact App Support, tell us what happened and roughly when you last used your credits, and we will check what can be done.",
+        "append_if_feature": [
+          { "feature": "backup_sync", "text": "If your app has backup or sign-in, restore it first." }
+        ]
+      },
+      "keywords": [
+        "credits lost reinstall", "credits gone new phone", "credits reset", "wallet empty after reinstall",
+        "lost wallet", "credits missing after update"
+      ],
+      "actions": [
+        { "type": "support_chat", "label": "Talk to a Person", "target": "human_handoff" }
+      ],
+      "related_faq_ids": ["credits_missing", "how_credits_work"],
+      "escalation": { "offer_human": true }
+    },
+    {
+      "id": "manage_where_bought",
+      "category_id": "premium_billing",
+      "subcategory_id": "platform_help",
+      "order": 1,
+      "question": "Where do I manage a subscription I bought on iPhone or Android?",
+      "preview": "Subscriptions live in the store you bought from.",
+      "answer": {
+        "title": "Manage It Where You Bought It",
+        "body": "A subscription is managed in the store that billed it. A subscription bought through the Apple App Store is managed in your Apple account's subscription settings. A subscription bought through Google Play is managed in Google Play. {{APP_NAME}} cannot change or cancel it for you."
+      },
+      "keywords": [
+        "iphone subscription", "android subscription", "apple subscription", "google play subscription",
+        "where bought", "which store", "wrong store"
+      ],
+      "actions": [
+        { "type": "system_action", "label": "Open Subscription Settings", "target": "subscription_management" }
+      ],
+      "requires_feature": ["subscriptions"]
+    },
+    {
+      "id": "premium_other_platform",
+      "category_id": "premium_billing",
+      "subcategory_id": "platform_help",
+      "order": 2,
+      "requires_feature": ["multi_platform", "premium"],
+      "question": "I bought on one platform. Can I use Premium on another?",
+      "preview": "Moving between iPhone and Android.",
+      "answer": {
+        "title": "Premium on a Different Platform",
+        "body": "Purchases are linked to the store account that made them, and a purchase on one store does not automatically carry over to another. If you have switched platforms, contact App Support and tell us what you bought and where."
+      },
+      "keywords": [
+        "switch to android", "switch to iphone", "other platform", "cross platform", "premium on android",
+        "premium on iphone", "changed phone type", "bought on iphone use on android",
+        "bought on android use on iphone"
+      ],
+      "actions": [
+        { "type": "support_chat", "label": "Talk to a Person", "target": "human_handoff" }
+      ],
+      "escalation": { "offer_human": true }
+    },
+    {
+      "id": "app_crashes",
+      "category_id": "report_problem",
+      "subcategory_id": "app_crash",
+      "order": 1,
+      "popular_rank": 15,
+      "question": "The app is crashing or won't open.",
+      "preview": "Quick fixes for crashes and launch problems.",
+      "answer": {
+        "title": "App Crashes or Won't Open",
+        "steps": [
+          "Close {{APP_NAME}} completely and open it again.",
+          "Update the app to the latest version in {{STORE_NAME}}.",
+          "Make sure your device has enough free storage and is not in a very low battery state.",
+          "Restart your device and try again.",
+          "If it still crashes, send us a problem report and tell us what you were doing when it happened."
+        ]
+      },
+      "keywords": [
+        "crash", "crashing", "app closes", "won't open", "not opening", "keeps closing", "force close",
+        "stuck on launch", "white screen", "black screen"
+      ],
+      "actions": [
+        { "type": "system_action", "label": "Check for Update", "target": "app_store_update" },
+        { "type": "support_form", "label": "Report This Problem", "target": "report_problem", "prefill_type": "app_crash" }
+      ],
+      "related_faq_ids": ["app_update", "app_slow"]
+    },
+    {
+      "id": "audio_not_playing",
+      "category_id": "report_problem",
+      "subcategory_id": "audio",
+      "order": 1,
+      "popular_rank": 19,
+      "requires_feature": ["audio"],
+      "question": "Why isn't Bible audio playing?",
+      "preview": "Quick steps to restore audio.",
+      "answer": {
+        "title": "Audio Isn't Playing",
+        "steps": [
+          "Check your device volume, and that silent mode or Bluetooth is not blocking the sound.",
+          "Check your internet connection, because audio may stream online.",
+          "Pause and restart the audio, then try another chapter.", "Close and reopen the app.",
+          "If it still doesn't work, report the problem and tell us the book and chapter."
+        ]
+      },
+      "keywords": [
+        "audio not playing", "no audio", "no sound", "audio problem", "audio broken", "cannot hear",
+        "audio won't play"
+      ],
+      "actions": [
+        { "type": "support_form", "label": "Report Audio Problem", "target": "report_problem", "prefill_type": "audio" }
+      ],
+      "related_faq_ids": ["audio_stops", "audio_download"]
+    },
+    {
+      "id": "audio_stops",
+      "category_id": "report_problem",
+      "subcategory_id": "audio",
+      "order": 2,
+      "requires_feature": ["audio"],
+      "question": "Why does Bible audio keep stopping?",
+      "preview": "Troubleshoot interrupted audio.",
+      "answer": {
+        "title": "Audio Keeps Stopping",
+        "steps": [
+          "Check that your internet connection is stable.",
+          "Check that low-power or battery-saving mode is not restricting {{APP_NAME}} in the background.",
+          "Restart the audio and try again.",
+          "If it continues, send us a problem report with the chapter where it happens."
+        ],
+        "append_if_feature": [
+          { "feature": "audio_download", "text": "You can also download the audio first so it plays without a connection." }
+        ]
+      },
+      "keywords": [
+        "audio stops", "audio pauses", "audio keeps stopping", "audio interrupted", "player stops",
+        "audio cuts off"
+      ],
+      "actions": [
+        { "type": "support_form", "label": "Report Audio Problem", "target": "report_problem", "prefill_type": "audio" }
+      ]
+    },
+    {
+      "id": "content_not_loading",
+      "category_id": "report_problem",
+      "subcategory_id": "content_loading",
+      "order": 1,
+      "question": "Verses or other content isn't loading.",
+      "preview": "Fix content that won't appear.",
+      "answer": {
+        "title": "Content Not Loading",
+        "steps": [
+          "Check your internet connection.", "Close and reopen the app.",
+          "Update the app to the latest version.",
+          "If it still doesn't load, report the problem and tell us which book, chapter or content is affected."
+        ]
+      },
+      "keywords": [
+        "not loading", "blank page", "empty chapter", "verses missing", "content missing",
+        "loading forever", "spinner", "won't load"
+      ],
+      "actions": [
+        { "type": "support_form", "label": "Report This Problem", "target": "report_problem", "prefill_type": "content_loading" }
+      ]
+    },
+    {
+      "id": "download_stuck",
+      "category_id": "report_problem",
+      "subcategory_id": "download",
+      "order": 1,
+      "requires_any_feature": ["downloadable_content", "audio_download"],
+      "question": "My download is stuck or keeps failing.",
+      "preview": "Get a stuck download moving again.",
+      "answer": {
+        "title": "Download Stuck or Failing",
+        "steps": [
+          "Check your internet connection and, if you can, switch to a stronger Wi-Fi network.",
+          "Make sure your device has enough free storage.",
+          "Keep {{APP_NAME}} open until the download finishes, and turn off low-power mode.",
+          "Cancel the download and start it again, or close and reopen the app.",
+          "If it still fails, report the problem and tell us which item you were downloading."
+        ]
+      },
+      "keywords": [
+        "download stuck", "download failed", "download not working", "download keeps failing",
+        "downloading forever", "download paused", "cannot download", "download error"
+      ],
+      "actions": [
+        { "type": "app_route", "label": "Open Downloads", "target": "downloads_manager" },
+        { "type": "support_form", "label": "Report This Problem", "target": "report_problem", "prefill_type": "download" }
+      ]
+    },
+    {
+      "id": "saved_content_missing",
+      "category_id": "report_problem",
+      "subcategory_id": "sync_saved_content",
+      "order": 1,
+      "question": "My bookmarks, notes or highlights are missing, for example after reinstalling or updating.",
+      "preview": "What to try when saved content disappears.",
+      "answer": {
+        "title": "Saved Content Missing",
+        "steps": [
+          "Check that you are viewing the right section and Bible version.", "Update the app and reopen it.",
+          "If you deleted or reinstalled the app, restore your device from a device backup if you have one. Content that was stored only on the device may not be recoverable if no backup exists.",
+          "If content is still missing, report the problem and tell us what happened just before it disappeared."
+        ],
+        "append_if_feature": [
+          {
+            "feature": "backup_sync",
+            "text": "If you use backup or sign-in, make sure you are using the same account as before and restore your in-app backup."
+          }
+        ]
+      },
+      "keywords": [
+        "bookmarks missing", "notes missing", "lost notes", "highlights gone", "saved verses gone",
+        "data lost", "disappeared", "deleted notes", "reinstalled", "after reinstall", "deleted the app",
+        "uninstalled", "lost after update"
+      ],
+      "actions": [
+        { "type": "app_route", "label": "Open Backup Settings", "target": "backup_settings", "requires_feature": ["backup_sync"] },
+        { "type": "support_form", "label": "Report This Problem", "target": "report_problem", "prefill_type": "sync_saved_content" },
+        { "type": "support_chat", "label": "Talk to a Person", "target": "human_handoff" }
+      ],
+      "escalation": { "offer_human": true }
+    },
+    {
+      "id": "sync_not_working",
+      "category_id": "report_problem",
+      "subcategory_id": "sync_saved_content",
+      "order": 2,
+      "requires_feature": ["backup_sync"],
+      "question": "My content isn't syncing between devices.",
+      "preview": "Fix backup and sync problems.",
+      "answer": {
+        "title": "Sync Not Working",
+        "steps": [
+          "Check that you are signed in to the same account on both devices.",
+          "Check your internet connection on both devices.",
+          "Open the backup settings and run a manual backup or sync.", "Update the app on both devices.",
+          "If it still doesn't sync, report the problem."
+        ]
+      },
+      "keywords": [
+        "sync", "not syncing", "sync problem", "devices not matching", "backup failed", "cloud backup",
+        "icloud"
+      ],
+      "actions": [
+        { "type": "app_route", "label": "Open Backup Settings", "target": "backup_settings" },
+        { "type": "support_form", "label": "Report This Problem", "target": "report_problem", "prefill_type": "sync_saved_content" }
+      ]
+    },
+    {
+      "id": "app_slow",
+      "category_id": "report_problem",
+      "subcategory_id": "performance",
+      "order": 1,
+      "question": "Why is the app slow, lagging or freezing?",
+      "preview": "Simple steps to improve performance.",
+      "answer": {
+        "title": "App Running Slowly",
+        "steps": [
+          "Close and reopen {{APP_NAME}}.", "Make sure you have enough free storage on your device.",
+          "Update the app and your device software.", "Restart your device.",
+          "If the slowdown continues, report the problem and tell us your device model."
+        ]
+      },
+      "keywords": [
+        "slow", "lag", "lagging", "freezing", "frozen", "performance", "app slow", "stuck", "hangs",
+        "battery drain"
+      ],
+      "actions": [
+        { "type": "support_form", "label": "Report This Problem", "target": "report_problem", "prefill_type": "performance" }
+      ]
+    },
+    {
+      "id": "notifications_not_arriving",
+      "category_id": "report_problem",
+      "subcategory_id": "notification",
+      "order": 1,
+      "question": "I'm not getting notifications.",
+      "preview": "Check permissions and settings.",
+      "answer": {
+        "title": "Notifications Not Arriving",
+        "steps": [
+          "Open the notification settings in {{APP_NAME}} and make sure the reminder you want is turned on.",
+          "In your device settings, allow notifications for {{APP_NAME}}.",
+          "Check that Focus, Do Not Disturb or battery-saving modes are not hiding them.",
+          "If a reminder still doesn't arrive, report the problem."
+        ]
+      },
+      "keywords": [
+        "no notifications", "notification not working", "reminder not coming", "not receiving",
+        "alerts not working", "reminder missing"
+      ],
+      "actions": [
+        { "type": "app_route", "label": "Notification Settings", "target": "notification_settings" },
+        { "type": "system_action", "label": "Device Notification Settings", "target": "device_notification_settings" },
+        { "type": "support_form", "label": "Report This Problem", "target": "report_problem", "prefill_type": "notification" }
+      ]
+    },
+    {
+      "id": "display_layout_issue",
+      "category_id": "report_problem",
+      "subcategory_id": "display",
+      "order": 1,
+      "question": "Text is cut off, overlapping or looks wrong.",
+      "preview": "Fix layout and display problems.",
+      "answer": {
+        "title": "Display or Layout Problem",
+        "steps": [
+          "Check the text size in {{APP_NAME}} appearance settings and try a smaller size.",
+          "Check your device display size and larger-text settings, which can affect how the app looks.",
+          "Update the app to the latest version.",
+          "If it still looks wrong, send a report with a screenshot and your device model."
+        ]
+      },
+      "keywords": [
+        "text cut off", "overlapping", "layout", "display problem", "looks wrong", "screen glitch",
+        "too big", "too small", "misaligned"
+      ],
+      "actions": [
+        { "type": "app_route", "label": "Open Appearance Settings", "target": "appearance_settings" },
+        { "type": "support_form", "label": "Report This Problem", "target": "report_problem", "prefill_type": "display" }
+      ]
+    },
+    {
+      "id": "text_error",
+      "category_id": "report_problem",
+      "subcategory_id": "content_error",
+      "order": 1,
+      "question": "I found a mistake in the Bible text.",
+      "preview": "Report a wrong, missing or garbled verse.",
+      "answer": {
+        "title": "Mistake in the Text",
+        "body": "Thank you for telling us. Please send a report with the Bible version, book, chapter and verse, and what looks wrong. Please do not paste long passages. Our team will check it against the source."
+      },
+      "keywords": [
+        "typo", "mistake in verse", "wrong verse", "missing verse", "wrong text", "spelling error",
+        "text error", "incorrect"
+      ],
+      "actions": [
+        { "type": "support_form", "label": "Report Text Mistake", "target": "report_problem", "prefill_type": "content_error" }
+      ]
+    },
+    {
+      "id": "wrong_version_showing",
+      "category_id": "report_problem",
+      "subcategory_id": "content_error",
+      "order": 2,
+      "question": "The app is showing the wrong Bible version or text.",
+      "preview": "Check which version you are reading.",
+      "answer": {
+        "title": "Wrong Version or Text",
+        "body": "Check which Bible version is selected, and remember that the app language and the Bible version are separate settings. Close and reopen the app. If the text still looks wrong, send a report with a screenshot and tell us the version, book, chapter and verse.",
+        "append_if_feature": [
+          { "feature": "parallel_versions", "text": "Also check that a second or side-by-side version is not turned on by mistake." }
+        ]
+      },
+      "keywords": [
+        "wrong version", "wrong bible", "different version showing", "wrong translation",
+        "wrong language bible", "text different", "not my version"
+      ],
+      "actions": [
+        { "type": "app_route", "label": "Choose Bible Version", "target": "bible_version_selector" },
+        { "type": "support_form", "label": "Report Text Problem", "target": "report_problem", "prefill_type": "content_error" }
+      ]
+    },
+    {
+      "id": "report_inappropriate_content",
+      "category_id": "report_problem",
+      "subcategory_id": "inappropriate_content",
+      "order": 1,
+      "requires_feature": ["generated_or_shared_content"],
+      "question": "How do I report inappropriate or harmful content?",
+      "preview": "Tell us about content that should not be there.",
+      "answer": {
+        "title": "Report Content",
+        "body": "Send a report and tell us where you saw it. A screenshot helps us find it quickly. Please do not include personal details about other people. Our team will review it."
+      },
+      "keywords": [
+        "report content", "inappropriate", "offensive", "report message", "harmful", "flag content",
+        "bad content"
+      ],
+      "actions": [
+        { "type": "support_form", "label": "Report Content", "target": "report_problem", "prefill_type": "inappropriate_content" }
+      ]
+    },
+    {
+      "id": "challenge_link_not_opening",
+      "category_id": "report_problem",
+      "subcategory_id": "challenge",
+      "order": 1,
+      "question": "The challenge link won't open.",
+      "preview": "Fix a link that doesn't work.",
+      "answer": {
+        "title": "Challenge Link Not Opening",
+        "steps": [
+          "Make sure the whole link was copied and shared, with nothing cut off.",
+          "Check your internet connection.", "Try opening the link in a different browser or app.",
+          "Ask the sender to share the challenge again.",
+          "If it still won't open, report the problem and include the link."
+        ]
+      },
+      "keywords": [
+        "link not opening", "quiz link not working", "challenge link broken", "link won't open",
+        "link error", "page not loading quiz"
+      ],
+      "actions": [
+        { "type": "support_form", "label": "Report This Problem", "target": "report_problem", "prefill_type": "challenge" }
+      ],
+      "related_faq_ids": ["play_challenge", "challenge_limits"]
+    },
+    {
+      "id": "results_not_updating",
+      "category_id": "report_problem",
+      "subcategory_id": "challenge",
+      "order": 2,
+      "question": "My challenge results aren't updating.",
+      "preview": "Fix missing or wrong play counts.",
+      "answer": {
+        "title": "Results Not Updating",
+        "steps": [
+          "Check your internet connection, because results are recorded online.",
+          "Close and reopen the app, then open your challenge results again.",
+          "Give it a short while, since new plays can take a moment to appear.",
+          "If the numbers still look wrong, report the problem and tell us which challenge."
+        ]
+      },
+      "keywords": [
+        "results not updating", "count not updating", "players not showing", "stats not updating",
+        "percentage wrong", "results delay"
+      ],
+      "actions": [
+        { "type": "support_form", "label": "Report This Problem", "target": "report_problem", "prefill_type": "challenge" }
+      ],
+      "related_faq_ids": ["challenge_results"]
+    },
+    {
+      "id": "challenge_wont_create",
+      "category_id": "report_problem",
+      "subcategory_id": "challenge",
+      "order": 3,
+      "question": "I can't create a challenge.",
+      "preview": "Fix a challenge that won't be created.",
+      "answer": {
+        "title": "Can't Create a Challenge",
+        "steps": [
+          "Check your internet connection.", "Update the app and try again.",
+          "If it still can't be created, report the problem and tell us what you chose before it failed."
+        ],
+        "append_if_feature": [
+          { "feature": "daily_free_quiz", "text": "Also check whether your free daily creation has been used. The create screen shows your options." }
+        ]
+      },
+      "keywords": [
+        "cannot create challenge", "create button not working", "challenge not created", "create failed",
+        "unable to create quiz"
+      ],
+      "actions": [
+        { "type": "support_form", "label": "Report This Problem", "target": "report_problem", "prefill_type": "challenge" }
+      ],
+      "related_faq_ids": ["create_challenge", "daily_free_quiz_limit"]
+    },
+    {
+      "id": "free_credit_not_ready",
+      "category_id": "report_problem",
+      "subcategory_id": "credits_wallet",
+      "order": 1,
+      "requires_feature": ["free_credit_timer"],
+      "question": "I can't collect my free credit.",
+      "preview": "Fix the free credit timer.",
+      "answer": {
+        "title": "Free Credit Not Ready",
+        "steps": [
+          "Free credits can be collected only when the Wallet shows one is ready. Wait until it is ready.",
+          "Check your internet connection.", "Close and reopen the app.",
+          "If you still can't collect it, report the problem."
+        ]
+      },
+      "keywords": [
+        "cannot collect", "timer not ready", "free credit not working", "collect button disabled",
+        "free credit missing", "timer stuck"
+      ],
+      "actions": [
+        { "type": "support_form", "label": "Report This Problem", "target": "report_problem", "prefill_type": "credits_wallet" }
+      ],
+      "related_faq_ids": ["earn_free_credits"]
+    },
+    {
+      "id": "rewarded_ad_problem",
+      "category_id": "report_problem",
+      "subcategory_id": "credits_wallet",
+      "order": 2,
+      "requires_feature": ["rewarded_ads"],
+      "question": "The ad won't load, or I watched an ad and got no credits.",
+      "preview": "Fix ad rewards.",
+      "answer": {
+        "title": "Ad or Ad Reward Problem",
+        "steps": [
+          "Check your internet connection.",
+          "Turn off any VPN or ad blocker, which can stop ads from loading.",
+          "Ads are not always available, so try again after a short while.",
+          "Watch the ad until it finishes, then check your Wallet balance.",
+          "If you finished an ad and no credits were added, report the problem and tell us the time it happened."
+        ]
+      },
+      "keywords": [
+        "ad not loading", "no ad available", "watched ad no credits", "ad reward missing",
+        "ad credits not received", "ad failed"
+      ],
+      "actions": [
+        { "type": "support_form", "label": "Report This Problem", "target": "report_problem", "prefill_type": "credits_wallet" },
+        { "type": "support_chat", "label": "Talk to a Person", "target": "human_handoff" }
+      ],
+      "related_faq_ids": ["rewarded_ad_credits"],
+      "escalation": { "offer_human": true }
+    },
+    {
+      "id": "lifeline_credit_lost",
+      "category_id": "report_problem",
+      "subcategory_id": "credits_wallet",
+      "order": 3,
+      "requires_feature": ["quiz_lifelines"],
+      "question": "Credits were taken but the quiz helper didn't work.",
+      "preview": "Get help when credits are spent in a quiz.",
+      "answer": {
+        "title": "Credits Spent, Helper Didn't Work",
+        "steps": [
+          "Close and reopen the app and check your Wallet balance again.",
+          "Check that the question loaded fully.",
+          "If credits were taken but the helper did not appear, report the problem and tell us which quiz and when it happened."
+        ]
+      },
+      "keywords": [
+        "credits deducted", "credits taken hint", "spent credits no hint", "50/50 not working",
+        "skip not working", "credits lost quiz", "credits cut"
+      ],
+      "actions": [
+        { "type": "support_form", "label": "Report This Problem", "target": "report_problem", "prefill_type": "credits_wallet" },
+        { "type": "support_chat", "label": "Talk to a Person", "target": "human_handoff" }
+      ],
+      "related_faq_ids": ["quiz_lifelines"],
+      "escalation": { "offer_human": true }
+    },
+    {
+      "id": "ai_allowance_not_renewed",
+      "category_id": "report_problem",
+      "subcategory_id": "credits_wallet",
+      "order": 4,
+      "requires_feature": ["daily_ai_allowance"],
+      "question": "My free AI allowance didn't renew.",
+      "preview": "Fix an allowance that is still used up.",
+      "answer": {
+        "title": "Free Allowance Not Renewing",
+        "steps": [
+          "Close and reopen the app.", "Check your internet connection.", "Check again after a short while.",
+          "If the allowance still hasn't renewed, report the problem and tell us which AI feature."
+        ]
+      },
+      "keywords": [
+        "allowance not renewed", "free ai not resetting", "ai limit not reset", "still limit next day",
+        "free chats not back"
+      ],
+      "actions": [
+        { "type": "support_form", "label": "Report This Problem", "target": "report_problem", "prefill_type": "credits_wallet" }
+      ],
+      "related_faq_ids": ["daily_ai_allowance", "ai_limit_reached"]
+    },
+    {
+      "id": "ai_not_responding",
+      "category_id": "report_problem",
+      "subcategory_id": "ai_problem",
+      "order": 1,
+      "requires_any_feature": ["verse_explanation", "chapter_summary", "ai_chat", "ai_prayer"],
+      "question": "The AI isn't answering, or keeps failing.",
+      "preview": "Fix an AI answer that won't load.",
+      "answer": {
+        "title": "AI Not Responding",
+        "steps": [
+          "Check your internet connection, because AI answers are created online.",
+          "Close and reopen the app, then try again.", "Try again after a short while.",
+          "If it keeps failing, report the problem and tell us which AI feature it was."
+        ]
+      },
+      "keywords": [
+        "ai not working", "ai not responding", "ai answer failed", "no ai response", "ai error",
+        "assistant not answering", "ai stuck loading"
+      ],
+      "actions": [
+        { "type": "support_form", "label": "Report This Problem", "target": "report_problem", "prefill_type": "ai_problem" }
+      ],
+      "related_faq_ids": ["ai_credits_charged_no_answer"]
+    },
+    {
+      "id": "ai_credits_charged_no_answer",
+      "category_id": "report_problem",
+      "subcategory_id": "ai_problem",
+      "order": 2,
+      "requires_feature": ["ai_length_credits", "credits"],
+      "question": "Credits were used but I didn't get an AI answer.",
+      "preview": "Get help when credits are used and nothing arrives.",
+      "answer": {
+        "title": "Credits Used, No Answer",
+        "steps": [
+          "Close and reopen the app and check your Wallet balance again.",
+          "Check your internet connection and look at the screen where you asked, in case the answer is still loading.",
+          "If credits were used and no answer appeared, report the problem and tell us the feature, the time, and the answer length you chose."
+        ]
+      },
+      "keywords": [
+        "credits used no answer", "credits deducted ai", "ai took credits", "charged but no answer",
+        "credits lost ai", "ai credits gone"
+      ],
+      "actions": [
+        { "type": "support_form", "label": "Report This Problem", "target": "report_problem", "prefill_type": "ai_problem" },
+        { "type": "support_chat", "label": "Talk to a Person", "target": "human_handoff" }
+      ],
+      "related_faq_ids": ["ai_not_responding", "ai_credit_cost"],
+      "escalation": { "offer_human": true }
+    },
+    {
+      "id": "ai_answer_concern",
+      "category_id": "report_problem",
+      "subcategory_id": "ai_problem",
+      "order": 3,
+      "requires_any_feature": ["verse_explanation", "chapter_summary", "ai_chat", "ai_prayer"],
+      "question": "An AI answer seems wrong or concerning.",
+      "preview": "What to do about a mistaken or harmful AI answer.",
+      "answer": {
+        "title": "Wrong or Concerning AI Answer",
+        "body": "AI answers can be incomplete or mistaken, so please check them against Scripture and speak with a trusted pastor or teacher about important matters. If an answer was offensive or harmful, you can report it."
+      },
+      "keywords": [
+        "ai wrong answer", "ai mistake", "wrong ai answer", "ai inappropriate", "ai answer offensive",
+        "report ai answer"
+      ],
+      "actions": [
+        { "type": "support_form", "label": "Report This Problem", "target": "report_problem", "prefill_type": "ai_problem" }
+      ],
+      "related_faq_ids": ["ai_not_responding"]
+    },
+    {
+      "id": "prayer_post_not_showing",
+      "category_id": "report_problem",
+      "subcategory_id": "prayer",
+      "order": 1,
+      "requires_feature": ["prayer_wall"],
+      "question": "My prayer request isn't showing on the Prayer Wall.",
+      "preview": "Fix a post that doesn't appear.",
+      "answer": {
+        "title": "Prayer Request Not Showing",
+        "steps": [
+          "Check your internet connection.", "Close and reopen the app, then open the Prayer Wall again.",
+          "Give it a short while, since new posts can take a moment to appear.",
+          "Posts that break the app's community rules can be removed.",
+          "If it still does not appear, report the problem and tell us roughly when you posted it."
+        ]
+      },
+      "keywords": [
+        "prayer not showing", "prayer post missing", "my request not showing", "post not appearing",
+        "prayer wall empty", "prayer not posted"
+      ],
+      "actions": [
+        { "type": "support_form", "label": "Report This Problem", "target": "report_problem", "prefill_type": "prayer" }
+      ],
+      "related_faq_ids": ["post_prayer_request"]
+    },
+    {
+      "id": "feature_missing_after_update",
+      "category_id": "report_problem",
+      "subcategory_id": "other",
+      "order": 1,
+      "question": "A feature is missing or changed after an update.",
+      "preview": "Find a feature that moved or disappeared.",
+      "answer": {
+        "title": "Feature Missing After an Update",
+        "steps": [
+          "Close and reopen {{APP_NAME}} so the update can finish.",
+          "Look in the menu and in Search, because features sometimes move.",
+          "Check that your Bible version, language and settings are still what you expect.",
+          "If it is still missing, tell us which feature and what you expected to see."
+        ],
+        "append_if_feature": [
+          { "feature": "premium", "text": "If a Premium feature looks locked, use Restore Purchases first." }
+        ]
+      },
+      "keywords": [
+        "feature missing", "feature gone", "disappeared after update", "changed after update",
+        "removed feature", "new update problem", "where did it go", "after updating"
+      ],
+      "actions": [
+        { "type": "native_action", "label": "Restore Purchases", "target": "restore_purchase" },
+        { "type": "support_form", "label": "Report This Problem", "target": "report_problem", "prefill_type": "other" },
+        { "type": "support_form", "label": "Share Feedback", "target": "suggest_feature", "prefill_type": "improve_feature" }
+      ]
+    }
+  ],
+  "answer_feedback": {
+    "prompt": "Was this helpful?",
+    "yes_label": "Yes",
+    "no_label": "No",
+    "yes_response": "Glad that helped.",
+    "no_response": "Sorry about that. Let's find another way.",
+    "on_no": {
+      "actions": [
+        { "type": "support_chat", "label": "Ask App Support", "target": "support_chat" }
+      ],
+      "pass_context_to_chat": ["faq_id", "original_question"]
+    },
+    "on_no_repeated": { "after_count": 2, "action": "offer_human_handoff" }
+  },
+  "report_problem": {
+    "title": "Report a Problem",
+    "subtitle": "Tell us what's happening. The more details you share, the faster we can help.",
+    "quick_fix_title": "Try these quick fixes",
+    "still_not_working_label": "Still not working? Report it",
+    "issue_types": [
+      {
+        "id": "app_crash",
+        "label": "App Crashes",
+        "ui_subtitle": "App closes or won't open",
+        "icon": "alert",
+        "show_in_list": true,
+        "quick_fix_faq_ids": ["app_crashes"]
+      },
+      {
+        "id": "audio",
+        "label": "Audio Not Working",
+        "ui_subtitle": "Audio stops, no sound, etc.",
+        "icon": "headphones",
+        "show_in_list": true,
+        "requires_feature": ["audio"],
+        "quick_fix_faq_ids": ["audio_not_playing", "audio_stops"]
+      },
+      {
+        "id": "content_loading",
+        "label": "Content Not Loading",
+        "ui_subtitle": "Verses, audio or other content",
+        "icon": "clock",
+        "show_in_list": true,
+        "quick_fix_faq_ids": ["content_not_loading"]
+      },
+      {
+        "id": "download",
+        "label": "Download Problem",
+        "ui_subtitle": "Downloads stuck or failing",
+        "icon": "download",
+        "show_in_list": false,
+        "requires_any_feature": ["downloadable_content", "audio_download"],
+        "quick_fix_faq_ids": ["download_stuck"]
+      },
+      {
+        "id": "sync_saved_content",
+        "label": "Sync Issues",
+        "ui_subtitle": "Bookmarks, notes not syncing or missing",
+        "icon": "sync",
+        "show_in_list": true,
+        "quick_fix_faq_ids": ["saved_content_missing", "sync_not_working"]
+      },
+      {
+        "id": "performance",
+        "label": "Performance Issues",
+        "ui_subtitle": "Slow, lagging or freezing",
+        "icon": "speed",
+        "show_in_list": true,
+        "quick_fix_faq_ids": ["app_slow"]
+      },
+      {
+        "id": "purchase",
+        "label": "Premium or Purchase Issue",
+        "ui_subtitle": "Premium locked, purchase not showing",
+        "icon": "crown",
+        "show_in_list": false,
+        "quick_fix_faq_ids": ["premium_not_active", "restore_purchase", "plans_not_loading", "credits_missing"],
+        "requires_any_feature": ["premium", "credits"]
+      },
+      {
+        "id": "notification",
+        "label": "Notification Issue",
+        "ui_subtitle": "Reminders not arriving",
+        "icon": "bell",
+        "show_in_list": false,
+        "quick_fix_faq_ids": ["notifications_not_arriving"]
+      },
+      {
+        "id": "display",
+        "label": "Display or Layout Issue",
+        "ui_subtitle": "Text cut off or looks wrong",
+        "icon": "layout",
+        "show_in_list": false,
+        "quick_fix_faq_ids": ["display_layout_issue"]
+      },
+      {
+        "id": "content_error",
+        "label": "Mistake in Bible Text",
+        "ui_subtitle": "Wrong, missing or garbled verse text",
+        "icon": "book",
+        "show_in_list": false,
+        "quick_fix_faq_ids": ["text_error", "wrong_version_showing"]
+      },
+      {
+        "id": "inappropriate_content",
+        "label": "Report Content",
+        "ui_subtitle": "Offensive or harmful content",
+        "icon": "flag",
+        "show_in_list": false,
+        "requires_feature": ["generated_or_shared_content"],
+        "quick_fix_faq_ids": ["report_inappropriate_content"]
+      },
+      {
+        "id": "challenge",
+        "label": "Challenge Problem",
+        "ui_subtitle": "Create, share or results not working",
+        "icon": "trophy",
+        "show_in_list": false,
+        "requires_feature": ["verse_challenge"],
+        "quick_fix_faq_ids": ["challenge_link_not_opening", "results_not_updating", "challenge_wont_create"]
+      },
+      {
+        "id": "credits_wallet",
+        "label": "Credits or Wallet Issue",
+        "ui_subtitle": "Credits, free rewards or AI limits",
+        "icon": "wallet",
+        "show_in_list": false,
+        "requires_feature": ["credits"],
+        "quick_fix_faq_ids": [
+          "credits_missing", "free_credit_not_ready", "rewarded_ad_problem", "lifeline_credit_lost",
+          "ai_allowance_not_renewed", "ai_credits_charged_no_answer"
+        ]
+      },
+      {
+        "id": "ai_problem",
+        "label": "AI Feature Issue",
+        "ui_subtitle": "AI answers failing, missing or wrong",
+        "icon": "sparkle",
+        "show_in_list": false,
+        "requires_any_feature": ["verse_explanation", "chapter_summary", "ai_chat", "ai_prayer"],
+        "quick_fix_faq_ids": ["ai_not_responding", "ai_credits_charged_no_answer", "ai_answer_concern"]
+      },
+      {
+        "id": "prayer",
+        "label": "Prayer or Prayer Wall Issue",
+        "ui_subtitle": "Posts or prayers not showing",
+        "icon": "heart",
+        "show_in_list": false,
+        "requires_feature": ["prayer_wall"],
+        "quick_fix_faq_ids": ["prayer_post_not_showing"]
+      },
+      {
+        "id": "other",
+        "label": "Other Issue",
+        "ui_subtitle": "Something else not working",
+        "icon": "info",
+        "show_in_list": true,
+        "quick_fix_faq_ids": ["feature_missing_after_update"]
+      }
+    ],
+    "intro": "Tell us what's not working and we'll help you troubleshoot.",
+    "fields": [
+      { "id": "issue_type", "type": "select", "label": "What's the issue?", "placeholder": "Select an issue type", "required": true },
+      {
+        "id": "description",
+        "type": "textarea",
+        "label": "Tell us more (optional)",
+        "placeholder": "Describe the problem...",
+        "placeholder_overrides": {
+          "content_error": "Which Bible version, book, chapter and verse? What looks wrong?",
+          "sync_saved_content": "What is missing, and what happened just before it went missing?"
+        },
+        "required": false,
+        "required_when": { "issue_type": ["other", "content_error"] },
+        "min_length": 10,
+        "max_length": 2000
+      },
+      {
+        "id": "screenshot",
+        "type": "image",
+        "label": "Add a screenshot (optional)",
+        "button_label": "Add Screenshot",
+        "required": false,
+        "max_files": 3
+      },
+      {
+        "id": "contact_email",
+        "type": "email",
+        "label": "Your email (optional)",
+        "placeholder": "Enter your email address",
+        "helper_text": "Replies appear in Support History. Add an email if you also want a copy there.",
+        "required": false
+      }
+    ],
+    "automatic_metadata": [
+      "app_id", "app_name", "app_version", "build_number", "platform", "os_version", "device_model",
+      "language", "country", "timestamp", "premium_status", "anonymous_user_id", "enabled_features"
+    ],
+    "submission": { "destination": "support_backend", "offline_behavior": "save_draft_and_retry", "appears_in_history": true },
+    "privacy_message": "Please don't include passwords, full payment-card details or verification codes.",
+    "submit_label": "Send Report",
+    "success": {
+      "title": "Report received",
+      "message": "Thanks for letting us know. Your report has been sent to our support team. You can follow it in Support History.",
+      "button": "Done"
+    }
+  },
+  "feature_request": {
+    "title": "Suggest a Feature",
+    "subtitle": "We'd love to hear your ideas! Share your suggestion and help us make {{APP_NAME}} better.",
+    "feature_types": [
+      { "id": "new_feature", "label": "New Feature Idea", "ui_subtitle": "Suggest something new", "icon": "lightbulb" },
+      { "id": "improve_feature", "label": "Improve Existing Feature", "ui_subtitle": "Share how we can improve", "icon": "book" },
+      { "id": "design_usability", "label": "Design & Usability", "ui_subtitle": "Suggest design changes", "icon": "pencil" },
+      { "id": "content_request", "label": "Content Request", "ui_subtitle": "Request new content or versions", "icon": "document" },
+      { "id": "other_suggestion", "label": "Other Suggestion", "ui_subtitle": "Any other ideas", "icon": "chat" }
+    ],
+    "fields": [
+      { "id": "feature_type", "type": "select", "label": "What type of suggestion?", "placeholder": "Select a category", "required": true },
+      {
+        "id": "suggestion",
+        "type": "textarea",
+        "label": "Your suggestion",
+        "placeholder": "Tell us your idea...",
+        "placeholder_overrides": { "content_request": "Which translation, language or content would you like us to add?" },
+        "required": true,
+        "min_length": 10,
+        "max_length": 2000
+      },
+      { "id": "image", "type": "image", "label": "Add an image (optional)", "button_label": "Add Image", "required": false, "max_files": 1 },
+      { "id": "contact_email", "type": "email", "label": "Your email (optional)", "placeholder": "Enter your email address", "required": false }
+    ],
+    "automatic_metadata": ["app_id", "app_name", "app_version", "platform", "language", "country", "timestamp", "anonymous_user_id"],
+    "submission": { "destination": "support_backend", "offline_behavior": "save_draft_and_retry", "appears_in_history": true },
+    "submit_label": "Submit Suggestion",
+    "success": { "title": "Suggestion Submitted!", "message": "Thank you for sharing your suggestion.\nOur team will review it soon.", "button": "Got It" }
+  },
+  "support_chat": {
+    "title": "App Support",
+    "subtitle": "Ask anything about your {{APP_NAME}}.",
+    "input_placeholder": "Ask another question...",
+    "first_input_placeholder": "Ask your question about the app...",
+    "welcome_message": "Hi! I can help with using {{APP_NAME}}, settings, purchases and problems with the app. How can I help?",
+    "suggested_prompts": [
+      { "text": "How many credits does an AI answer use?", "requires_feature": ["ai_length_credits"] },
+      { "text": "Can I complete my daily streak offline?", "requires_feature": ["offline_daily_content"] },
+      { "text": "How does the Prayer Wall work?", "requires_feature": ["prayer_wall"] },
+      { "text": "How do I create a Verse Challenge?", "requires_feature": ["verse_challenge"] },
+      { "text": "Where are my challenge results?", "requires_feature": ["verse_challenge"] },
+      { "text": "How do I get free credits?", "requires_feature": ["free_credit_timer"] },
+      { "text": "How do I change Bible versions?", "requires_feature": ["multiple_versions"] },
+      { "text": "My audio isn't working", "requires_feature": ["audio"] },
+      { "text": "I can't access Premium", "requires_feature": ["premium"] },
+      { "text": "How do I cancel my subscription?", "requires_feature": ["subscriptions"] },
+      { "text": "The app keeps crashing" },
+      { "text": "I found a mistake in the Bible text" }
+    ],
+    "guardrails": {
+      "separate_from_bible_assistant": true,
+      "never_answer_scripture_questions": true,
+      "never_give_prayer_or_personal_guidance": true,
+      "never_consume_credits": true,
+      "never_show_paywall_or_upsell": true,
+      "never_quote_prices_trial_lengths_or_premium_feature_lists": true,
+      "never_promise_refunds": true,
+      "answer_only_from_support_knowledge": true,
+      "support_knowledge_sources": ["faq", "support_backend_articles"],
+      "layer_label_on_each_message": ["faq", "ai", "human"]
+    },
+    "routing": {
+      "local_match": {
+        "enabled": true,
+        "confidence_threshold": 0.82,
+        "max_words_for_auto_answer": 12,
+        "ambiguity_margin": 0.08,
+        "on_confident_match": "show_local_answer",
+        "on_ambiguous_match": { "action": "show_suggestions", "max_suggestions": 3, "message": "Did you mean one of these?" },
+        "on_no_match": "send_to_support_backend",
+        "note": "Typed messages longer than max_words_for_auto_answer always go to the support backend so that the sensitive-topic check runs. FAQs the user taps from a list never need the check."
+      },
+      "backend_response_contract": {
+        "intent": [
+          "app_help", "bug_report", "feature_request", "scripture_question", "prayer_request",
+          "personal_advice", "sensitive_distress", "sensitive_danger", "human_requested", "unclear"
+        ],
+        "fields": ["intent", "answer_text", "confidence", "needs_human"],
+        "note": "The backend returns an intent. For every intent except app_help, the app shows the fixed text from this file, never AI-generated text."
+      },
+      "intent_actions": {
+        "app_help": { "action": "show_ai_answer", "low_confidence_action": "offer_human_handoff" },
+        "bug_report": {
+          "action": "offer_problem_report",
+          "message": "It sounds like something isn't working correctly. I can help you report this problem.",
+          "button_label": "Report a Problem",
+          "target": "report_problem"
+        },
+        "feature_request": {
+          "action": "offer_feature_request",
+          "message": "That sounds like a feature suggestion. You can send it directly to our team.",
+          "button_label": "Suggest a Feature",
+          "target": "suggest_feature"
+        },
+        "scripture_question": { "action": "redirect", "out_of_scope_key": "scripture_question" },
+        "prayer_request": { "action": "redirect", "out_of_scope_key": "prayer_request" },
+        "personal_advice": { "action": "redirect", "out_of_scope_key": "personal_advice" },
+        "sensitive_distress": { "action": "show_fixed_sensitive_response", "sensitive_key": "distress" },
+        "sensitive_danger": { "action": "show_fixed_sensitive_response", "sensitive_key": "danger" },
+        "human_requested": { "action": "start_human_handoff" },
+        "unclear": {
+          "action": "ask_clarifying_question",
+          "message": "I want to make sure I help with the right thing. Could you tell me a little more about what you need help with in {{APP_NAME}}?"
+        }
+      },
+      "client_hints": {
+        "note": "Lightweight client-side hints only. The backend classifier is the authority.",
+        "bug_phrases": [
+          "crash", "not working", "doesn't work", "error", "bug", "stuck", "freeze", "frozen", "broken",
+          "can't open", "won't load"
+        ],
+        "feature_phrases": [
+          "please add", "can you add", "feature request", "suggestion", "would be nice", "i wish",
+          "should have", "it would be great"
+        ]
+      }
+    },
+    "offline": {
+      "message": "You're offline. Common answers are still available in the help topics. You can write your question now and send it when you're back online.",
+      "retry_label": "Try Again"
+    },
+    "errors": {
+      "backend_unavailable": "We couldn't reach support right now. You can browse help topics, or send a problem report and we'll follow up.",
+      "retry_label": "Try Again"
+    },
+    "welcome_message_no_purchases": "Hi! I can help with using {{APP_NAME}}, settings and problems with the app. How can I help?",
+    "welcome_message_rule": "Use welcome_message_no_purchases when neither premium nor credits is enabled.",
+    "suggested_prompts_limit": 4
+  },
+  "human_handoff": {
+    "enabled": true,
+    "button_label": "Talk to a Person",
+    "entry_points": ["support_home_link", "chat_menu", "after_ai_answer", "after_negative_feedback", "faq_action"],
+    "triggers": {
+      "user_requested": true,
+      "ai_low_confidence": true,
+      "ai_unavailable": true,
+      "negative_feedback_count": 2,
+      "same_question_repeated_count": 2,
+      "forced_topics": ["unauthorized_charge", "data_deletion", "privacy_request", "account_access", "legal"]
+    },
+    "messages": {
+      "offer": "I'm not able to fully solve this one. Would you like me to pass it to our support team?",
+      "offer_accept_label": "Yes, pass it on",
+      "offer_decline_label": "No, keep trying",
+      "forced_topic_notice": "This needs a person to look at it, so I'm passing it to our support team.",
+      "confirmation": "Thanks. Your conversation has been passed to our support team. You can follow it in Support History.",
+      "expected_reply": "Our team usually replies within {{RESPONSE_TIME}}.",
+      "expected_reply_fallback": "Our team will reply as soon as they can."
+    },
+    "handoff_payload": [
+      "conversation_transcript", "faq_ids_viewed", "ai_answers_given", "app_name", "app_version",
+      "platform", "os_version", "language", "country", "premium_status", "contact_email_if_provided"
+    ],
+    "reply_delivery": { "primary": "support_history_with_push_notification", "secondary": "email_if_provided" },
+    "note": "Expected reply time and business hours live on the server so they can change without an app release."
+  },
+  "out_of_scope": {
+    "scripture_question": {
+      "message": "App Support is for help with the app. For Bible questions or Scripture guidance, please use the Bible Assistant.",
+      "action_label": "Open Bible Assistant",
+      "target": "bible_assistant",
+      "requires_feature": ["bible_assistant"],
+      "unavailable_message": "App Support is for help with the app, so I can't answer Bible questions here."
+    },
+    "prayer_request": {
+      "message": "App Support is for help with the app. For prayer support, please use the Prayer section.",
+      "action_label": "Open Prayer",
+      "target": "prayer",
+      "requires_feature": ["prayer"],
+      "unavailable_message": "App Support is for help with the app, so I can't help with prayer requests here."
+    },
+    "personal_advice": {
+      "message": "App Support can help with using the app, subscriptions, technical problems and feedback. For Bible-based guidance, please use the Bible Assistant.",
+      "action_label": "Open Bible Assistant",
+      "target": "bible_assistant",
+      "requires_feature": ["bible_assistant"],
+      "unavailable_message": "App Support can help with using the app, subscriptions, technical problems and feedback."
+    }
+  },
+  "sensitive_support": {
+    "classifier": "server_side_before_retrieval",
+    "generated_text_allowed": false,
+    "note": "Fixed text only. Crisis-line details are supplied per region by the server in CRISIS_RESOURCES and are never hard-coded in this file.",
+    "distress": {
+      "message": "I'm sorry you're going through a hard time. App Support can't help with this, but you don't have to face it alone. {{CRISIS_RESOURCES}}",
+      "secondary_action": { "label": "Open Prayer", "target": "prayer", "requires_feature": ["prayer"] }
+    },
+    "danger": { "message": "If you or someone else is in danger, please contact your local emergency services right now. {{CRISIS_RESOURCES}}" }
+  },
+  "support_history": {
+    "title": "Support History",
+    "empty_title": "No support conversations yet",
+    "empty_message": "Your previous App Support conversations will appear here.",
+    "new_chat_title": "Need more help?",
+    "new_chat_subtitle": "Start a new conversation anytime.",
+    "new_chat_label": "New Support Conversation",
+    "statuses": { "open": "Open", "in_progress": "In Progress", "waiting_for_you": "Waiting for your reply", "resolved": "Resolved", "closed": "Closed" },
+    "status_styles": { "open": "neutral", "in_progress": "warning", "waiting_for_you": "attention", "resolved": "success", "closed": "muted" },
+    "row_fields": ["title", "date_time", "status"],
+    "title_source": "first_user_message_or_faq_question"
+  },
+  "analytics_events": [
+    "support_home_viewed", "category_opened", "faq_viewed", "faq_helpful_yes", "faq_helpful_no",
+    "faq_action_tapped", "support_search_performed", "support_search_no_result", "chat_message_sent",
+    "chat_answered_by_faq", "chat_answered_by_ai", "chat_redirected_out_of_scope",
+    "chat_sensitive_response_shown", "handoff_offered", "handoff_accepted", "problem_report_started",
+    "problem_report_submitted", "feature_request_started", "feature_request_submitted"
+  ],
+  "safety": {
+    "never_request": ["password", "full_payment_card_number", "cvv", "bank_password", "one_time_password", "verification_code"],
+    "sensitive_data_message": "For your security, please don't share passwords, verification codes, or full payment-card details."
+  },
+  "faq_detail": { "related_title": "Related Articles", "related_limit": 3, "hero_image_field": "media_key", "helpful_block": "answer_feedback" },
+  "reference_profiles": {
+    "blue_reading_bible": {
+      "note": "Documentation only. Each app supplies its own enabled features at runtime. Features below are those stated for the Blue Reading Bible template.",
+      "enabled_features": [
+        "verse_challenge", "daily_free_quiz", "quiz_lifelines", "generated_or_shared_content", "credits",
+        "credit_purchase", "free_credit_timer", "rewarded_ads", "daily_ai_allowance", "ai_chat",
+        "unlimited_ai", "bible_assistant", "premium", "subscriptions", "verse_explanation",
+        "chapter_summary"
+      ],
+      "confirm_per_app": [
+        "multiple_versions", "downloadable_content", "audio", "audio_download", "backup_sync", "account",
+        "daily_verse", "reading_plans", "widgets", "wallpapers", "streaks", "ads", "free_trial",
+        "multi_platform", "in_app_language", "resume_position", "parallel_versions", "verse_images",
+        "brightness_control", "reading_view_modes", "custom_fonts", "verse_numbers_toggle",
+        "keep_screen_awake"
+      ],
+      "report_problem_list_overrides": { "display": true, "challenge": true, "credits_wallet": true }
+    },
+    "old_paper_bible": {
+      "note": "Documentation only. Each app supplies its own enabled features at runtime. Features below are those stated for the Old Paper Bible template.",
+      "enabled_features": [
+        "credits", "credit_purchase", "free_credit_timer", "rewarded_ads", "ai_length_credits", "ai_chat",
+        "bible_assistant", "verse_explanation", "chapter_summary", "ai_prayer", "prayer", "prayer_wall",
+        "block_users", "generated_or_shared_content", "streaks", "daily_verse", "offline_daily_content"
+      ],
+      "not_in_this_template": ["verse_challenge", "daily_free_quiz", "quiz_lifelines", "daily_ai_allowance"],
+      "confirm_per_app": [
+        "premium", "subscriptions", "unlimited_ai", "free_trial", "ads", "multiple_versions",
+        "downloadable_content", "audio", "audio_download", "audio_playback_controls", "backup_sync",
+        "account", "reading_plans", "widgets", "wallpapers", "multi_platform", "in_app_language",
+        "resume_position", "parallel_versions", "verse_images", "brightness_control", "reading_view_modes",
+        "custom_fonts", "verse_numbers_toggle", "keep_screen_awake"
+      ],
+      "report_problem_list_overrides": { "display": true, "ai_problem": true, "prayer": true, "credits_wallet": true }
+    }
+  }
+}

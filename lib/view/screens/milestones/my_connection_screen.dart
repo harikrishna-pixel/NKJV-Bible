@@ -40,10 +40,9 @@ class _MyConnectionScreenState extends State<MyConnectionScreen> {
       _stats = s;
       _loading = false;
     });
-    // Additive unlock popup — does not change hub stats / progress logic.
+    // Seed celebrated baseline only (no popup here). Popups show at earn time.
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      MilestoneCelebrationCoordinator.checkAndShow(context);
+      MilestoneCelebrationCoordinator.seedBaselineIfNeeded();
     });
   }
 

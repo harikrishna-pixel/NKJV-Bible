@@ -1,16 +1,27 @@
 import 'package:biblebookapp/view/screens/milestones/models/milestone_model.dart';
 
-/// Static milestone catalog matching design (Connection / Prayer / Community).
+/// Milestone catalog — Connection / Prayer / Community (doc + mockup).
 class MilestonesData {
   MilestonesData._();
 
   static const List<MilestoneDef> all = [
-    // —— Connection ——
+    // —— Connection (total Days Connected, not streak) ——
+    MilestoneDef(
+      id: 'conn_1',
+      category: MilestoneCategory.connection,
+      title: 'First Connection',
+      subtitle: 'You completed your first Daily Connection.',
+      target: 1,
+      about:
+          'Your first day of connection is the start of a lasting walk with God.',
+      reward: 'Every journey begins with one faithful step.',
+      icon: IconKind.lantern,
+    ),
     MilestoneDef(
       id: 'conn_7',
       category: MilestoneCategory.connection,
       title: '7 Days Connected',
-      subtitle: 'A week of faithful connection with God.',
+      subtitle: 'You made meaningful time with God for 7 days.',
       target: 7,
       about:
           'Showing up for seven days builds a rhythm of seeking God first.',
@@ -21,7 +32,7 @@ class MilestonesData {
       id: 'conn_30',
       category: MilestoneCategory.connection,
       title: '30 Days Connected',
-      subtitle: 'You have made time with God for 30 days.',
+      subtitle: 'You\'ve made meaningful time with God for 30 days.',
       target: 30,
       about:
           'A month of connection deepens trust and anchors your heart in Him.',
@@ -62,12 +73,55 @@ class MilestonesData {
       icon: IconKind.wreath,
     ),
 
-    // —— Prayer ——
+    // —— Path completion (lives under Connection tab per doc) ——
+    MilestoneDef(
+      id: 'path_1',
+      category: MilestoneCategory.connection,
+      title: 'First Path Completed',
+      subtitle: 'You completed your first Connection Path.',
+      target: 1,
+      about:
+          'Finishing a Connection Path marks a season of focused growth with God.',
+      reward: 'Keep walking — each path draws you closer.',
+      icon: IconKind.sprout,
+    ),
+    MilestoneDef(
+      id: 'path_3',
+      category: MilestoneCategory.connection,
+      title: 'Three Paths Completed',
+      subtitle: 'You completed 3 Connection Paths.',
+      target: 3,
+      about: 'Returning to guided paths builds a habit of spiritual focus.',
+      reward: 'Faithfulness compounds over every finished path.',
+      icon: IconKind.sprout,
+    ),
+    MilestoneDef(
+      id: 'path_5',
+      category: MilestoneCategory.connection,
+      title: 'Five Paths Completed',
+      subtitle: 'You completed 5 Connection Paths.',
+      target: 5,
+      about: 'Five finished paths show a heart that keeps seeking God.',
+      reward: 'Stay rooted — He meets you on every path.',
+      icon: IconKind.wreath,
+    ),
+    MilestoneDef(
+      id: 'path_10',
+      category: MilestoneCategory.connection,
+      title: 'Ten Paths Completed',
+      subtitle: 'You completed 10 Connection Paths.',
+      target: 10,
+      about: 'Ten paths completed is a testimony of lasting devotion.',
+      reward: 'Well done, faithful servant — keep going.',
+      icon: IconKind.wreath,
+    ),
+
+    // —— Prayer (doc §8 / mockup 13A) ——
     MilestoneDef(
       id: 'pray_1',
       category: MilestoneCategory.prayer,
       title: 'First Prayer',
-      subtitle: 'You shared your first prayer.',
+      subtitle: 'You Post your first prayer.',
       target: 1,
       about:
           'Sharing your first prayer opens a door of hope for yourself and others.',
@@ -80,8 +134,7 @@ class MilestonesData {
       title: 'Praying Together',
       subtitle: 'Joined in prayer 10 times.',
       target: 10,
-      about:
-          'Standing with others in prayer builds unity and compassion.',
+      about: 'Standing with others in prayer builds unity and compassion.',
       reward: 'Where two or three gather, He is in the midst.',
       icon: IconKind.prayer,
     ),
@@ -119,15 +172,14 @@ class MilestonesData {
       icon: IconKind.prayer,
     ),
 
-    // —— Community ——
+    // —— Community (doc §9 / mockup 13B) ——
     MilestoneDef(
       id: 'comm_1',
       category: MilestoneCategory.community,
       title: 'Community Starter',
       subtitle: 'Made your first comment on a prayer.',
       target: 1,
-      about:
-          'Your first word of encouragement can lift a weary soul.',
+      about: 'Your first word of encouragement can lift a weary soul.',
       reward: 'Kind words plant seeds of hope.',
       icon: IconKind.community,
     ),
@@ -137,8 +189,7 @@ class MilestonesData {
       title: 'Encourager',
       subtitle: 'Made 10 encouraging comments.',
       target: 10,
-      about:
-          'Encouragement multiplies when shared freely in community.',
+      about: 'Encouragement multiplies when shared freely in community.',
       reward: 'Build one another up in love.',
       icon: IconKind.community,
     ),
@@ -148,8 +199,7 @@ class MilestonesData {
       title: 'Faithful Supporter',
       subtitle: 'Made 50 encouraging comments.',
       target: 50,
-      about:
-          'Faithful support turns strangers into family in Christ.',
+      about: 'Faithful support turns strangers into family in Christ.',
       reward: 'You are a blessing to many.',
       icon: IconKind.community,
     ),
@@ -159,8 +209,7 @@ class MilestonesData {
       title: 'Community Builder',
       subtitle: 'Made 100 encouraging comments.',
       target: 100,
-      about:
-          'Builders create places where faith and friendship thrive.',
+      about: 'Builders create places where faith and friendship thrive.',
       reward: 'Your presence strengthens the body.',
       icon: IconKind.community,
     ),
@@ -170,8 +219,7 @@ class MilestonesData {
       title: 'Light in Community',
       subtitle: 'Made 250 encouraging comments.',
       target: 250,
-      about:
-          'A consistent light guides many toward hope and belonging.',
+      about: 'A consistent light guides many toward hope and belonging.',
       reward: 'Let your light shine before others.',
       icon: IconKind.community,
     ),
@@ -202,7 +250,7 @@ class MilestonesData {
   static String tabIntro(MilestoneCategory c) {
     switch (c) {
       case MilestoneCategory.connection:
-        return 'Celebrate your daily connection and lasting faithfulness.';
+        return 'Celebrate your daily connection and lasting faithfulness with God.';
       case MilestoneCategory.prayer:
         return 'Celebrate your prayer journey and faithful time spent in prayer.';
       case MilestoneCategory.community:

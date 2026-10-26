@@ -12,6 +12,11 @@ class ConnectionPathProgress {
   static const _stepPrefix = 'cp_step_';
   static const _reflectionPrefix = 'cp_reflection_';
   static const _completedOnPrefix = 'cp_completed_on_';
+  /// Calendar date (YYYY-MM-DD) each path day was completed — for
+  /// "Days Connected" milestones.
+  static const _dayDoneOnPrefix = 'cp_day_done_on_';
+  /// Connection Check slider (not shared with onboarding).
+  static const _checkPrefix = 'cp_connection_check_';
 
   static Future<bool> isStarted(String pathId) =>
       ReadingPlanProgressService.isStarted(pathId);
@@ -83,6 +88,12 @@ class ConnectionPathProgress {
       day,
       completed: true,
     );
+    final prefs = await SharedPreferences.getInstance();
+    final dayKey = '$_dayDoneOnPrefix${path.id}_$day';
+    if (!prefs.containsKey(dayKey)) {
+      await prefs.setString(
+          dayKey, DateTime.now().toIso8601String().split('T')[0]);
+    }
     final done = await ReadingPlanProgressService.completedDayCount(
       path.id,
       path.durationDays,
@@ -97,6 +108,21 @@ class ConnectionPathProgress {
       return true;
     }
     return false;
+  }
+
+  /// One key per completed path day: its YYYY-MM-DD date, or a per-day key for
+  /// days completed before dates were recorded (still counted once each).
+  static Future<Set<String>> connectedDayKeys() async {
+    final p = await SharedPreferences.getInstance();
+    final out = <String>{};
+    for (final path in await ConnectionPathsData.load()) {
+      for (var i = 0; i < path.durationDays; i++) {
+        if (!await isDayCompleted(path.id, i)) continue;
+        final date = p.getString('$_dayDoneOnPrefix${path.id}_$i');
+        out.add(date != null && date.isNotEmpty ? date : 'cp:${path.id}:$i');
+      }
+    }
+    return out;
   }
 
   static Future<DateTime?> completedOn(String pathId) async {
@@ -114,12 +140,13 @@ class ConnectionPathProgress {
         await p.remove('$_stepPrefix${path.id}_${i}_${s.name}');
       }
       await p.remove('$_reflectionPrefix${path.id}_$i');
+      await p.remove('$_dayDoneOnPrefix${path.id}_$i');
     }
   }
 
   static Future<List<ConnectionPath>> activePaths() async {
     final out = <ConnectionPath>[];
-    for (final path in ConnectionPathsData.all) {
+    for (final path in await ConnectionPathsData.load()) {
       if (await isStarted(path.id) && !await isCompleted(path.id)) {
         out.add(path);
       }
@@ -129,9 +156,24 @@ class ConnectionPathProgress {
 
   static Future<List<ConnectionPath>> completedPaths() async {
     final out = <ConnectionPath>[];
-    for (final path in ConnectionPathsData.all) {
+    for (final path in await ConnectionPathsData.load()) {
       if (await isCompleted(path.id)) out.add(path);
     }
     return out;
+  }
+
+  static Future<double?> connectionCheck(String pathId) async {
+    final p = await SharedPreferences.getInstance();
+    return p.getDouble('$_checkPrefix$pathId');
+  }
+
+  static Future<void> saveConnectionCheck(String pathId, double value) async {
+    final p = await SharedPreferences.getInstance();
+    await p.setDouble('$_checkPrefix$pathId', value);
+  }
+
+  static Future<bool> hasConnectionCheck(String pathId) async {
+    final p = await SharedPreferences.getInstance();
+    return p.containsKey('$_checkPrefix$pathId');
   }
 }

@@ -10,6 +10,7 @@ import 'package:biblebookapp/view/screens/prayer_wall/prayer_wall_screen.dart';
 import 'package:biblebookapp/view/screens/prayer_wall/prayer_wall_service.dart';
 import 'package:biblebookapp/view/screens/prayer_wall/prayer_added_success_screen.dart';
 import 'package:biblebookapp/view/screens/prayer_wall/prayer_wall_verify_dialogs.dart';
+import 'package:biblebookapp/view/screens/milestones/milestone_celebration_coordinator.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
@@ -360,6 +361,8 @@ class _PostPrayerScreenState extends State<PostPrayerScreen> {
       final prayerId = (_extractPrayerId(created) ?? '').trim();
       PrayerWallItem? postedItem;
       if (prayerId.isNotEmpty) {
+        // Seed before earn so unlock can show on this screen.
+        await MilestoneCelebrationCoordinator.seedBaselineIfNeeded();
         // Always track prayers created by this device so Edit/Delete works even
         // for anonymous/community posts.
         await PrayerWallLocalStore.addMyPrayerId(prayerId);
@@ -388,6 +391,11 @@ class _PostPrayerScreenState extends State<PostPrayerScreen> {
             prayerId: prayerId,
             authorUserId: posterUserId.trim(),
           );
+        }
+        // After duration meta is saved, so First Prayer counts this post even
+        // if the Prayer Wall account sync has rebuilt the my-prayer list.
+        if (mounted) {
+          await MilestoneCelebrationCoordinator.checkAndShow(context);
         }
         postedItem = PrayerWallItem(
           id: prayerId,
@@ -463,8 +471,9 @@ class _PostPrayerScreenState extends State<PostPrayerScreen> {
       );
       return;
     }
-    if (_isPrayerInputTooShort(_titleCtrl.text) ||
-        _isPrayerInputTooShort(words)) {
+    // 50-char minimum applies to the prayer request only; the title just
+    // needs to be non-empty (checked above).
+    if (_isPrayerInputTooShort(words)) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Please enter at least 50 characters.'),

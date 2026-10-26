@@ -5,7 +5,7 @@ import 'package:biblebookapp/view/screens/milestones/models/milestone_model.dart
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
-/// Screen 14 — Milestone Detail.
+/// Mockup 13C — Milestone Detail.
 class MilestoneDetailScreen extends StatefulWidget {
   const MilestoneDetailScreen({super.key, required this.milestoneId});
 
@@ -39,6 +39,8 @@ class _MilestoneDetailScreenState extends State<MilestoneDetailScreen> {
     final p = _progress;
     return ParchmentScaffold(
       title: 'Milestone Detail',
+      backgroundAsset: 'assets/peace-bg.png',
+      scrim: true,
       body: _loading || p == null
           ? const Center(child: CircularProgressIndicator(color: Pc.brown))
           : ListView(
@@ -47,7 +49,8 @@ class _MilestoneDetailScreenState extends State<MilestoneDetailScreen> {
                 Center(
                   child: LaurelEmblem(
                     size: 180,
-                    text: p.def.category == MilestoneCategory.connection
+                    text: p.def.category == MilestoneCategory.connection &&
+                            !p.def.id.startsWith('path_')
                         ? '${p.def.target}'
                         : null,
                     icon: milestoneIconFor(p.def.icon),
@@ -59,7 +62,7 @@ class _MilestoneDetailScreenState extends State<MilestoneDetailScreen> {
                   textAlign: TextAlign.center,
                   style: const TextStyle(
                     fontFamily: Pc.serif,
-                    fontSize: 27,
+                    fontSize: 26,
                     fontWeight: FontWeight.w700,
                     color: Pc.ink,
                   ),
@@ -75,9 +78,9 @@ class _MilestoneDetailScreenState extends State<MilestoneDetailScreen> {
                     color: Pc.muted,
                   ),
                 ),
-                const SizedBox(height: 14),
+                const SizedBox(height: 16),
                 const OrnamentDivider(),
-                const SizedBox(height: 12),
+                const SizedBox(height: 14),
                 Row(
                   children: [
                     const Expanded(
@@ -105,7 +108,7 @@ class _MilestoneDetailScreenState extends State<MilestoneDetailScreen> {
                   ],
                 ),
                 const SizedBox(height: 8),
-                ParchmentProgressBar(value: p.fraction, height: 8),
+                ParchmentProgressBar(value: p.fraction, height: 9),
                 const SizedBox(height: 18),
                 _InfoCard(
                   icon: Icons.emoji_objects_outlined,
@@ -120,7 +123,12 @@ class _MilestoneDetailScreenState extends State<MilestoneDetailScreen> {
                 ),
               ],
             ),
-      bottom: ParchmentButton(label: 'Continue', onPressed: () => Get.back()),
+      bottom: ParchmentButton(
+        label: 'Continue',
+        onPressed: () => Get.back(),
+        gold: true,
+        showArrow: true,
+      ),
     );
   }
 }
@@ -142,7 +150,7 @@ class _InfoCard extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, color: Pc.bronze, size: 34),
+          Icon(icon, color: Pc.bronze, size: 32),
           const SizedBox(width: 14),
           Expanded(
             child: Column(

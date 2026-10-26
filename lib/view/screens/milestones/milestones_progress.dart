@@ -1,5 +1,6 @@
 import 'package:biblebookapp/services/reading_plan_progress_service.dart';
 import 'package:biblebookapp/streak/streak_service.dart';
+import 'package:biblebookapp/view/constants/share_preferences.dart';
 import 'package:biblebookapp/view/screens/milestones/data/milestones_data.dart';
 import 'package:biblebookapp/view/screens/milestones/models/milestone_model.dart';
 import 'package:biblebookapp/view/screens/prayer_wall/prayer_wall_local_store.dart';
@@ -13,11 +14,23 @@ import 'package:biblebookapp/view/screens/reading_plans/models/reading_plan_mode
 class MilestonesProgressService {
   MilestonesProgressService._();
 
-  static Future<int> _connectionDays() =>
-      StreakService.getTotalCompletedDays();
+  /// Days Connected = distinct days with a Daily Connection (streak) or a
+  /// completed Connection Path day; same calendar date counts once.
+  static Future<int> _connectionDays() async {
+    final streakDates = await SharPreferences.getStringList(
+            SharPreferences.streakCompletedDates) ??
+        <String>[];
+    final pathDays = await ConnectionPathProgress.connectedDayKeys();
+    return {...streakDates, ...pathDays}.length;
+  }
 
-  static Future<int> _prayersPosted() async =>
-      (await PrayerWallLocalStore.loadMyPrayerIds()).length;
+  /// My-prayer ids are cleared/rebuilt by the Prayer Wall account sync, so a
+  /// just-posted (pending) prayer can drop out; the device-owned ids written
+  /// on post are not touched by that sync.
+  static Future<int> _prayersPosted() async => {
+        ...await PrayerWallLocalStore.loadMyPrayerIds(),
+        ...await PrayerWallLocalStore.loadOwnedPrayerIds(),
+      }.length;
 
   static Future<int> _prayersJoined() async =>
       (await PrayerWallLocalStore.loadLikeMap()).length;
@@ -36,8 +49,12 @@ class MilestonesProgressService {
   static Future<int> currentFor(MilestoneDef def) async {
     switch (def.category) {
       case MilestoneCategory.connection:
+        // Path-completion milestones (doc §10) live under Connection tab.
+        if (def.id.startsWith('path_')) return _pathsCompleted();
+        // Connection day milestones use total days connected (not streak).
         return _connectionDays();
       case MilestoneCategory.prayer:
+        // First Prayer = published prayers; others = unique prayers joined.
         if (def.id == 'pray_1') return _prayersPosted();
         return _prayersJoined();
       case MilestoneCategory.community:

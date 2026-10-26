@@ -1,5 +1,5 @@
-import 'package:biblebookapp/view/screens/connection_paths/connection_path_progress.dart';
 import 'package:biblebookapp/view/screens/connection_paths/connection_paths_screen.dart';
+import 'package:biblebookapp/view/screens/connection_paths/data/connection_paths_data.dart';
 import 'package:biblebookapp/view/screens/connection_paths/models/connection_path.dart';
 import 'package:biblebookapp/view/screens/connection_paths/my_paths_screen.dart';
 import 'package:biblebookapp/view/screens/connection_paths/path_overview_screen.dart';
@@ -7,10 +7,8 @@ import 'package:biblebookapp/view/screens/connection_paths/widgets/parchment_ui.
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
-void _returnHome() => Get.until((route) => route.isFirst);
-
-/// Screen 6 — Day Completed.
-class DayCompletedScreen extends StatefulWidget {
+/// Mockup screen 9 — Day Complete.
+class DayCompletedScreen extends StatelessWidget {
   const DayCompletedScreen({
     super.key,
     required this.path,
@@ -21,72 +19,48 @@ class DayCompletedScreen extends StatefulWidget {
   final int dayIndex;
 
   @override
-  State<DayCompletedScreen> createState() => _DayCompletedScreenState();
-}
-
-class _DayCompletedScreenState extends State<DayCompletedScreen> {
-  int _connected = 0;
-
-  @override
-  void initState() {
-    super.initState();
-    ConnectionPathProgress.completedDays(widget.path).then((d) {
-      if (mounted) setState(() => _connected = d.length);
-    });
-  }
-
-  @override
   Widget build(BuildContext context) {
+    final msg = path.days[dayIndex].completionMessage;
     return ParchmentScaffold(
       title: '',
+      showBack: false,
+      backgroundAsset: ConnectionPathsData.completeBgAsset,
+      // Lighter than the default scrim so the sunrise shows (mockup 9 / 11).
+      scrimColor: const Color(0x99F8F1E3),
       body: Center(
         child: SingleChildScrollView(
           padding: const EdgeInsets.symmetric(horizontal: 28),
           child: Column(
             children: [
-              const LaurelEmblem(icon: Icons.add, size: 170),
-              const SizedBox(height: 14),
-              Text(
-                'Day ${widget.dayIndex + 1}\nCompleted!',
+              Container(
+                width: 88,
+                height: 88,
+                decoration: BoxDecoration(
+                  color: Pc.gold.withValues(alpha: 0.2),
+                  shape: BoxShape.circle,
+                  border: Border.all(color: Pc.gold, width: 2),
+                ),
+                child:
+                    const Icon(Icons.check_rounded, size: 48, color: Pc.brown),
+              ),
+              const SizedBox(height: 18),
+              const Text(
+                'Day Complete!',
                 textAlign: TextAlign.center,
-                style: const TextStyle(
+                style: TextStyle(
                   fontFamily: Pc.serif,
-                  fontSize: 30,
-                  height: 1.15,
+                  fontSize: 28,
                   fontWeight: FontWeight.w700,
                   color: Pc.ink,
                 ),
               ),
               const SizedBox(height: 10),
-              const Text(
-                'Great! You made time\nwith God today.',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontFamily: Pc.serif,
-                  fontSize: 16,
-                  height: 1.4,
-                  color: Pc.muted,
-                ),
-              ),
-              const SizedBox(height: 22),
-              const OrnamentDivider(),
-              const SizedBox(height: 14),
               Text(
-                '$_connected Day${_connected == 1 ? '' : 's'} Connected',
+                msg.isEmpty ? 'Great! You made time with God today.' : msg,
+                textAlign: TextAlign.center,
                 style: const TextStyle(
                   fontFamily: Pc.serif,
-                  fontSize: 18,
-                  fontWeight: FontWeight.w700,
-                  color: Pc.ink,
-                ),
-              ),
-              const SizedBox(height: 6),
-              const Text(
-                'Keep going on your\nConnection Path. Your next day\nunlocks tomorrow.',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontFamily: Pc.serif,
-                  fontSize: 14,
+                  fontSize: 15,
                   height: 1.4,
                   color: Pc.muted,
                 ),
@@ -99,20 +73,26 @@ class _DayCompletedScreenState extends State<DayCompletedScreen> {
         mainAxisSize: MainAxisSize.min,
         children: [
           ParchmentButton(
-            label: 'View Path Progress',
+            label: 'Continue My Journey',
             onPressed: () => Get.off(
-              () => PathProgressScreen(path: widget.path),
+              () => PathOverviewScreen(path: path),
               transition: Transition.cupertino,
             ),
+            gold: true,
+            showArrow: true,
           ),
-          ParchmentLinkButton(label: 'Return Home', onPressed: _returnHome),
+          TextButton(
+            onPressed: () => Get.until((r) => r.isFirst),
+            child: const Text('Back to Home',
+                style: TextStyle(color: Pc.muted, fontWeight: FontWeight.w600)),
+          ),
         ],
       ),
     );
   }
 }
 
-/// Screen 9 — Path Completed.
+/// Mockup screen 11 — Path Complete.
 class PathCompletedScreen extends StatelessWidget {
   const PathCompletedScreen({super.key, required this.path});
 
@@ -120,46 +100,78 @@ class PathCompletedScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final msg = path.completionMessage;
     return ParchmentScaffold(
       title: '',
+      showBack: false,
+      backgroundAsset: ConnectionPathsData.completeBgAsset,
+      // Lighter than the default scrim so the sunrise shows (mockup 9 / 11).
+      scrimColor: const Color(0x99F8F1E3),
       body: Center(
         child: SingleChildScrollView(
           padding: const EdgeInsets.symmetric(horizontal: 28),
           child: Column(
             children: [
-              const LaurelEmblem(icon: Icons.add, size: 170),
-              const SizedBox(height: 14),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(16),
+                child: Image.asset(
+                  ConnectionPathsData.coverFor(path),
+                  height: 140,
+                  width: double.infinity,
+                  fit: BoxFit.cover,
+                ),
+              ),
+              const SizedBox(height: 18),
+              const Icon(Icons.workspace_premium_rounded,
+                  size: 56, color: Pc.gold),
+              const SizedBox(height: 12),
               const Text(
-                'Path\nCompleted!',
+                'Path Complete!',
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   fontFamily: Pc.serif,
-                  fontSize: 32,
-                  height: 1.15,
+                  fontSize: 28,
                   fontWeight: FontWeight.w700,
                   color: Pc.ink,
                 ),
               ),
-              const SizedBox(height: 6),
+              const SizedBox(height: 8),
               Text(
                 path.title,
+                textAlign: TextAlign.center,
                 style: const TextStyle(
                   fontFamily: Pc.serif,
                   fontSize: 18,
-                  color: Pc.ink,
+                  fontWeight: FontWeight.w700,
+                  color: Pc.brown,
                 ),
               ),
-              const SizedBox(height: 22),
-              const Text(
-                'You have finished this path.\nKeep making meaningful time\nwith God every day.',
+              const SizedBox(height: 12),
+              Text(
+                msg.isEmpty
+                    ? 'You finished this Connection Path. Keep walking with God.'
+                    : msg,
                 textAlign: TextAlign.center,
-                style: TextStyle(
+                style: const TextStyle(
                   fontFamily: Pc.serif,
                   fontSize: 15,
                   height: 1.45,
                   color: Pc.muted,
                 ),
               ),
+              if (path.summaryReference.isNotEmpty) ...[
+                const SizedBox(height: 18),
+                Text(
+                  path.summaryReference,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    fontFamily: Pc.serif,
+                    fontSize: 14,
+                    fontStyle: FontStyle.italic,
+                    color: Pc.ink,
+                  ),
+                ),
+              ],
             ],
           ),
         ),
@@ -168,18 +180,21 @@ class PathCompletedScreen extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           ParchmentButton(
-            label: 'View My Paths',
-            onPressed: () => Get.off(
-              () => const MyPathsScreen(initialTab: 1),
-              transition: Transition.cupertino,
-            ),
-          ),
-          ParchmentLinkButton(
-            label: 'Start Another Path',
+            label: 'Explore More Paths',
             onPressed: () => Get.off(
               () => const AllConnectionPathsScreen(),
               transition: Transition.cupertino,
             ),
+            gold: true,
+            showArrow: true,
+          ),
+          TextButton(
+            onPressed: () => Get.off(
+              () => const MyPathsScreen(initialTab: 1),
+              transition: Transition.cupertino,
+            ),
+            child: const Text('View Completed Paths',
+                style: TextStyle(color: Pc.muted, fontWeight: FontWeight.w600)),
           ),
         ],
       ),

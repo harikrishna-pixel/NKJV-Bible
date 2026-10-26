@@ -18,7 +18,21 @@ class Pc {
   static const border = Color(0xFFD4C4A8);
   static const bgAsset = 'assets/lightMode/day_bg.png';
 
+  /// Scenic / parchment backgrounds from app assets (Connection Paths).
+  static const pathsBg = 'assets/peace-bg.png';
+  static const verseBg = 'assets/verse_image_bg.png';
+  static const checkBg = 'assets/welcome-screen-bg.png';
+  static const completeBg = 'assets/splash-bg.png';
+  static const heroBg = 'assets/onboarding/5.jpg';
+
   static const serif = 'Georgia';
+
+  /// Mockup gold CTA gradient.
+  static const goldGradient = LinearGradient(
+    begin: Alignment.centerLeft,
+    end: Alignment.centerRight,
+    colors: [Color(0xFFC9A227), Color(0xFF8B6914)],
+  );
 
   static BoxDecoration cardDecoration({double radius = 14}) => BoxDecoration(
         color: card.withValues(alpha: 0.9),
@@ -45,6 +59,10 @@ class ParchmentScaffold extends StatelessWidget {
     this.actions = const [],
     this.showBack = true,
     this.onBack,
+    this.backgroundAsset,
+    this.scrim = false,
+    this.scrimColor,
+    this.headerColor = Pc.ink,
   });
 
   final String title;
@@ -55,78 +73,98 @@ class ParchmentScaffold extends StatelessWidget {
   final bool showBack;
   final VoidCallback? onBack;
 
+  /// Optional full-screen asset background. Defaults to [Pc.bgAsset]
+  /// so Milestones and other callers stay unchanged.
+  final String? backgroundAsset;
+
+  /// Soft light overlay so cards stay readable on photo backgrounds.
+  final bool scrim;
+
+  /// Custom overlay colour; when set it is used instead of the [scrim] cream.
+  final Color? scrimColor;
+
+  /// Back arrow / title / subtitle colour (white over dark photo pages).
+  final Color headerColor;
+
   @override
   Widget build(BuildContext context) {
+    final bg = backgroundAsset ?? Pc.bgAsset;
     return Scaffold(
       body: Container(
-        decoration: const BoxDecoration(
+        decoration: BoxDecoration(
           image: DecorationImage(
-            image: AssetImage(Pc.bgAsset),
-            fit: BoxFit.fill,
+            image: AssetImage(bg),
+            fit: BoxFit.cover,
           ),
         ),
-        child: SafeArea(
-          child: Column(
-            children: [
-              Padding(
-                padding: const EdgeInsets.fromLTRB(4, 2, 4, 0),
-                child: Row(
-                  children: [
-                    SizedBox(
-                      width: 48,
-                      child: showBack
-                          ? IconButton(
-                              onPressed: onBack ?? () => Get.back(),
-                              icon: const Icon(Icons.arrow_back, color: Pc.ink),
-                            )
-                          : null,
-                    ),
-                    Expanded(
-                      child: Column(
-                        children: [
-                          Text(
-                            title,
-                            textAlign: TextAlign.center,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              fontFamily: Pc.serif,
-                              fontSize: 21,
-                              fontWeight: FontWeight.w700,
-                              color: Pc.ink,
-                            ),
-                          ),
-                          if (subtitle != null)
+        child: Container(
+          color: scrimColor ?? (scrim ? const Color(0xCCF8F1E3) : null),
+          child: SafeArea(
+            child: Column(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(4, 2, 4, 0),
+                  child: Row(
+                    children: [
+                      SizedBox(
+                        width: 48,
+                        child: showBack
+                            ? IconButton(
+                                onPressed: onBack ?? () => Get.back(),
+                                icon:
+                                    Icon(Icons.arrow_back, color: headerColor),
+                              )
+                            : null,
+                      ),
+                      Expanded(
+                        child: Column(
+                          children: [
                             Text(
-                              subtitle!,
-                              style: const TextStyle(
+                              title,
+                              textAlign: TextAlign.center,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
                                 fontFamily: Pc.serif,
-                                fontSize: 13,
-                                color: Pc.muted,
+                                fontSize: 21,
+                                fontWeight: FontWeight.w700,
+                                color: headerColor,
                               ),
                             ),
-                        ],
+                            if (subtitle != null)
+                              Text(
+                                subtitle!,
+                                style: TextStyle(
+                                  fontFamily: Pc.serif,
+                                  fontSize: 13,
+                                  color: headerColor == Pc.ink
+                                      ? Pc.muted
+                                      : headerColor.withValues(alpha: 0.85),
+                                ),
+                              ),
+                          ],
+                        ),
                       ),
-                    ),
-                    SizedBox(
-                      width: 48,
-                      child: actions.isEmpty
-                          ? null
-                          : Row(
-                              mainAxisAlignment: MainAxisAlignment.end,
-                              children: actions,
-                            ),
-                    ),
-                  ],
+                      SizedBox(
+                        width: 48,
+                        child: actions.isEmpty
+                            ? null
+                            : Row(
+                                mainAxisAlignment: MainAxisAlignment.end,
+                                children: actions,
+                              ),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-              Expanded(child: body),
-              if (bottom != null)
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(18, 8, 18, 14),
-                  child: bottom!,
-                ),
-            ],
+                Expanded(child: body),
+                if (bottom != null)
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(18, 8, 18, 14),
+                    child: bottom!,
+                  ),
+              ],
+            ),
           ),
         ),
       ),
@@ -162,17 +200,73 @@ class ParchmentCard extends StatelessWidget {
   }
 }
 
+/// Category pill that switches selected state in a single frame (no
+/// animation), so the label never shows against the wrong background.
+class ParchmentChoiceChip extends StatelessWidget {
+  const ParchmentChoiceChip({
+    super.key,
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      behavior: HitTestBehavior.opaque,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14),
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: selected ? Pc.brown : Pc.card,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: selected ? Pc.brown : Pc.border),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (selected) ...[
+              const Icon(Icons.check, size: 16, color: Colors.white),
+              const SizedBox(width: 6),
+            ],
+            Text(
+              label,
+              style: TextStyle(
+                fontFamily: Pc.serif,
+                fontWeight: FontWeight.w600,
+                fontSize: 13,
+                color: selected ? Colors.white : Pc.ink,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class ParchmentButton extends StatelessWidget {
   const ParchmentButton({
     super.key,
     required this.label,
     required this.onPressed,
     this.icon,
+    this.gold = false,
+    this.showArrow = false,
   });
 
   final String label;
   final VoidCallback? onPressed;
   final IconData? icon;
+
+  /// Mockup gold CTA (Connection Paths). Default brown keeps Milestones same.
+  final bool gold;
+  final bool showArrow;
 
   @override
   Widget build(BuildContext context) {
@@ -183,19 +277,22 @@ class ParchmentButton extends StatelessWidget {
         color: Colors.transparent,
         child: InkWell(
           onTap: onPressed,
-          borderRadius: BorderRadius.circular(10),
+          borderRadius: BorderRadius.circular(12),
           child: Ink(
-            height: 50,
+            height: 52,
             decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(10),
-              gradient: const LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [Color(0xFF6B4E36), Pc.brownDark],
-              ),
+              borderRadius: BorderRadius.circular(12),
+              gradient: gold
+                  ? Pc.goldGradient
+                  : const LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [Color(0xFF6B4E36), Pc.brownDark],
+                    ),
               boxShadow: [
                 BoxShadow(
-                  color: Pc.brownDark.withValues(alpha: 0.25),
+                  color: (gold ? const Color(0xFF8B6914) : Pc.brownDark)
+                      .withValues(alpha: 0.28),
                   blurRadius: 8,
                   offset: const Offset(0, 3),
                 ),
@@ -220,6 +317,11 @@ class ParchmentButton extends StatelessWidget {
                     ),
                   ),
                 ),
+                if (showArrow) ...[
+                  const SizedBox(width: 6),
+                  const Icon(Icons.arrow_forward_rounded,
+                      color: Colors.white, size: 18),
+                ],
               ],
             ),
           ),
@@ -511,8 +613,8 @@ class DayStepper extends StatelessWidget {
         itemCount: total,
         separatorBuilder: (_, __) => const SizedBox(width: 8),
         itemBuilder: (_, i) {
+          // Only completed days are filled; the next day stays outlined.
           final done = completed.contains(i);
-          final isCurrent = i == current && !done;
           return GestureDetector(
             onTap: onTapDay == null ? null : () => onTapDay!(i),
             child: Column(
@@ -523,7 +625,7 @@ class DayStepper extends StatelessWidget {
                   alignment: Alignment.center,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    color: done || isCurrent ? Pc.brown : Pc.card,
+                    color: done ? Pc.brown : Pc.card,
                     border: Border.all(color: Pc.brown, width: 1.4),
                   ),
                   child: done
@@ -534,7 +636,7 @@ class DayStepper extends StatelessWidget {
                             fontFamily: Pc.serif,
                             fontWeight: FontWeight.w700,
                             fontSize: 13,
-                            color: isCurrent ? Colors.white : Pc.brown,
+                            color: Pc.brown,
                           ),
                         ),
                 ),

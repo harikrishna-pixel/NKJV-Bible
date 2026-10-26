@@ -1,6 +1,5 @@
 import 'dart:io';
 
-import 'package:biblebookapp/utils/emoji_text_style.dart';
 import 'package:biblebookapp/view/constants/colors.dart';
 import 'package:flutter/material.dart';
 
@@ -27,11 +26,12 @@ class ThanksForLoveRatingDialogContent extends StatelessWidget {
     final screenWidth = MediaQuery.of(context).size.width;
     final titleSize = isTablet ? 24.0 : (screenWidth < 380 ? 20.0 : 22.0);
     final bodySize = isTablet ? 17.0 : (screenWidth < 380 ? 14.0 : 15.5);
-    final rateLabel =
-        Platform.isIOS ? 'Rate on App Store' : 'Rate on Play Store';
+    final rateLabel = Platform.isIOS
+        ? 'Rate Us on the App Store'
+        : 'Rate Us on the Play Store';
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
+      padding: const EdgeInsets.fromLTRB(20, 8, 20, 26),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -46,37 +46,23 @@ class ThanksForLoveRatingDialogContent extends StatelessWidget {
               ),
             ),
           ),
-          const SizedBox(height: 4),
-          SizedBox(
-            height: 88,
-            child: Stack(
-              alignment: Alignment.center,
-              children: [
-                const Positioned(top: 4, left: 52, child: _Sparkle(size: 14)),
-                const Positioned(top: 0, right: 58, child: _Sparkle(size: 18)),
-                const Positioned(bottom: 8, left: 38, child: _Sparkle(size: 12)),
-                const Positioned(bottom: 2, right: 44, child: _Sparkle(size: 16)),
-                const Positioned(top: 28, left: 24, child: _Sparkle(size: 10)),
-                const Positioned(top: 24, right: 28, child: _Sparkle(size: 11)),
-                emojiText('😍', fontSize: isTablet ? 52 : 48),
-              ],
-            ),
-          ),
-          const SizedBox(height: 12),
-          textWithTrailingEmoji(
-            prefix: 'Thanks for the love! ',
-            emoji: '💛',
-            emojiFontSize: titleSize,
-            prefixStyle: TextStyle(
+          const SizedBox(height: 2),
+          _StarsHeader(big: isTablet ? 56 : 50),
+          const SizedBox(height: 14),
+          Text(
+            'Enjoying the app?',
+            textAlign: TextAlign.center,
+            style: TextStyle(
               fontWeight: FontWeight.w700,
-              fontSize: titleSize,
+              fontSize: titleSize + 4,
               color: _titleBrown,
               height: 1.2,
             ),
           ),
-          const SizedBox(height: 14),
+          const SizedBox(height: 12),
           Text(
-            "Could you leave a quick rating?\nIt helps more people discover God's Word.",
+            "If you're finding this app helpful for your Bible reading, "
+            'please take a moment to rate us.',
             textAlign: TextAlign.center,
             style: TextStyle(
               fontSize: bodySize,
@@ -138,57 +124,71 @@ class ThanksForLoveRatingDialogContent extends StatelessWidget {
               ),
             ),
           ),
-          const SizedBox(height: 18),
-          Row(
-            children: [
-              Expanded(child: Divider(color: Colors.grey.shade300, height: 1)),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 12),
-                child: Text(
-                  'or',
-                  style: TextStyle(
-                    color: Colors.grey.shade500,
-                    fontSize: isTablet ? 15 : 14,
-                    fontWeight: FontWeight.w400,
-                  ),
-                ),
-              ),
-              Expanded(child: Divider(color: Colors.grey.shade300, height: 1)),
-            ],
-          ),
-          const SizedBox(height: 10),
-          TextButton(
-            onPressed: onMaybeLater,
-            style: TextButton.styleFrom(
-              foregroundColor: _bodyGrey,
-              padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
-            ),
-            child: Text(
-              'Maybe Later',
-              style: TextStyle(
-                fontSize: isTablet ? 17 : 16,
-                fontWeight: FontWeight.w500,
-                color: _bodyGrey,
-              ),
-            ),
-          ),
         ],
       ),
     );
   }
 }
 
-class _Sparkle extends StatelessWidget {
-  const _Sparkle({required this.size});
+/// Mockup header: big filled gold star with rays, smaller outlined stars.
+class _StarsHeader extends StatelessWidget {
+  const _StarsHeader({required this.big});
 
-  final double size;
+  final double big;
+
+  static const Color _gold = ThanksForLoveRatingDialogContent._sparkleGold;
 
   @override
   Widget build(BuildContext context) {
-    return Icon(
-      Icons.auto_awesome,
-      size: size,
-      color: ThanksForLoveRatingDialogContent._sparkleGold.withOpacity(0.9),
+    Widget outline(double s) =>
+        Icon(Icons.star_border_rounded, size: s, color: _gold);
+    Widget ray(double angle) => Transform.rotate(
+          angle: angle,
+          child: Container(
+            width: 3,
+            height: 12,
+            decoration: BoxDecoration(
+              color: _gold,
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+        );
+    return SizedBox(
+      height: big + 22,
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: [
+          outline(big * 0.42),
+          const SizedBox(width: 2),
+          outline(big * 0.52),
+          const SizedBox(width: 4),
+          Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  ray(-0.6),
+                  const SizedBox(width: 10),
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 4),
+                    child: ray(0),
+                  ),
+                  const SizedBox(width: 10),
+                  ray(0.6),
+                ],
+              ),
+              Icon(Icons.star_rounded, size: big, color: _gold),
+            ],
+          ),
+          const SizedBox(width: 4),
+          outline(big * 0.52),
+          const SizedBox(width: 2),
+          outline(big * 0.42),
+        ],
+      ),
     );
   }
 }
