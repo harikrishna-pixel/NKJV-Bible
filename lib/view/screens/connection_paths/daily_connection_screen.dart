@@ -90,9 +90,12 @@ class _DailyConnectionScreenState extends State<DailyConnectionScreen> {
     });
   }
 
-  bool get _singleStepReview => widget.review && widget.initialStep != null;
+  /// Review always moves forward to Prayer (also when opened from a step row).
+  bool get _reviewDoneHere => _step == PathStep.prayer;
 
-  bool get _reviewDoneHere => _singleStepReview || _step == PathStep.prayer;
+  /// Back from the step the review was opened on returns to the day card.
+  bool get _atReviewStart =>
+      widget.review && _step == (widget.initialStep ?? PathStep.verse);
 
   Future<void> _goNext() async {
     if (widget.review) {
@@ -121,20 +124,11 @@ class _DailyConnectionScreenState extends State<DailyConnectionScreen> {
 
   Future<void> _goBack() async {
     final i = _steps.indexOf(_step);
-    if (i <= 0 || _singleStepReview) {
+    if (i <= 0 || _atReviewStart) {
       Get.back();
       return;
     }
     setState(() => _step = _steps[i - 1]);
-  }
-
-  Future<void> _skipReflection() async {
-    await ConnectionPathProgress.setStepDone(
-        pathId, widget.dayIndex, PathStep.reflection);
-    setState(() {
-      _done = {..._done, PathStep.reflection};
-      _step = PathStep.prayer;
-    });
   }
 
   Future<void> _completeDay() async {
@@ -189,14 +183,19 @@ class _DailyConnectionScreenState extends State<DailyConnectionScreen> {
   @override
   Widget build(BuildContext context) {
     final dayNum = widget.dayIndex + 1;
-    // Every daily step uses the sunrise Bible photo with a light dark tint,
-    // white header and light step bar.
+    // Verse: sunrise Bible photo with a light dark tint and white header.
+    // Devotion / Reflection / Prayer (mockup 6–8): valley sunrise with a cream
+    // wash that fades toward the bottom, dark header.
+    final sunrise = _step != PathStep.verse;
     return ParchmentScaffold(
       title: widget.path.title,
       subtitle: 'Day $dayNum of ${widget.path.durationDays}',
-      backgroundAsset: ConnectionPathsData.verseBgAsset,
-      scrimColor: Colors.black.withValues(alpha: 0.18),
-      headerColor: Colors.white,
+      backgroundAsset: sunrise
+          ? ConnectionPathsData.valleyBgAsset
+          : ConnectionPathsData.verseBgAsset,
+      scrimColor: sunrise ? null : Colors.black.withValues(alpha: 0.18),
+      scrimGradient: sunrise ? Pc.sunriseScrim : null,
+      headerColor: sunrise ? Pc.ink : Colors.white,
       onBack: _goBack,
       body: _loading
           ? const Center(child: CircularProgressIndicator(color: Pc.brown))
@@ -204,7 +203,7 @@ class _DailyConnectionScreenState extends State<DailyConnectionScreen> {
               children: [
                 Padding(
                   padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
-                  child: _StepBar(current: _step, done: _done, light: true),
+                  child: _StepBar(current: _step, done: _done, light: !sunrise),
                 ),
                 Expanded(child: _buildStep()),
               ],
@@ -217,7 +216,7 @@ class _DailyConnectionScreenState extends State<DailyConnectionScreen> {
     if (_loading) return null;
     if (widget.review) {
       return ParchmentButton(
-        label: _reviewDoneHere ? 'Done' : 'Continue',
+        label: _reviewDoneHere ? 'Completed' : 'Continue',
         onPressed: _goNext,
         gold: true,
         showArrow: !_reviewDoneHere,
@@ -235,35 +234,17 @@ class _DailyConnectionScreenState extends State<DailyConnectionScreen> {
         return ParchmentButton(
           label: 'Next',
           onPressed: _goNext,
-          gold: true,
           showArrow: true,
         );
       case PathStep.reflection:
-        return Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextButton(
-              onPressed: _skipReflection,
-              child: const Text(
-                'Skip for Now',
-                // Reflection now sits on the dark photo.
-                style: TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.w600,
-                  shadows: _photoTextShadow,
-                ),
-              ),
-            ),
-            ValueListenableBuilder<TextEditingValue>(
-              valueListenable: _reflection,
-              builder: (_, value, __) => ParchmentButton(
-                label: 'Next',
-                onPressed: value.text.trim().isEmpty ? null : _goNext,
-                gold: true,
-                showArrow: true,
-              ),
-            ),
-          ],
+        // Next only — enabled once something is written.
+        return ValueListenableBuilder<TextEditingValue>(
+          valueListenable: _reflection,
+          builder: (_, value, __) => ParchmentButton(
+            label: 'Next',
+            onPressed: value.text.trim().isEmpty ? null : _goNext,
+            showArrow: true,
+          ),
         );
       case PathStep.prayer:
         return ParchmentButton(
@@ -285,7 +266,7 @@ class _DailyConnectionScreenState extends State<DailyConnectionScreen> {
           onShare: _shareVerse,
         );
       case PathStep.devotion:
-        return _TextStep(title: day.title, body: day.devotion);
+        return _OpenTextStep(title: day.title, body: day.devotion);
       case PathStep.reflection:
         return _ReflectionStep(
           prompt: day.reflection,
@@ -293,8 +274,43 @@ class _DailyConnectionScreenState extends State<DailyConnectionScreen> {
           readOnly: widget.review,
         );
       case PathStep.prayer:
-        return _TextStep(title: 'Prayer', body: day.prayer);
+        return _OpenTextStep(title: 'Prayer', body: day.prayer);
     }
+  }
+}
+
+/// Mockup 8: left-aligned title + text directly on the sunrise wash.
+class _OpenTextStep extends StatelessWidget {
+  const _OpenTextStep({required this.title, required this.body});
+  final String title;
+  final String body;
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(22, 10, 22, 20),
+      children: [
+        Text(
+          title,
+          style: const TextStyle(
+            fontFamily: Pc.serif,
+            fontSize: 26,
+            fontWeight: FontWeight.w700,
+            color: Pc.ink,
+          ),
+        ),
+        const SizedBox(height: 10),
+        Text(
+          body,
+          style: const TextStyle(
+            fontFamily: Pc.serif,
+            fontSize: 16.5,
+            height: 1.55,
+            color: Pc.ink,
+          ),
+        ),
+      ],
+    );
   }
 }
 
@@ -564,49 +580,6 @@ class _GlassCard extends StatelessWidget {
   }
 }
 
-class _TextStep extends StatelessWidget {
-  const _TextStep({required this.title, required this.body});
-  final String title;
-  final String body;
-
-  @override
-  Widget build(BuildContext context) {
-    return ListView(
-      padding: const EdgeInsets.fromLTRB(18, 12, 18, 20),
-      children: [
-        _GlassCard(
-          child: Column(
-            children: [
-              Text(
-                title,
-                textAlign: TextAlign.center,
-                style: const TextStyle(
-                  fontFamily: Pc.serif,
-                  fontSize: 22,
-                  fontWeight: FontWeight.w700,
-                  color: Pc.ink,
-                ),
-              ),
-              const SizedBox(height: 12),
-              const OrnamentDivider(),
-              const SizedBox(height: 14),
-              Text(
-                body,
-                style: const TextStyle(
-                  fontFamily: Pc.serif,
-                  fontSize: 16,
-                  height: 1.55,
-                  color: Pc.ink,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-}
-
 class _ReflectionStep extends StatelessWidget {
   const _ReflectionStep({
     required this.prompt,
@@ -624,78 +597,112 @@ class _ReflectionStep extends StatelessWidget {
   Widget build(BuildContext context) {
     return ListView(
       padding: const EdgeInsets.fromLTRB(18, 12, 18, 20),
+      // Drag to hide the keyboard (multi-line field: Return adds a new line).
+      keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
       children: [
-        _GlassCard(
-          child: Column(
-            children: [
-              const Text(
-                'Reflection',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontFamily: Pc.serif,
-                  fontSize: 22,
-                  fontWeight: FontWeight.w700,
-                  color: Pc.ink,
-                ),
+        // Mockup 7: open layout on the sunrise wash (no outer card).
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Reflection',
+              style: TextStyle(
+                fontFamily: Pc.serif,
+                fontSize: 26,
+                fontWeight: FontWeight.w700,
+                color: Pc.ink,
               ),
-              const SizedBox(height: 12),
-              Text(
-                prompt,
-                textAlign: TextAlign.center,
-                style: const TextStyle(
-                  fontFamily: Pc.serif,
-                  fontSize: 16,
-                  height: 1.45,
-                  color: Pc.ink,
-                ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              prompt,
+              style: const TextStyle(
+                fontFamily: Pc.serif,
+                fontSize: 17,
+                height: 1.45,
+                color: Pc.ink,
               ),
-              const SizedBox(height: 16),
+            ),
+            const SizedBox(height: 16),
+            Container(
+              decoration: BoxDecoration(
+                color: Pc.card,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Pc.border),
+              ),
+              padding: const EdgeInsets.all(12),
+              child: readOnly
+                  ? SizedBox(
+                      width: double.infinity,
+                      child: Text(
+                        controller.text.trim().isEmpty
+                            ? 'No reflection written for this day.'
+                            : controller.text,
+                        style: TextStyle(
+                          fontFamily: Pc.serif,
+                          fontSize: 15,
+                          height: 1.4,
+                          color: controller.text.trim().isEmpty
+                              ? Pc.muted
+                              : Pc.ink,
+                        ),
+                      ),
+                    )
+                  : TextField(
+                      controller: controller,
+                      maxLines: 6,
+                      maxLength: 500,
+                      onTapOutside: (_) =>
+                          FocusManager.instance.primaryFocus?.unfocus(),
+                      style: const TextStyle(
+                        fontFamily: Pc.serif,
+                        fontSize: 15,
+                        color: Pc.ink,
+                        height: 1.4,
+                      ),
+                      decoration: const InputDecoration(
+                        hintText: 'Write your thoughts here…',
+                        hintStyle:
+                            TextStyle(color: Pc.muted, fontFamily: Pc.serif),
+                        border: InputBorder.none,
+                        counterStyle: TextStyle(color: Pc.muted, fontSize: 12),
+                      ),
+                    ),
+            ),
+            if (!readOnly) ...[
+              const SizedBox(height: 14),
               Container(
+                padding: const EdgeInsets.fromLTRB(12, 12, 14, 12),
                 decoration: BoxDecoration(
-                  color: Pc.card,
+                  color: Pc.card.withValues(alpha: 0.92),
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(color: Pc.border),
                 ),
-                padding: const EdgeInsets.all(12),
-                child: readOnly
-                    ? SizedBox(
-                        width: double.infinity,
-                        child: Text(
-                          controller.text.trim().isEmpty
-                              ? 'No reflection written for this day.'
-                              : controller.text,
-                          style: TextStyle(
-                            fontFamily: Pc.serif,
-                            fontSize: 15,
-                            height: 1.4,
-                            color: controller.text.trim().isEmpty
-                                ? Pc.muted
-                                : Pc.ink,
-                          ),
-                        ),
-                      )
-                    : TextField(
-                        controller: controller,
-                        maxLines: 6,
-                        maxLength: 500,
-                        style: const TextStyle(
+                child: Row(
+                  children: [
+                    Image.asset(
+                      ConnectionPathsData.sproutAsset,
+                      width: 34,
+                      height: 34,
+                    ),
+                    const SizedBox(width: 12),
+                    const Expanded(
+                      child: Text(
+                        'Take your time. You can write as much or as '
+                        'little as you like.',
+                        style: TextStyle(
                           fontFamily: Pc.serif,
-                          fontSize: 15,
+                          fontSize: 14,
+                          height: 1.35,
                           color: Pc.ink,
-                          height: 1.4,
-                        ),
-                        decoration: const InputDecoration(
-                          hintText: 'Write your thoughts here…',
-                          hintStyle:
-                              TextStyle(color: Pc.muted, fontFamily: Pc.serif),
-                          border: InputBorder.none,
-                          counterStyle:
-                              TextStyle(color: Pc.muted, fontSize: 12),
                         ),
                       ),
+                    ),
+                  ],
+                ),
               ),
             ],
-          ),
+          ],
         ),
       ],
     );

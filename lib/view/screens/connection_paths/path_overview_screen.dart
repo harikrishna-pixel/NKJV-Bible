@@ -261,6 +261,7 @@ class _PathOverviewScreenState extends State<PathOverviewScreen> {
             total: path.durationDays,
             completed: s.completed,
             current: s.current,
+            selected: shown,
             onTapDay: (i) => setState(() => _selected = i),
           ),
           const SizedBox(height: 12),

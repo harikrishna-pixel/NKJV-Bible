@@ -1578,6 +1578,20 @@ class _HomeScreenState extends State<HomeScreen>
       await _waitForUpdateAlertFlowBeforeJourney();
       if (!mounted) return;
     }
+    // The update wait can time out while its dialog is still open. Never
+    // stack: wait until nothing is on top of Home, then a short gap so
+    // pop-ups show one after the other.
+    while (mounted && !(ModalRoute.of(context)?.isCurrent ?? true)) {
+      await Future.delayed(const Duration(milliseconds: 500));
+    }
+    if (!mounted) return;
+    await Future.delayed(const Duration(milliseconds: 800));
+    if (!mounted) return;
+    if (!(ModalRoute.of(context)?.isCurrent ?? true)) {
+      _continueJourneySheetShown = false;
+      unawaited(_maybeShowContinueJourneySheet());
+      return;
+    }
     await StreakFlowNavigation.showContinueJourneyBottomSheet(context);
   }
 

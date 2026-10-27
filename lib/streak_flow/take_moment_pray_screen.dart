@@ -1,5 +1,4 @@
-import 'package:biblebookapp/streak_flow/take_moment_released_screen.dart';
-import 'package:biblebookapp/streak_flow/take_moment_rest_screen.dart';
+import 'package:biblebookapp/streak_flow/take_moment_complete_screen.dart';
 import 'package:biblebookapp/view/constants/colors.dart';
 import 'package:biblebookapp/view/constants/theme_provider.dart';
 import 'package:flutter/material.dart';
@@ -25,7 +24,6 @@ class _TakeMomentPrayScreenState extends State<TakeMomentPrayScreen> {
   static const Color _brown = Color(0xFF3D2914);
   static const Color _gold = Color(0xFFC9A227);
   static const Color _cream = Color(0xFFF5F0E6);
-  static const Color _warmTan = Color(0xFF8B7355);
 
   bool _navigating = false;
 
@@ -167,7 +165,8 @@ class _TakeMomentPrayScreenState extends State<TakeMomentPrayScreen> {
   void _continue() {
     if (_navigating) return;
     _navigating = true;
-    Get.off(() => const TakeMomentReleasedScreen());
+    // Single merged "Well done!" screen (former placed + scripture steps).
+    Get.off(() => const TakeMomentCompleteScreen());
   }
 
   @override
@@ -175,12 +174,15 @@ class _TakeMomentPrayScreenState extends State<TakeMomentPrayScreen> {
     final isTablet = MediaQuery.of(context).size.width > 450;
     const isDark = false;
     final Color textColor = isDark ? Colors.white : _brown;
-    final Color softText = isDark ? Colors.white70 : _warmTan;
 
     return Scaffold(
-      body: TakeMomentRestScreen.peaceBackgroundStack(
-        isDark: isDark,
-        showBird: false,
+      body: Container(
+        decoration: const BoxDecoration(
+          image: DecorationImage(
+            image: AssetImage(takeMomentPaperBg),
+            fit: BoxFit.cover,
+          ),
+        ),
         child: SafeArea(
           child: Column(
             children: [
@@ -212,56 +214,53 @@ class _TakeMomentPrayScreenState extends State<TakeMomentPrayScreen> {
                   ],
                 ),
               ),
-              const Spacer(flex: 1),
               Expanded(
-                flex: 8,
                 child: SingleChildScrollView(
-                  padding: const EdgeInsets.symmetric(horizontal: 36),
+                  padding: const EdgeInsets.fromLTRB(32, 8, 32, 8),
                   child: Column(
                     children: [
+                      // Praying hands in a soft golden halo (mockup).
                       Container(
-                        width: isTablet ? 168 : 144,
-                        height: isTablet ? 140 : 120,
+                        width: isTablet ? 250 : 210,
+                        height: isTablet ? 250 : 210,
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
-                          boxShadow: [
-                            BoxShadow(
-                              color:
-                                  Colors.white.withOpacity(isDark ? 0.18 : 0.7),
-                              blurRadius: 28,
-                              spreadRadius: 4,
-                            ),
-                            BoxShadow(
-                              color: _gold.withOpacity(0.22),
-                              blurRadius: 22,
-                              spreadRadius: 1,
-                            ),
-                          ],
+                          gradient: RadialGradient(
+                            colors: [
+                              const Color(0xFFFFF3C9).withOpacity(0.95),
+                              const Color(0xFFF6DFA0).withOpacity(0.45),
+                              const Color(0xFFF6DFA0).withOpacity(0.0),
+                            ],
+                            stops: const [0.0, 0.6, 1.0],
+                          ),
                         ),
+                        padding: EdgeInsets.all(isTablet ? 30 : 24),
                         child: Image.asset(
-                          'assets/take_moment/lets_pray_icon.png',
+                          takeMomentPrayingHands,
                           fit: BoxFit.contain,
                         ),
                       ),
-                      const SizedBox(height: 28),
+                      const SizedBox(height: 12),
                       Text(
-                        "Let's Pray",
+                        "Let’s Pray",
                         textAlign: TextAlign.center,
                         style: TextStyle(
-                          fontSize: isTablet ? 32 : 28,
-                          fontWeight: FontWeight.w600,
+                          fontSize: isTablet ? 46 : 40,
+                          fontWeight: FontWeight.w700,
                           color: textColor,
                           fontFamily: 'Georgia',
                         ),
                       ),
-                      const SizedBox(height: 28),
+                      const SizedBox(height: 10),
+                      const TakeMomentOrnamentDivider(),
+                      const SizedBox(height: 18),
                       Text(
                         _prayerText,
                         textAlign: TextAlign.center,
                         style: TextStyle(
-                          fontSize: isTablet ? 18 : 16,
-                          height: 1.65,
-                          color: softText,
+                          fontSize: isTablet ? 20 : 18,
+                          height: 1.6,
+                          color: textColor,
                           fontFamily: 'Georgia',
                         ),
                       ),
@@ -269,26 +268,13 @@ class _TakeMomentPrayScreenState extends State<TakeMomentPrayScreen> {
                   ),
                 ),
               ),
-              const Spacer(flex: 1),
+              const SizedBox(height: 12),
               _primaryButton(
                 context,
                 label: 'Amen',
                 onPressed: _continue,
               ),
-              const SizedBox(height: 14),
-              TextButton(
-                onPressed: _continue,
-                child: Text(
-                  'Skip',
-                  style: TextStyle(
-                    fontSize: isTablet ? 16 : 15,
-                    color: softText,
-                    fontFamily: 'Georgia',
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ),
-              const SizedBox(height: 20),
+              SizedBox(height: isTablet ? 56 : 48),
             ],
           ),
         ),

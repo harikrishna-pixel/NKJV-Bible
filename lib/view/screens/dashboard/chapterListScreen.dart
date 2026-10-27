@@ -13,6 +13,7 @@ import 'package:get/get.dart';
 
 import '../../../controller/dashboard_controller.dart';
 import '../../constants/share_preferences.dart';
+import 'fActionButton.dart';
 import 'home_screen.dart';
 
 class ChapterListScreen extends StatefulWidget {
@@ -251,6 +252,8 @@ class _ChapterListScreenState extends State<ChapterListScreen> {
                               selectedChapter = index;
                               selectedChangeChapter = index;
                             });
+                            // Keep audio + sleep timer going in the new book.
+                            floatingButtonState.prepareForBookChange();
                             Get.offAll(
                                   () => HomeScreen(
                                       From: "Chapter",

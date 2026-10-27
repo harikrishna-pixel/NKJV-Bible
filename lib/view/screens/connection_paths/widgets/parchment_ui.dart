@@ -34,6 +34,15 @@ class Pc {
     colors: [Color(0xFFC9A227), Color(0xFF8B6914)],
   );
 
+  /// Mockup 7–9: cream wash strong at the top, fading so the valley sunrise
+  /// shows toward the bottom.
+  static const sunriseScrim = LinearGradient(
+    begin: Alignment.topCenter,
+    end: Alignment.bottomCenter,
+    colors: [Color(0xEBF8F1E3), Color(0xC7F8F1E3), Color(0x33F8F1E3)],
+    stops: [0.0, 0.55, 1.0],
+  );
+
   static BoxDecoration cardDecoration({double radius = 14}) => BoxDecoration(
         color: card.withValues(alpha: 0.9),
         borderRadius: BorderRadius.circular(radius),
@@ -62,6 +71,7 @@ class ParchmentScaffold extends StatelessWidget {
     this.backgroundAsset,
     this.scrim = false,
     this.scrimColor,
+    this.scrimGradient,
     this.headerColor = Pc.ink,
   });
 
@@ -83,13 +93,21 @@ class ParchmentScaffold extends StatelessWidget {
   /// Custom overlay colour; when set it is used instead of the [scrim] cream.
   final Color? scrimColor;
 
+  /// Overlay that fades over the photo (e.g. cream at top → clear at bottom).
+  /// Used instead of [scrimColor] when set.
+  final Gradient? scrimGradient;
+
   /// Back arrow / title / subtitle colour (white over dark photo pages).
   final Color headerColor;
 
   @override
   Widget build(BuildContext context) {
     final bg = backgroundAsset ?? Pc.bgAsset;
+    final keyboard = MediaQuery.of(context).viewInsets.bottom;
     return Scaffold(
+      // Background stays full-screen when the keyboard opens; only the
+      // content is lifted above the keyboard.
+      resizeToAvoidBottomInset: false,
       body: Container(
         decoration: BoxDecoration(
           image: DecorationImage(
@@ -98,8 +116,15 @@ class ParchmentScaffold extends StatelessWidget {
           ),
         ),
         child: Container(
-          color: scrimColor ?? (scrim ? const Color(0xCCF8F1E3) : null),
+          decoration: BoxDecoration(
+            color: scrimGradient != null
+                ? null
+                : scrimColor ?? (scrim ? const Color(0xCCF8F1E3) : null),
+            gradient: scrimGradient,
+          ),
+          padding: EdgeInsets.only(bottom: keyboard),
           child: SafeArea(
+            bottom: keyboard == 0,
             child: Column(
               children: [
                 Padding(
@@ -324,6 +349,62 @@ class ParchmentButton extends StatelessWidget {
                 ],
               ],
             ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Light outlined secondary button (mockup "Skip for Now" / "Back" /
+/// "View Path Overview").
+class ParchmentLightButton extends StatelessWidget {
+  const ParchmentLightButton({
+    super.key,
+    required this.label,
+    required this.onPressed,
+    this.leadingIcon,
+  });
+
+  final String label;
+  final VoidCallback? onPressed;
+  final IconData? leadingIcon;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Pc.card.withValues(alpha: 0.95),
+      borderRadius: BorderRadius.circular(12),
+      child: InkWell(
+        onTap: onPressed,
+        borderRadius: BorderRadius.circular(12),
+        child: Container(
+          height: 52,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: Pc.border),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              if (leadingIcon != null) ...[
+                Icon(leadingIcon, size: 20, color: Pc.ink),
+                const SizedBox(width: 4),
+              ],
+              Flexible(
+                child: Text(
+                  label,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontFamily: Pc.serif,
+                    fontSize: 15.5,
+                    fontWeight: FontWeight.w600,
+                    color: Pc.ink,
+                  ),
+                ),
+              ),
+            ],
           ),
         ),
       ),
@@ -596,12 +677,16 @@ class DayStepper extends StatelessWidget {
     required this.completed,
     required this.current,
     this.onTapDay,
+    this.selected,
   });
 
   final int total;
   final Set<int> completed;
   final int current;
   final void Function(int dayIndex)? onTapDay;
+
+  /// Day shown below the stepper — gets a gold ring + bold label (not filled).
+  final int? selected;
 
   @override
   Widget build(BuildContext context) {
@@ -615,6 +700,7 @@ class DayStepper extends StatelessWidget {
         itemBuilder: (_, i) {
           // Only completed days are filled; the next day stays outlined.
           final done = completed.contains(i);
+          final isSelected = selected == i;
           return GestureDetector(
             onTap: onTapDay == null ? null : () => onTapDay!(i),
             child: Column(
@@ -625,8 +711,23 @@ class DayStepper extends StatelessWidget {
                   alignment: Alignment.center,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    color: done ? Pc.brown : Pc.card,
-                    border: Border.all(color: Pc.brown, width: 1.4),
+                    color: done
+                        ? Pc.brown
+                        : isSelected
+                            ? Pc.gold.withValues(alpha: 0.18)
+                            : Pc.card,
+                    border: Border.all(
+                      color: isSelected ? Pc.gold : Pc.brown,
+                      width: isSelected ? 2.6 : 1.4,
+                    ),
+                    boxShadow: isSelected
+                        ? [
+                            BoxShadow(
+                              color: Pc.gold.withValues(alpha: 0.45),
+                              blurRadius: 8,
+                            ),
+                          ]
+                        : null,
                   ),
                   child: done
                       ? const Icon(Icons.check, size: 18, color: Colors.white)
@@ -643,7 +744,12 @@ class DayStepper extends StatelessWidget {
                 const SizedBox(height: 3),
                 Text(
                   'Day ${i + 1}',
-                  style: const TextStyle(fontSize: 9.5, color: Pc.muted),
+                  style: TextStyle(
+                    fontSize: 9.5,
+                    color: isSelected ? Pc.ink : Pc.muted,
+                    fontWeight:
+                        isSelected ? FontWeight.w700 : FontWeight.normal,
+                  ),
                 ),
               ],
             ),

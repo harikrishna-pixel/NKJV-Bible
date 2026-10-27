@@ -75,38 +75,66 @@ class _ConnectionCheckScreenState extends State<ConnectionCheckScreen> {
               ),
             ),
             const SizedBox(height: 28),
-            Text(
-              _label,
-              style: const TextStyle(
-                fontFamily: Pc.serif,
-                fontSize: 20,
-                fontWeight: FontWeight.w700,
-                color: Pc.brown,
+            // Separate box (mockup) so the level + slider read over the photo.
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.fromLTRB(14, 14, 14, 12),
+              decoration: BoxDecoration(
+                color: Pc.card.withValues(alpha: 0.92),
+                borderRadius: BorderRadius.circular(18),
+                border: Border.all(color: Pc.border),
+                boxShadow: [
+                  BoxShadow(
+                    color: Pc.brownDark.withValues(alpha: 0.12),
+                    blurRadius: 14,
+                    offset: const Offset(0, 5),
+                  ),
+                ],
               ),
-            ),
-            const SizedBox(height: 12),
-            SliderTheme(
-              data: SliderTheme.of(context).copyWith(
-                activeTrackColor: Pc.brown,
-                inactiveTrackColor: Pc.track,
-                thumbColor: Pc.brownDark,
-                overlayColor: Pc.brown.withValues(alpha: 0.15),
+              child: Column(
+                children: [
+                  Text(
+                    _label,
+                    style: const TextStyle(
+                      fontFamily: Pc.serif,
+                      fontSize: 20,
+                      fontWeight: FontWeight.w700,
+                      color: Pc.brown,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  SliderTheme(
+                    data: SliderTheme.of(context).copyWith(
+                      activeTrackColor: Pc.brown,
+                      inactiveTrackColor: Pc.track,
+                      thumbColor: Pc.brownDark,
+                      overlayColor: Pc.brown.withValues(alpha: 0.15),
+                    ),
+                    child: Slider(
+                      value: _value,
+                      onChanged: (v) => setState(() => _value = v),
+                    ),
+                  ),
+                  const Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 8),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text('Very Far',
+                            style: TextStyle(
+                                fontFamily: Pc.serif,
+                                fontSize: 12.5,
+                                color: Pc.muted)),
+                        Text('Very Close',
+                            style: TextStyle(
+                                fontFamily: Pc.serif,
+                                fontSize: 12.5,
+                                color: Pc.muted)),
+                      ],
+                    ),
+                  ),
+                ],
               ),
-              child: Slider(
-                value: _value,
-                onChanged: (v) => setState(() => _value = v),
-              ),
-            ),
-            const Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text('Very Far',
-                    style: TextStyle(
-                        fontFamily: Pc.serif, fontSize: 12, color: Pc.muted)),
-                Text('Very Close',
-                    style: TextStyle(
-                        fontFamily: Pc.serif, fontSize: 12, color: Pc.muted)),
-              ],
             ),
             const Spacer(),
           ],
@@ -120,23 +148,6 @@ class _ConnectionCheckScreenState extends State<ConnectionCheckScreen> {
             onPressed: _continue,
             gold: true,
             showArrow: true,
-          ),
-          const SizedBox(height: 8),
-          // Sits over the dark lower photo, so white with a soft shadow.
-          const Text(
-            'You can always update this later in your progress',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              fontFamily: Pc.serif,
-              fontSize: 12.5,
-              color: Colors.white,
-              shadows: [
-                Shadow(
-                    color: Color(0x99000000),
-                    blurRadius: 6,
-                    offset: Offset(0, 1)),
-              ],
-            ),
           ),
         ],
       ),

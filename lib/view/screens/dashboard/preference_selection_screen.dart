@@ -1512,6 +1512,9 @@ class FaithJourneyDialog {
       context: context,
       barrierDismissible: false,
       barrierColor: Colors.transparent,
+      // Full-screen page: let the background fill the status bar and home
+      // indicator areas (content keeps its own SafeArea).
+      useSafeArea: false,
       builder: (ctx) {
         final mq = MediaQuery.of(ctx).size;
         final isTablet = mq.width > 600;

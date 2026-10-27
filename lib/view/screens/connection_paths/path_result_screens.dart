@@ -21,48 +21,90 @@ class DayCompletedScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final msg = path.days[dayIndex].completionMessage;
+    final total = path.durationDays;
+    final done = (dayIndex + 1).clamp(0, total);
+    // Mockup 9: valley sunrise, gold check, progress dots, two buttons.
     return ParchmentScaffold(
       title: '',
       showBack: false,
       backgroundAsset: ConnectionPathsData.completeBgAsset,
-      // Lighter than the default scrim so the sunrise shows (mockup 9 / 11).
-      scrimColor: const Color(0x99F8F1E3),
+      scrimGradient: Pc.sunriseScrim,
       body: Center(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 28),
+          padding: const EdgeInsets.symmetric(horizontal: 24),
           child: Column(
             children: [
               Container(
-                width: 88,
-                height: 88,
+                width: 96,
+                height: 96,
                 decoration: BoxDecoration(
-                  color: Pc.gold.withValues(alpha: 0.2),
                   shape: BoxShape.circle,
-                  border: Border.all(color: Pc.gold, width: 2),
+                  gradient: Pc.goldGradient,
+                  boxShadow: [
+                    BoxShadow(
+                      color: Pc.gold.withValues(alpha: 0.45),
+                      blurRadius: 24,
+                      spreadRadius: 4,
+                    ),
+                  ],
                 ),
-                child:
-                    const Icon(Icons.check_rounded, size: 48, color: Pc.brown),
+                child: const Icon(Icons.check_rounded,
+                    size: 56, color: Colors.white),
               ),
               const SizedBox(height: 18),
-              const Text(
-                'Day Complete!',
+              Text(
+                'Day ${dayIndex + 1} Complete',
                 textAlign: TextAlign.center,
-                style: TextStyle(
+                style: const TextStyle(
                   fontFamily: Pc.serif,
-                  fontSize: 28,
+                  fontSize: 30,
                   fontWeight: FontWeight.w700,
                   color: Pc.ink,
                 ),
               ),
-              const SizedBox(height: 10),
+              const SizedBox(height: 8),
               Text(
                 msg.isEmpty ? 'Great! You made time with God today.' : msg,
                 textAlign: TextAlign.center,
                 style: const TextStyle(
                   fontFamily: Pc.serif,
-                  fontSize: 15,
+                  fontSize: 16,
                   height: 1.4,
-                  color: Pc.muted,
+                  color: Pc.ink,
+                ),
+              ),
+              const SizedBox(height: 22),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+                decoration: BoxDecoration(
+                  color: Pc.card.withValues(alpha: 0.92),
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: Pc.border),
+                ),
+                child: Column(
+                  children: [
+                    const Text(
+                      'Your Progress',
+                      style: TextStyle(
+                        fontFamily: Pc.serif,
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                        color: Pc.ink,
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    _ProgressDots(done: done, total: total),
+                    const SizedBox(height: 8),
+                    Text(
+                      '$done of $total days completed',
+                      style: const TextStyle(
+                        fontFamily: Pc.serif,
+                        fontSize: 13.5,
+                        color: Pc.muted,
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ],
@@ -78,16 +120,55 @@ class DayCompletedScreen extends StatelessWidget {
               () => PathOverviewScreen(path: path),
               transition: Transition.cupertino,
             ),
-            gold: true,
             showArrow: true,
           ),
-          TextButton(
-            onPressed: () => Get.until((r) => r.isFirst),
-            child: const Text('Back to Home',
-                style: TextStyle(color: Pc.muted, fontWeight: FontWeight.w600)),
+          const SizedBox(height: 10),
+          ParchmentLightButton(
+            label: 'View Path Overview',
+            onPressed: () => Get.off(
+              () => PathOverviewScreen(path: path),
+              transition: Transition.cupertino,
+            ),
           ),
         ],
       ),
+    );
+  }
+}
+
+/// Day dots joined by a line: filled gold for completed days (mockup 9).
+class _ProgressDots extends StatelessWidget {
+  const _ProgressDots({required this.done, required this.total});
+  final int done;
+  final int total;
+
+  @override
+  Widget build(BuildContext context) {
+    final dot = total > 14 ? 8.0 : 12.0;
+    return Row(
+      children: [
+        for (var i = 0; i < total; i++) ...[
+          if (i > 0)
+            Expanded(
+              child: Container(
+                height: 2,
+                color: i < done ? Pc.bronze : Pc.track,
+              ),
+            ),
+          Container(
+            width: dot,
+            height: dot,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: i < done ? Pc.bronze : Pc.card,
+              border: Border.all(
+                color: i < done ? Pc.bronze : Pc.border,
+                width: 1.5,
+              ),
+            ),
+          ),
+        ],
+      ],
     );
   }
 }

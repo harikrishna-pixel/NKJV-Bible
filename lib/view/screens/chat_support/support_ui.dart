@@ -187,7 +187,11 @@ class SupportHeader extends StatelessWidget {
         child: SafeArea(
           bottom: false,
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(4, 4, 4, 12),
+            // Light mode, no title (topic screens): just the back arrow, so
+            // the content sits higher without the brown bar.
+            padding: !p.isDark && title.isEmpty
+                ? const EdgeInsets.fromLTRB(4, 0, 4, 0)
+                : const EdgeInsets.fromLTRB(4, 4, 4, 12),
             child: Row(
               children: [
                 IconButton(
@@ -251,7 +255,8 @@ class SupportHero extends StatelessWidget {
   Widget build(BuildContext context) {
     final p = SupportPalette.of(context);
     return Padding(
-      padding: const EdgeInsets.fromLTRB(24, 18, 24, 14),
+      // Light mode has no brown header bar, so less gap above the icon.
+      padding: EdgeInsets.fromLTRB(24, p.isDark ? 18 : 4, 24, 14),
       child: Column(
         children: [
           Container(

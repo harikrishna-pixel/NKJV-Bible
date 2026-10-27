@@ -1518,7 +1518,8 @@ class _MultiSelectPaywallState extends State<MultiSelectPaywall> {
       final sym =
           product.currencySymbol.isNotEmpty ? product.currencySymbol : '\$';
       final perMonth = product.rawPrice / 12;
-      return '$sym${perMonth.toStringAsFixed(2)} per month';
+      // Whole number only (e.g. ₹208 per month, not ₹208.25).
+      return '$sym${perMonth.round()} per month';
     }
     return 'per month';
   }
