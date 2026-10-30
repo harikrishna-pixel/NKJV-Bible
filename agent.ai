@@ -10,6 +10,18 @@ The user's requested task is the highest priority.
 
 ---
 
+## 0. PLUGINS / SKILLS (e.g. Superpowers)
+
+These rules OVERRIDE any plugin or skill workflow, including Superpowers.
+
+- Do not delete existing code (including "code written before tests").
+- Do not require or force test-first (TDD) before making a change.
+- Do not create git branches, worktrees, commits, merges or PRs unless the user asks.
+- Do not run long brainstorm / plan / subagent flows for small fixes; for those, make the minimal change directly.
+- Skills may be used to help (e.g. systematic debugging, verification before completion), as long as they follow every rule in this file.
+
+---
+
 ## 1. ONLY CHANGE THE REQUESTED TASK
 
 - Make the smallest possible change.

@@ -50,6 +50,63 @@ class _MilestoneLifetimeIapScreenState extends State<MilestoneLifetimeIapScreen>
     }
   }
 
+  /// Premium already active on this device (any plan, incl. a purchase made in
+  /// a previous app version) — same expiry the app uses for ad-free/premium.
+  Future<bool> _hasActivePremium() async {
+    final raw =
+        await SharPreferences.getString(SharPreferences.isRewardAdViewTime);
+    if (raw == null || raw.isEmpty) return false;
+    try {
+      return DateTime.parse(raw).isAfter(DateTime.now());
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// Same Restore alert as the main paywall's "already on this plan" dialog.
+  Future<bool> _askRestore(BuildContext context) async {
+    final result = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) => PopScope(
+        canPop: false,
+        child: AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          title: const Text(
+            "You're Already on this Plan",
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+          ),
+          content: const Text(
+            "Would You like to Restore it ?",
+            style: TextStyle(fontSize: 16),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(false),
+              child: const Text("Cancel", style: TextStyle(fontSize: 16)),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.of(dialogContext).pop(true),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: CommanColor.lightModePrimary,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+              child: const Text(
+                "Yes, Restore",
+                style: TextStyle(fontSize: 16, color: Colors.white),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+    return result == true;
+  }
+
   Future<void> _openInvisibleLifetimePurchase(BuildContext context) async {
     final sixMonth = await SharPreferences.getString('sixMonthPlan') ??
         BibleInfo.sixMonthPlanid;
@@ -64,6 +121,15 @@ class _MilestoneLifetimeIapScreenState extends State<MilestoneLifetimeIapScreen>
         ? 'milestone_scripture_lifetime'
         : 'milestone_prayer_lifetime';
 
+    // Already purchased (e.g. previous version): offer Restore instead of buy.
+    var restoreOnly = false;
+    if (await _hasActivePremium()) {
+      if (!context.mounted) return;
+      restoreOnly = await _askRestore(context);
+      if (!restoreOnly) return;
+    }
+    if (!context.mounted) return;
+
     // Plan slot: 0=6mo, 1=1yr, 2=2yr, 3=lifetime — purchase the 1-year plan.
     final ok = await Navigator.of(context).push<bool>(
       PageRouteBuilder<bool>(
@@ -76,7 +142,8 @@ class _MilestoneLifetimeIapScreenState extends State<MilestoneLifetimeIapScreen>
           lifeTimePlan: lifeTime,
           checkad: checkad,
           initialSelectedPlanIndex: 1,
-          autoStartSelectedPlanPurchase: true,
+          autoStartSelectedPlanPurchase: !restoreOnly,
+          autoStartRestore: restoreOnly,
           invisiblePurchaseHost: true,
         ),
       ),
@@ -102,9 +169,6 @@ class _MilestoneLifetimeIapScreenState extends State<MilestoneLifetimeIapScreen>
     final title = isScripture
         ? 'Deepen Your Journey in Scripture'
         : 'Strengthen Your Prayer Life';
-    final bonus = isScripture
-        ? '🎁 Special Offer: 1000 Bonus Chat Credits'
-        : '🎁 Special Offer: 1000 Bonus Prayer Credits';
     final features = isScripture
         ? const [
             'Ask Questions About Any Scripture',
@@ -125,7 +189,6 @@ class _MilestoneLifetimeIapScreenState extends State<MilestoneLifetimeIapScreen>
       overflow: TextOverflow.ellipsis,
     );
 
-    final bonusColor = isDark ? const Color(0xFFB7F3C2) : const Color(0xFF2E7D32);
     final offColor = isDark ? const Color(0xFFFFB4AB) : Colors.red.shade700;
 
     return Scaffold(
@@ -208,16 +271,6 @@ class _MilestoneLifetimeIapScreenState extends State<MilestoneLifetimeIapScreen>
                       ],
                     ),
                     textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: 10),
-                  Text(
-                    bonus,
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                      color: bonusColor,
-                    ),
                   ),
                   const SizedBox(height: 20),
                   Stack(

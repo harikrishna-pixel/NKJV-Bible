@@ -949,6 +949,13 @@ class _SubscriptionScreenState extends State<SubscriptionScreen>
     if (Get.isRegistered<DashBoardController>()) {
       await Get.find<DashBoardController>().refreshPremiumStatusFromPrefs();
     }
+    if (widget.invisiblePurchaseHost &&
+        widget.checkad.startsWith('milestone_')) {
+      // Trigger paywall (milestone offer): close it and return to the screen
+      // that opened it — the offer screen pops itself on `true`.
+      _popInvisiblePurchaseHost(true);
+      return;
+    }
     if (widget.invisiblePurchaseHost) {
       // Leave the visible AR paywall too. Pop-only left MultiSelectPaywall
       // on screen after a successful 1 Month / 1 Year buy.
@@ -3521,7 +3528,19 @@ class _SubscriptionScreenState extends State<SubscriptionScreen>
     final hasInternet = await InternetConnection().hasInternetAccess;
     if (!hasInternet) {
       _restoreCollecting = false;
-      Constants.showToast("No Internet Connection");
+      // Close the invisible purchase host too, or it blocks every tap on the
+      // paywall underneath (same cleanup as the Restore dialog's Cancel).
+      EasyLoading.dismiss();
+      _shouldShowRestoreDialog = false;
+      _pendingRestoreProductId = null;
+      final closingHost = widget.invisiblePurchaseHost;
+      _popInvisiblePurchaseHost(false);
+      // Toasts share EasyLoading; the host's dispose() dismisses it, so show
+      // the toast after the host has closed and keep it up ~2.5s.
+      Future.delayed(
+        Duration(milliseconds: closingHost ? 500 : 0),
+        () => Constants.showToast("No Internet Connection", 2500),
+      );
       return; // Return early - don't show loader or proceed
     }
 
@@ -3559,6 +3578,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen>
       EasyLoading.dismiss();
       DebugConsole.log("restore No active subscription available error - $e");
       Constants.showToast('No active subscription available');
+      _popInvisiblePurchaseHost(false);
     }
   }
 

@@ -567,10 +567,6 @@ class _PrayerWallUserProfileScreenState
                                         if (showTitle && showSubtitle) ...[
                                           Text(
                                             title,
-                                            maxLines: expanded ? null : 1,
-                                            overflow: expanded
-                                                ? TextOverflow.visible
-                                                : TextOverflow.ellipsis,
                                             style: TextStyle(
                                               fontSize: 14,
                                               height: 1.35,
@@ -583,10 +579,6 @@ class _PrayerWallUserProfileScreenState
                                           const SizedBox(height: 6),
                                           Text(
                                             subtitle,
-                                            maxLines: expanded ? null : 2,
-                                            overflow: expanded
-                                                ? TextOverflow.visible
-                                                : TextOverflow.ellipsis,
                                             style: TextStyle(
                                               fontSize: 14,
                                               height: 1.35,
@@ -599,10 +591,6 @@ class _PrayerWallUserProfileScreenState
                                         ] else
                                           Text(
                                             fallback,
-                                            maxLines: expanded ? null : 2,
-                                            overflow: expanded
-                                                ? TextOverflow.visible
-                                                : TextOverflow.ellipsis,
                                             style: TextStyle(
                                               fontSize: 14,
                                               height: 1.35,

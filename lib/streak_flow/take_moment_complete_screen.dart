@@ -124,11 +124,17 @@ class TakeMomentCompleteScreen extends StatelessWidget {
                           stops: [0.0, 0.18, 0.78, 1.0],
                         ).createShader(rect),
                         blendMode: BlendMode.dstIn,
-                        child: Image.asset(
-                          _crossHillAsset,
-                          height: isTablet ? 260 : 210,
-                          width: double.infinity,
-                          fit: BoxFit.cover,
+                        child: LayoutBuilder(
+                          builder: (context, constraints) => Image.asset(
+                            _crossHillAsset,
+                            // Art is 700x400; on wide iPads a fixed height with
+                            // cover cropped the cross, so match its aspect.
+                            height: isTablet
+                                ? constraints.maxWidth * 400 / 700
+                                : 210,
+                            width: double.infinity,
+                            fit: BoxFit.cover,
+                          ),
                         ),
                       ),
                       const SizedBox(height: 4),

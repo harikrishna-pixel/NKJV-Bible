@@ -21,6 +21,7 @@ import 'package:biblebookapp/view/screens/profile/view/profile_screen.dart';
 import 'package:biblebookapp/view/screens/milestones/milestone_celebration_coordinator.dart';
 import 'package:biblebookapp/utils/network_error_message.dart';
 import 'package:biblebookapp/view/constants/constant.dart';
+import 'package:biblebookapp/view/widget/delayed_barrier_dismiss.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:internet_connection_checker_plus/internet_connection_checker_plus.dart';
@@ -142,6 +143,8 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
 
   /// UI-only: blocked prayers list (unblock + count).
   bool _showingBlocked = false;
+  /// Ignores repeat ⋮ taps while the Prayer Profile menu is opening/open.
+  bool _profileMenuBusy = false;
   /// True when My Prayers sort is Expired.
   bool get _showingExpired =>
       _showingHistory && !_showingBlocked && _myPrayerSort == 'Expired';
@@ -1244,9 +1247,19 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
       unawaited(_backfillBlockedDisplayNamesFromWall());
       return;
     }
-    setState(() => _showingBlocked = !_showingBlocked);
-    if (_showingBlocked) {
-      unawaited(_backfillBlockedDisplayNamesFromWall());
+    // Open only — never toggle Blocked closed; only Back closes it.
+    if (_showingBlocked) return;
+    setState(() => _showingBlocked = true);
+    unawaited(_backfillBlockedDisplayNamesFromWall());
+  }
+
+  Future<void> _onPrayerProfileMoreTap(BuildContext buttonContext) async {
+    if (_profileMenuBusy || _showingBlocked) return;
+    _profileMenuBusy = true;
+    try {
+      await _showPrayerProfileOverflowMenu(buttonContext);
+    } finally {
+      _profileMenuBusy = false;
     }
   }
 
@@ -1320,6 +1333,9 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
       ],
     );
     if (!mounted || selected != 'blocked') return;
+    // iPad: while the menu fades out, repeat taps fall through to the page
+    // underneath (switching to Blocked). Swallow them briefly.
+    if (isTabletLayout(context)) showTapShield(context);
     await _openBlockedPeopleFromMenu();
   }
 
@@ -3124,12 +3140,20 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
     final isReported = _reportedPrayerIds.contains(item.id);
     final isBlocked = _isItemBlocked(item);
     final canBlock = !_isMyPrayer(item);
+    // iPad: a stray drag/scroll while the sheet is still sliding up (< half
+    // open) makes Flutter dismiss it right away. Disable drag-to-close there
+    // and host it on the root navigator; Cancel / outside tap still close it.
+    final isTablet = MediaQuery.of(context).size.shortestSide >= 600;
 
     final action = await showModalBottomSheet<String>(
       context: context,
+      useRootNavigator: isTablet,
+      enableDrag: !isTablet,
       backgroundColor: Colors.transparent,
       builder: (ctx) {
-        return SafeArea(
+        return DelayedBarrierDismiss(
+          enabled: isTablet,
+          child: SafeArea(
           child: Padding(
             padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
             child: Material(
@@ -3207,6 +3231,7 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
                 ],
               ),
             ),
+          ),
           ),
         );
       },
@@ -4402,20 +4427,15 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
   /// UI-only: My Prayer — load prayers I posted (ids from local store + ?prayerId=).
   Future<void> _openMyPrayerHistory() async {
     if (_openingHistory) return;
-    if (_showingHistory) {
-      setState(() {
-        _showingHistory = false;
-        _showingBlocked = false;
-        _myPrayerSort = 'Current';
-        _historyError = null;
-      });
-      return;
-    }
+    // Already open (e.g. a repeat tap landing late): keep Prayer Profile /
+    // Blocked as is — only the Back button closes them.
+    if (_showingHistory) return;
 
     final allowed = await _ensureLoggedIn(
       message: 'Please log in to view your prayers.',
     );
     if (!allowed || !mounted) return;
+    if (_showingHistory) return;
 
     setState(() {
       _showingHistory = true;
@@ -4748,8 +4768,7 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
                           tooltip: 'More',
                           icon: Icon(Icons.more_vert,
                               color: isDark ? Colors.white : brown),
-                          onPressed: () =>
-                              _showPrayerProfileOverflowMenu(btnCtx),
+                          onPressed: () => _onPrayerProfileMoreTap(btnCtx),
                         ),
                       )
                     else
@@ -5795,6 +5814,7 @@ class _QueuePrayerDetailScreenState extends State<_QueuePrayerDetailScreen>
   static const _muted = Color(0xFF6B5344);
   static const _cream = Color(0xFFF5EFE4);
 
+  bool _moreBusy = false;
   late final AnimationController _prayFloat;
 
   @override
@@ -5985,13 +6005,24 @@ class _QueuePrayerDetailScreenState extends State<_QueuePrayerDetailScreen>
                         ),
                       ),
                     ),
-                    IconButton(
-                      icon: Icon(Icons.more_horiz, color: onBgBrown),
-                      onPressed: () async {
-                        await widget.onMore();
-                        if (mounted) setState(() {});
-                      },
-                    ),
+                    // Report is for other users' prayers only.
+                    if (widget.isMine)
+                      const SizedBox(width: 48)
+                    else
+                      IconButton(
+                        icon: Icon(Icons.more_horiz, color: onBgBrown),
+                        onPressed: () async {
+                          // iPad: ignore repeat taps while the sheet opens.
+                          if (_moreBusy) return;
+                          _moreBusy = isTabletLayout(context);
+                          try {
+                            await widget.onMore();
+                          } finally {
+                            _moreBusy = false;
+                          }
+                          if (mounted) setState(() {});
+                        },
+                      ),
                   ],
                 ),
               ),

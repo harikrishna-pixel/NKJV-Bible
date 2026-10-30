@@ -1,9 +1,12 @@
+import 'package:biblebookapp/view/constants/constant.dart';
 import 'package:biblebookapp/view/screens/chat_support/chat_support_screen.dart';
 import 'package:biblebookapp/view/screens/chat_support/support_content.dart';
 import 'package:biblebookapp/view/screens/chat_support/support_form_screen.dart';
 import 'package:biblebookapp/view/screens/chat_support/support_ui.dart';
+import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:internet_connection_checker_plus/internet_connection_checker_plus.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -19,6 +22,24 @@ void _push(Widget page) => Get.to(
 void openSupportChat({String? question, bool sendToSupport = false}) =>
     _push(ChatSupportScreen(
         initialQuestion: question, sendToSupport: sendToSupport));
+
+/// Opens chat only when online; otherwise shows the internet toast and stays.
+Future<void> openSupportChatIfOnline(
+    {String? question, bool sendToSupport = false}) async {
+  final connectivity = await Connectivity().checkConnectivity();
+  var online = !connectivity.contains(ConnectivityResult.none);
+  if (online) {
+    // Low data: interface is up but nothing gets through — don't wait long.
+    online = await InternetConnection()
+        .hasInternetAccess
+        .timeout(const Duration(seconds: 3), onTimeout: () => false);
+  }
+  if (!online) {
+    Constants.showToast('Check your internet connection.', 2500);
+    return;
+  }
+  openSupportChat(question: question, sendToSupport: sendToSupport);
+}
 
 void openSupportFaq(SupportContent content, SupportFaq faq) =>
     _push(SupportFaqScreen(content: content, faq: faq));
@@ -508,7 +529,7 @@ class _SupportFaqScreenState extends State<SupportFaqScreen> {
           const SizedBox(height: 10),
           SupportPrimaryButton(
             label: label,
-            onPressed: () => openSupportChat(
+            onPressed: () => openSupportChatIfOnline(
                 question: widget.faq.question, sendToSupport: true),
           ),
         ],

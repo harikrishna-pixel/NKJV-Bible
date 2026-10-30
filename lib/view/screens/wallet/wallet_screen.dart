@@ -30,7 +30,8 @@ class WalletScreen extends StatefulWidget {
   State<WalletScreen> createState() => _WalletScreenState();
 }
 
-class _WalletScreenState extends State<WalletScreen> {
+class _WalletScreenState extends State<WalletScreen>
+    with WidgetsBindingObserver {
   final InAppPurchase _inAppPurchase = InAppPurchase.instance;
   StreamSubscription<List<PurchaseDetails>>? _subscription;
   List<ProductDetails> _products = [];
@@ -326,8 +327,8 @@ class _WalletScreenState extends State<WalletScreen> {
     // This checks actual internet access, not just network interface availability
     final hasInternet = await InternetConnection().hasInternetAccess;
     if (!hasInternet) {
-      // No internet connection - show toast and hide Buy Credits section
-      Constants.showToast("No Internet Connection");
+      // No internet connection - hide Buy Credits section. No toast on open;
+      // actions (Buy / Claim) show their own internet message.
       if (mounted) {
         setState(() {
           _isLowNetwork = true;
@@ -351,8 +352,7 @@ class _WalletScreenState extends State<WalletScreen> {
           connectionSpeed == null || connectionSpeed > 5000;
 
       if (isSlowConnection) {
-        // Slow/2G network - hide Buy Credits section and show toast
-        Constants.showToast("Check your Internet connection");
+        // Slow/2G network - hide Buy Credits section (no toast on open)
         if (mounted) {
           setState(() {
             _isLowNetwork = true;
@@ -383,9 +383,6 @@ class _WalletScreenState extends State<WalletScreen> {
                 !isEthernet; // Hide for mobile, show for WiFi/Ethernet
           });
         }
-        if (!isWifi && !isEthernet) {
-          Constants.showToast("Check your Internet connection");
-        }
       } catch (e2) {
         debugPrint('Error checking connectivity: $e2');
         // On error, assume good connection and show Buy Credits
@@ -410,6 +407,7 @@ class _WalletScreenState extends State<WalletScreen> {
   @override
   void dispose() {
     _subscription?.cancel();
+    WidgetsBinding.instance.removeObserver(this);
     _creditsTimer?.cancel();
     _storeLoadFallbackTimer?.cancel();
     _purchaseSheetWatch?.cancel();
@@ -821,6 +819,26 @@ class _WalletScreenState extends State<WalletScreen> {
   }
 
   void _hideCreditPurchaseLoading(String? productId) {
+  /// The store sheet takes the app out of `resumed`. Closing it without buying
+  /// often sends no purchase event, so once back, stop Processing after a
+  /// short grace if nothing arrived. A late purchase still grants credits
+  /// (the buy id is kept) and shows Processing again.
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state != AppLifecycleState.resumed) {
+      _purchaseSheetWatch?.cancel();
+      _purchaseSheetWatch = null;
+      return;
+    }
+    final loadingId = _loadingProductId;
+    if (loadingId == null) return;
+    _purchaseSheetWatch?.cancel();
+    _purchaseSheetWatch = Timer(const Duration(seconds: 3), () {
+      if (!mounted || _loadingProductId != loadingId) return;
+      _hideCreditPurchaseLoading(loadingId);
+    });
+  }
+
     _purchaseSheetWatch?.cancel();
     _purchaseSheetWatch = null;
     final id = (productId ?? '').trim();
@@ -855,6 +873,7 @@ class _WalletScreenState extends State<WalletScreen> {
         }
         // Additive UI only: keep Processing...... until success toast.
         _purchaseTimeouts[productId]?.cancel();
+        _purchaseSheetWatch?.cancel();
         _purchaseTimeouts.remove(productId);
         EasyLoading.show(status: 'Processing..');
         try {
@@ -920,6 +939,7 @@ class _WalletScreenState extends State<WalletScreen> {
         // Some stores report "already owned" as restored; grant credits once.
         // UI only: same Processing...... as purchased (not "Please wait...").
         _purchaseTimeouts[productId]?.cancel();
+        _purchaseSheetWatch?.cancel();
         _purchaseTimeouts.remove(productId);
         EasyLoading.show(status: 'Processing..');
         try {

@@ -1116,8 +1116,12 @@ class _AddWidgetIntroScreenState extends State<AddWidgetIntroScreen>
           builder: (context, constraints) {
             final path = _previewImages.first;
             final isWide = _isWidePreviewAsset(path);
-            // Maximize widget art; reduce empty padding around wide previews.
-            final previewHeight = isWide ? 172.0 : 220.0;
+            // Wide previews (Continue Reading / Favorite 2) are ~1.8:1; size the
+            // box from the width and use contain so the card is never cropped
+            // (fitWidth in a fixed 172 box cut it off, worst on iPad).
+            final previewHeight = isWide
+                ? (constraints.maxWidth * 0.56).clamp(150.0, 240.0)
+                : 220.0;
             return SizedBox(
               width: constraints.maxWidth,
               height: previewHeight,
@@ -1125,7 +1129,7 @@ class _AddWidgetIntroScreenState extends State<AddWidgetIntroScreen>
                 path,
                 width: constraints.maxWidth,
                 height: previewHeight,
-                fit: isWide ? BoxFit.fitWidth : BoxFit.contain,
+                fit: BoxFit.contain,
                 alignment: Alignment.center,
                 gaplessPlayback: true,
                 errorBuilder: (_, __, ___) => _previewImage(

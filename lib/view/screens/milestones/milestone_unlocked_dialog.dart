@@ -64,22 +64,13 @@ class MilestoneUnlockedDialog extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Container(
-              width: 118,
-              height: 118,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: _card,
-                border: Border.all(color: _gold, width: 3),
-                boxShadow: [
-                  BoxShadow(
-                    color: _brown.withOpacity(0.12),
-                    blurRadius: 12,
-                    offset: const Offset(0, 4),
-                  ),
-                ],
-              ),
-              child: const Icon(
+            // Same gold cross-in-laurel icon as Milestone Detail.
+            Image.asset(
+              'assets/journey/milestone_cross_laurel.png',
+              width: 140,
+              height: 140,
+              fit: BoxFit.contain,
+              errorBuilder: (_, __, ___) => const Icon(
                 Icons.workspace_premium_outlined,
                 size: 78,
                 color: _gold,

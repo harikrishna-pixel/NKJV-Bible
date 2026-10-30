@@ -243,8 +243,6 @@ class _CategoryList extends StatelessWidget {
               padding: const EdgeInsets.only(bottom: 10),
               child: _MilestoneCard(
                 progress: p,
-                showTargetOnBadge: category == MilestoneCategory.connection &&
-                    !p.def.id.startsWith('path_'),
                 onTap: () => onOpen(p),
               ),
             )),
@@ -270,12 +268,25 @@ class _MilestoneCard extends StatelessWidget {
   const _MilestoneCard({
     required this.progress,
     required this.onTap,
-    this.showTargetOnBadge = false,
   });
 
   final MilestoneProgress progress;
   final VoidCallback onTap;
-  final bool showTargetOnBadge;
+
+  /// Days Connected and Prayer cards: one distinct icon each.
+  static const Map<String, IconData> _cardIcons = {
+    'conn_1': Icons.emoji_objects_outlined,
+    'conn_7': Icons.calendar_view_week_outlined,
+    'conn_30': Icons.calendar_month_outlined,
+    'conn_50': Icons.favorite_border,
+    'conn_100': Icons.park_outlined,
+    'conn_365': Icons.wb_sunny_outlined,
+    'pray_1': Icons.edit_note_outlined,
+    'pray_10': Icons.people_outline,
+    'pray_50': Icons.handshake_outlined,
+    'pray_100': Icons.self_improvement,
+    'pray_250': Icons.public,
+  };
 
   @override
   Widget build(BuildContext context) {
@@ -297,9 +308,8 @@ class _MilestoneCard extends StatelessWidget {
             child: Row(
               children: [
                 BronzeBadge(
-                  icon: milestoneIconFor(p.def.icon),
+                  icon: _cardIcons[p.def.id] ?? milestoneIconFor(p.def.icon),
                   size: 52,
-                  label: showTargetOnBadge ? '${p.def.target}' : null,
                 ),
                 const SizedBox(width: 12),
                 Expanded(

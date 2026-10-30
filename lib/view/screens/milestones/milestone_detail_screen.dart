@@ -3,7 +3,17 @@ import 'package:biblebookapp/view/screens/milestones/milestones_progress.dart';
 import 'package:biblebookapp/view/screens/milestones/milestones_screen.dart';
 import 'package:biblebookapp/view/screens/milestones/models/milestone_model.dart';
 import 'package:flutter/material.dart';
-import 'package:get/get.dart';
+
+String _detailIconAsset(MilestoneCategory category) {
+  switch (category) {
+    case MilestoneCategory.connection:
+      return 'assets/journey/milestone_cross_laurel.png';
+    case MilestoneCategory.prayer:
+      return 'assets/journey/milestone_prayer_laurel.png';
+    case MilestoneCategory.community:
+      return 'assets/journey/milestone_community_laurel.png';
+  }
+}
 
 /// Mockup 13C — Milestone Detail.
 class MilestoneDetailScreen extends StatefulWidget {
@@ -47,13 +57,25 @@ class _MilestoneDetailScreenState extends State<MilestoneDetailScreen> {
               padding: const EdgeInsets.fromLTRB(22, 4, 22, 12),
               children: [
                 Center(
-                  child: LaurelEmblem(
-                    size: 180,
-                    text: p.def.category == MilestoneCategory.connection &&
-                            !p.def.id.startsWith('path_')
-                        ? '${p.def.target}'
-                        : null,
-                    icon: milestoneIconFor(p.def.icon),
+                  // Connection / Prayer / Community: gold laurel icon per tab.
+                  child: Image.asset(
+                    _detailIconAsset(p.def.category),
+                    // Prayer art has wide transparent margins; draw it larger.
+                    width: p.def.category == MilestoneCategory.prayer
+                        ? 260
+                        : 180,
+                    height: p.def.category == MilestoneCategory.prayer
+                        ? 260
+                        : 180,
+                    fit: BoxFit.contain,
+                    errorBuilder: (_, __, ___) => LaurelEmblem(
+                      size: 180,
+                      text: p.def.category == MilestoneCategory.connection &&
+                              !p.def.id.startsWith('path_')
+                          ? '${p.def.target}'
+                          : null,
+                      icon: milestoneIconFor(p.def.icon),
+                    ),
                   ),
                 ),
                 const SizedBox(height: 8),
@@ -123,12 +145,6 @@ class _MilestoneDetailScreenState extends State<MilestoneDetailScreen> {
                 ),
               ],
             ),
-      bottom: ParchmentButton(
-        label: 'Continue',
-        onPressed: () => Get.back(),
-        gold: true,
-        showArrow: true,
-      ),
     );
   }
 }

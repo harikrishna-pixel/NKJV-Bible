@@ -219,14 +219,14 @@ class PrayerWallGuidelinesDialog {
               ),
             ),
             const SizedBox(width: 8),
-            Flexible(child: _helpText()),
+            Flexible(child: _helpText(singleLine: true)),
           ],
         ),
       ),
     );
   }
 
-  static Widget _helpText({bool isDark = false}) {
+  static Widget _helpText({bool isDark = false, bool singleLine = false}) {
     final base = isDark ? Colors.white70 : _ink;
     return Text.rich(
       TextSpan(
@@ -237,7 +237,11 @@ class PrayerWallGuidelinesDialog {
           fontWeight: FontWeight.w500,
         ),
         children: [
-          const TextSpan(text: 'Need help?\nLearn about '),
+          TextSpan(
+            text: singleLine
+                ? 'Need help? Learn about '
+                : 'Need help?\nLearn about ',
+          ),
           TextSpan(
             text: 'Prayer Wall guidelines',
             style: TextStyle(

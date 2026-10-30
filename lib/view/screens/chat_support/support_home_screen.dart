@@ -127,7 +127,7 @@ class _SupportHomeScreenState extends State<SupportHomeScreen> {
             borderRadius: BorderRadius.circular(14),
             child: InkWell(
               borderRadius: BorderRadius.circular(14),
-              onTap: () => openSupportChat(),
+              onTap: () => openSupportChatIfOnline(),
               child: Container(
                 padding: const EdgeInsets.all(14),
                 decoration: BoxDecoration(

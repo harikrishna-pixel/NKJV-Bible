@@ -8,7 +8,6 @@ import 'package:biblebookapp/services/reading_activity_service.dart';
 import 'package:biblebookapp/streak/streak_service.dart';
 import 'package:biblebookapp/view/constants/share_preferences.dart';
 import 'package:biblebookapp/view/screens/dashboard/book_list_screen.dart';
-import 'package:biblebookapp/view/screens/dashboard/chapterListScreen.dart';
 import 'package:biblebookapp/view/screens/dashboard/home_screen.dart';
 import 'package:biblebookapp/streak_flow/daily_journey_screen.dart';
 import 'package:biblebookapp/view/screens/journey/journey_parchment.dart';
@@ -308,20 +307,46 @@ class _ReadingProgressScreenState extends State<ReadingProgressScreen> {
         break;
       }
     }
+    // Open the reader directly on this book + chapter (same path as
+    // Currently Reading), not the chapter list.
+    final bookName =
+        item.bookName.isNotEmpty ? item.bookName : (match?.title ?? '');
+    if (bookName.isEmpty) return;
+    final chapterNum = item.chapter <= 0 ? 1 : item.chapter;
+    final bookNumStr =
+        (item.bookNum > 0 ? item.bookNum : (match?.bookNum ?? 0)).toString();
+    final chapterCountStr =
+        (match?.chapterCount ?? chapterNum).toString();
+
+    await SharPreferences.setString(SharPreferences.selectedBook, bookName);
     await SharPreferences.setString(
-        SharPreferences.selectedBook, item.bookName);
-    if (item.bookNum > 0) {
-      await SharPreferences.setString(
-          SharPreferences.selectedBookNum, item.bookNum.toString());
+        SharPreferences.selectedChapter, '$chapterNum');
+    await SharPreferences.setString(
+        SharPreferences.selectedBookNum, bookNumStr);
+
+    if (Get.isRegistered<DashBoardController>()) {
+      final c = Get.find<DashBoardController>();
+      c.selectedChapter.value = '$chapterNum';
+      c.selectChapterChange.value = chapterNum;
+      c.selectedBookNum.value = bookNumStr;
+      c.selectedBookChapterCount.value = chapterCountStr;
+      c.selectedBook.value = bookName;
+      c.selectedBookContent.clear();
+      c.selectedVersesContent.clear();
     }
-    Get.to(
-      () => ChapterListScreen(
-        chapterCount: match?.chapterCount ?? item.chapter,
-        book_num: item.bookNum > 0 ? item.bookNum : (match?.bookNum ?? 1),
-        selectedChapter: item.chapter,
+
+    Get.offAll(
+      () => HomeScreen(
+        From: 'Chapter',
+        selectedVerseNumForRead: '',
+        selectedBookForRead: '',
+        selectedChapterForRead: '',
+        selectedBookNameForRead: bookName,
+        selectedVerseForRead: '',
       ),
       transition: Transition.cupertino,
-      duration: const Duration(milliseconds: 300),
+      duration: const Duration(milliseconds: 280),
+      opaque: true,
     );
   }
 

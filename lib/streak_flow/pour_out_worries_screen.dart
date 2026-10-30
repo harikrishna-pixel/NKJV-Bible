@@ -93,18 +93,22 @@ class _PourOutWorriesScreenState extends State<PourOutWorriesScreen> {
                             ),
                           );
                         }
+                        // Fixed top offset from the full screen height (not
+                        // the keyboard-shrunk area) so content doesn't jump
+                        // up when the keyboard opens.
                         return SingleChildScrollView(
-                          padding:
-                              const EdgeInsets.symmetric(horizontal: 24),
-                          child: ConstrainedBox(
-                            constraints: BoxConstraints(
-                                minHeight: constraints.maxHeight),
-                            child: Center(
-                              child: ConstrainedBox(
-                                constraints:
-                                    const BoxConstraints(maxWidth: 520),
-                                child: content,
-                              ),
+                          padding: EdgeInsets.fromLTRB(
+                            24,
+                            MediaQuery.of(context).size.height * 0.1,
+                            24,
+                            24,
+                          ),
+                          child: Align(
+                            alignment: Alignment.topCenter,
+                            child: ConstrainedBox(
+                              constraints:
+                                  const BoxConstraints(maxWidth: 520),
+                              child: content,
                             ),
                           ),
                         );

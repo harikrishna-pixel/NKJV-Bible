@@ -22,6 +22,7 @@ import '../../../Model/mainBookListModel.dart';
 import '../../constants/colors.dart';
 import '../../constants/theme_provider.dart';
 import '../../widget/country.dart';
+import '../../widget/delayed_barrier_dismiss.dart';
 import '../../widget/laguage.dart';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:get/get.dart';
@@ -197,6 +198,7 @@ class floatingButtonState extends State<floatingButton>
   int _ttsProgressVerse = -1;
   int _ttsPosSecondsShown = 0;
   DateTime? _ttsPosAheadAt;
+  String? _ttsPosChapterKey;
   bool _ttsProgressHandlerReady = false;
   DateTime? _ttsIgnoreUntil;
   DateTime? _ttsProgressAt;
@@ -302,8 +304,24 @@ class floatingButtonState extends State<floatingButton>
         }
       });
     } else if (state == AppLifecycleState.resumed) {
+      unawaited(_syncPlaybackTimeOnResume());
       _resumeAudioAfterPhoneCall();
     }
+  }
+
+  /// Show the real position right away on return from background instead of
+  /// waiting for the next position tick.
+  Future<void> _syncPlaybackTimeOnResume() async {
+    try {
+      if (!_showTtsUi()) {
+        final p = await audioPlayer.getCurrentPosition();
+        if (!mounted) return;
+        if (p != null) position = p;
+      }
+      if (!mounted) return;
+      setState(() {});
+      _fullPlayerSetState?.call(() {});
+    } catch (_) {}
   }
 
   void _markPausedIfPhoneCall() {
@@ -4221,6 +4239,11 @@ class floatingButtonState extends State<floatingButton>
 
     if (widget.textToSpeechLoad == false) {
       _ttsSheetUiAlive = true;
+      // iPad: a fast repeat tap (e.g. on the full player's down arrow) can land
+      // on the dimmed area and close this sheet at once — ignore outside taps
+      // briefly after it opens. Buttons inside still work.
+      var dismissReady = !isTabletLayout(context);
+      Timer? dismissTimer;
       return showModalBottomSheet(
         backgroundColor: Colors.black12,
         context: context,
@@ -4239,7 +4262,14 @@ class floatingButtonState extends State<floatingButton>
                 if (!_ttsSheetUiAlive) return;
                 setState(fn);
               };
+              if (!dismissReady && dismissTimer == null) {
+                dismissTimer = Timer(const Duration(milliseconds: 600), () {
+                  dismissReady = true;
+                  if (context.mounted) setModalState(() {});
+                });
+              }
               return PopScope(
+                canPop: dismissReady,
                 onPopInvokedWithResult: (didPop, _) {
                   if (didPop) _closeTtsSheetUi();
                 },
@@ -4832,6 +4862,7 @@ class floatingButtonState extends State<floatingButton>
           );
         },
       ).then((value) {
+        dismissTimer?.cancel();
         _closeTtsSheetUi();
         if (mounted && context.mounted) {
           setState(() {});
@@ -5081,6 +5112,15 @@ class floatingButtonState extends State<floatingButton>
   }
 
   Duration _ttsEstimatedPosition() {
+    // The "never go backwards" guard below must not carry the previous
+    // chapter's time into a new chapter (many chapter paths don't reset it).
+    final chapterKey =
+        '${_storedBookName ?? widget.bookName}|$selectedChapter';
+    if (_ttsPosChapterKey != chapterKey) {
+      _ttsPosChapterKey = chapterKey;
+      _ttsPosSecondsShown = 0;
+      _ttsPosAheadAt = null;
+    }
     var words = 0;
     for (var i = 0; i < curretNo && i < selectedChapterContent.length; i++) {
       words += _spokenWordCount(selectedChapterContent[i].content);
@@ -5302,6 +5342,12 @@ class floatingButtonState extends State<floatingButton>
   }
 
   bool _reopenOldSheet = false;
+  VoidCallback? _minimizeTapShield;
+
+  void _dropMinimizeTapShield() {
+    _minimizeTapShield?.call();
+    _minimizeTapShield = null;
+  }
 
   Future<void> _openReaderFullPlayer({required bool tts}) async {
     if (!mounted) return;
@@ -5348,12 +5394,57 @@ class floatingButtonState extends State<floatingButton>
       _closeFullPlayerUi();
       _fullPlayerOpen = false;
     }
-    if (!_reopenOldSheet || !mounted) return;
+    if (!_reopenOldSheet) return;
     _reopenOldSheet = false;
+    // Minimize: wait for the full player's slide-down to finish, then show the
+    // mini player on whichever FAB is live (Home can rebuild it on return,
+    // which left nothing on screen on iPad).
+    await Future.delayed(const Duration(milliseconds: 300));
+    floatingButtonState? host = mounted ? this : null;
+    if (host == null) {
+      for (final s in _liveStates) {
+        if (s.mounted) {
+          host = s;
+          break;
+        }
+      }
+    }
+    if (host == null) {
+      _dropMinimizeTapShield();
+      return;
+    }
     if (tts) {
-      await textToSpeechBottomSheet();
+      // Returning to the reader often reloads the chapter; while it loads the
+      // TTS sheet refuses to open ("Please wait"). Wait for the load first.
+      bool loading(floatingButtonState s) =>
+          s.widget.textToSpeechLoad ||
+          (Get.isRegistered<DashBoardController>() &&
+              Get.find<DashBoardController>().loadTextToSpeech.value);
+      final deadline = DateTime.now().add(const Duration(seconds: 5));
+      while (host!.mounted &&
+          loading(host) &&
+          DateTime.now().isBefore(deadline)) {
+        await Future.delayed(const Duration(milliseconds: 100));
+        if (!host.mounted) {
+          host = null;
+          for (final s in _liveStates) {
+            if (s.mounted) {
+              host = s;
+              break;
+            }
+          }
+          if (host == null) {
+            _dropMinimizeTapShield();
+            return;
+          }
+        }
+      }
+      _dropMinimizeTapShield();
+      if (!host.mounted) return;
+      await host.textToSpeechBottomSheet();
     } else {
-      await audioPlayerBottomSheet();
+      _dropMinimizeTapShield();
+      await host.audioPlayerBottomSheet();
     }
   }
 
@@ -5392,6 +5483,16 @@ class floatingButtonState extends State<floatingButton>
                 children: [
                   IconButton(
                     onPressed: () {
+                      if (_reopenOldSheet) return;
+                      // iPad: swallow repeat taps until the mini player is
+                      // back, so they can't hit the reader or its barrier.
+                      if (isTabletLayout(ctx)) {
+                        _minimizeTapShield?.call();
+                        _minimizeTapShield = showTapShield(
+                          ctx,
+                          duration: const Duration(seconds: 6),
+                        );
+                      }
                       _reopenOldSheet = true;
                       _closeFullPlayerUi();
                       Navigator.of(ctx).pop();

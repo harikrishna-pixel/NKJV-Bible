@@ -266,7 +266,11 @@ class _DailyConnectionScreenState extends State<DailyConnectionScreen> {
           onShare: _shareVerse,
         );
       case PathStep.devotion:
-        return _OpenTextStep(title: day.title, body: day.devotion);
+        return _OpenTextStep(
+          title: day.title,
+          body: day.devotion,
+          boxed: true,
+        );
       case PathStep.reflection:
         return _ReflectionStep(
           prompt: day.reflection,
@@ -274,42 +278,70 @@ class _DailyConnectionScreenState extends State<DailyConnectionScreen> {
           readOnly: widget.review,
         );
       case PathStep.prayer:
-        return _OpenTextStep(title: 'Prayer', body: day.prayer);
+        return _OpenTextStep(
+          title: 'Prayer',
+          body: day.prayer,
+          boxed: true,
+        );
     }
   }
 }
 
 /// Mockup 8: left-aligned title + text directly on the sunrise wash.
 class _OpenTextStep extends StatelessWidget {
-  const _OpenTextStep({required this.title, required this.body});
+  const _OpenTextStep({
+    required this.title,
+    required this.body,
+    this.boxed = false,
+  });
   final String title;
   final String body;
 
+  /// Devotion: put the text on a parchment card so it stays readable over
+  /// the busy lower part of the background photo.
+  final bool boxed;
+
   @override
   Widget build(BuildContext context) {
+    final content = <Widget>[
+      Text(
+        title,
+        style: const TextStyle(
+          fontFamily: Pc.serif,
+          fontSize: 26,
+          fontWeight: FontWeight.w700,
+          color: Pc.ink,
+        ),
+      ),
+      const SizedBox(height: 10),
+      Text(
+        body,
+        style: const TextStyle(
+          fontFamily: Pc.serif,
+          fontSize: 16.5,
+          height: 1.55,
+          color: Pc.ink,
+        ),
+      ),
+    ];
+    if (boxed) {
+      return ListView(
+        padding: const EdgeInsets.fromLTRB(16, 10, 16, 20),
+        children: [
+          Container(
+            padding: const EdgeInsets.fromLTRB(18, 16, 18, 18),
+            decoration: Pc.cardDecoration(radius: 16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: content,
+            ),
+          ),
+        ],
+      );
+    }
     return ListView(
       padding: const EdgeInsets.fromLTRB(22, 10, 22, 20),
-      children: [
-        Text(
-          title,
-          style: const TextStyle(
-            fontFamily: Pc.serif,
-            fontSize: 26,
-            fontWeight: FontWeight.w700,
-            color: Pc.ink,
-          ),
-        ),
-        const SizedBox(height: 10),
-        Text(
-          body,
-          style: const TextStyle(
-            fontFamily: Pc.serif,
-            fontSize: 16.5,
-            height: 1.55,
-            color: Pc.ink,
-          ),
-        ),
-      ],
+      children: content,
     );
   }
 }
