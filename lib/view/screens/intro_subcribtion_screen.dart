@@ -957,9 +957,10 @@ class _SubscriptionScreenState extends State<SubscriptionScreen>
       await Get.find<DashBoardController>().refreshPremiumStatusFromPrefs();
     }
     if (widget.invisiblePurchaseHost &&
-        widget.checkad.startsWith('milestone_')) {
-      // Trigger paywall (milestone offer): close it and return to the screen
-      // that opened it — the offer screen pops itself on `true`.
+        (widget.checkad.startsWith('milestone_') ||
+            widget.checkad == 'credits_sheet')) {
+      // Trigger paywall (milestone offer) / out-of-credits sheet: close it and
+      // return to the screen that opened it — the caller pops on `true`.
       _popInvisiblePurchaseHost(true);
       return;
     }

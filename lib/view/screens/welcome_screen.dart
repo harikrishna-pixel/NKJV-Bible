@@ -18,22 +18,28 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
   static const Color _kWelcomeGold = Color(0xFFC59434);
   static const Color _kWelcomeBrown = Color(0xFF5C4033);
 
-  static const List<({String icon, String label})> _features = [
+  // 2x2 feature cards (reference UI): gold line icons + label.
+  static const List<({IconData? icon, String? asset, String label})>
+      _features = [
     (
-    icon: 'assets/splash_welcome_icons/bible_assitant.png',
-    label: 'AI Bible\nAssistant',
+      icon: Icons.menu_book_rounded,
+      asset: null,
+      label: 'Understand\nScripture',
     ),
     (
-    icon: 'assets/splash_welcome_icons/prayer_support.png',
-    label: 'Prayer\nSupport',
+      icon: null,
+      asset: 'assets/take_moment/praying_hands.png',
+      label: 'Pray Together',
     ),
     (
-    icon: 'assets/splash_welcome_icons/easier-reading.png',
-    label: 'Easier\nReading',
+      icon: Icons.headphones_rounded,
+      asset: null,
+      label: 'Audio Bible',
     ),
     (
-    icon: 'assets/splash_welcome_icons/audio_bible.png',
-    label: 'Audio\nBible',
+      icon: Icons.auto_awesome,
+      asset: null,
+      label: 'AI Bible\nAssistant',
     ),
   ];
 
@@ -107,67 +113,85 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                                 //     : _welcomeSingleNewLogo(
                                 //         isTablet: isTablet),
                               ),
-                              SizedBox(height: isTablet ? 18 : 14),
+                              SizedBox(height: isTablet ? 22 : 18),
                               Text(
                                 'Welcome to',
                                 textAlign: TextAlign.center,
                                 style: TextStyle(
-                                  fontSize: isTablet ? 24 : 20,
-                                  fontWeight: FontWeight.w600,
+                                  fontSize: isTablet ? 32 : 28,
+                                  fontWeight: FontWeight.w700,
                                   color: _kWelcomeInk,
                                   fontFamily: 'Georgia',
-                                  height: 1.2,
+                                  height: 1.15,
                                 ),
                               ),
-                              const SizedBox(height: 4),
+                              const SizedBox(height: 2),
                               Text(
                                 BibleInfo.bible_shortName,
                                 textAlign: TextAlign.center,
                                 style: TextStyle(
-                                  fontSize: isTablet ? 34 : 28,
+                                  fontSize: isTablet ? 46 : 40,
                                   fontWeight: FontWeight.w800,
                                   color: _kWelcomeInk,
                                   fontFamily: 'Georgia',
                                   height: 1.1,
                                 ),
                               ),
-                              const SizedBox(height: 12),
+                              const SizedBox(height: 14),
                               _welcomeGoldDivider(),
-                              const SizedBox(height: 12),
+                              const SizedBox(height: 14),
                               Padding(
                                 padding: EdgeInsets.symmetric(
-                                  horizontal: isTablet ? 24 : 8,
+                                  horizontal: isTablet ? 24 : 12,
                                 ),
                                 child: Text(
-                                  'The Bible you trust, now with a refreshed design and powerful new tools to support your daily walk with God.',
+                                  'Read, pray, and grow closer\nto God every day.',
                                   textAlign: TextAlign.center,
                                   style: TextStyle(
-                                    fontSize: isTablet ? 17 : 14.5,
-                                    height: 1.55,
+                                    fontSize: isTablet ? 19 : 17,
+                                    height: 1.45,
                                     fontWeight: FontWeight.w500,
                                     color: _kWelcomeInk.withOpacity(0.9),
                                     fontFamily: 'Georgia',
                                   ),
                                 ),
                               ),
-                              SizedBox(height: isTablet ? 20 : 14),
-                              Row(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  for (var i = 0;
-                                  i < _features.length;
-                                  i++) ...[
-                                    if (i > 0)
-                                      SizedBox(width: isTablet ? 10 : 6),
-                                    Expanded(
-                                      child: _WelcomeFeatureCard(
-                                        iconAsset: _features[i].icon,
-                                        label: _features[i].label,
-                                        isTablet: isTablet,
+                              SizedBox(height: isTablet ? 26 : 22),
+                              Padding(
+                                padding: EdgeInsets.symmetric(
+                                  horizontal: isTablet ? 0 : 6,
+                                ),
+                                child: Column(
+                                  children: [
+                                    for (var row = 0; row < 2; row++) ...[
+                                      if (row > 0)
+                                        SizedBox(height: isTablet ? 14 : 12),
+                                      Row(
+                                        children: [
+                                          for (var col = 0;
+                                              col < 2;
+                                              col++) ...[
+                                            if (col > 0)
+                                              SizedBox(
+                                                  width: isTablet ? 14 : 12),
+                                            Expanded(
+                                              child: _WelcomeFeatureCard(
+                                                icon: _features[row * 2 + col]
+                                                    .icon,
+                                                iconAsset:
+                                                    _features[row * 2 + col]
+                                                        .asset,
+                                                label: _features[row * 2 + col]
+                                                    .label,
+                                                isTablet: isTablet,
+                                              ),
+                                            ),
+                                          ],
+                                        ],
                                       ),
-                                    ),
+                                    ],
                                   ],
-                                ],
+                                ),
                               ),
                             ],
                           ),
@@ -189,13 +213,21 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                     child: Container(
                       decoration: BoxDecoration(
                         gradient: const LinearGradient(
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
                           colors: [
-                            Color(0xFF763201),
-                            Color(0xFFD5821F),
-                            Color(0xFF763201),
+                            Color(0xFF8A5530),
+                            Color(0xFF5C3317),
                           ],
                         ),
-                        borderRadius: BorderRadius.circular(14),
+                        borderRadius: BorderRadius.circular(16),
+                        boxShadow: [
+                          BoxShadow(
+                            color: const Color(0xFF5C3317).withOpacity(0.3),
+                            blurRadius: 10,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
                       ),
                       child: ElevatedButton(
                         onPressed: _continueToOnboarding,
@@ -204,17 +236,28 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                           shadowColor: Colors.transparent,
                           elevation: 0,
                           shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(14),
+                            borderRadius: BorderRadius.circular(16),
                           ),
                         ),
-                        child: Text(
-                          'Continue',
-                          style: TextStyle(
-                            fontSize: isTablet ? 20 : 18,
-                            fontWeight: FontWeight.w700,
-                            color: Colors.white,
-                            fontFamily: 'Georgia',
-                          ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Text(
+                              'Continue',
+                              style: TextStyle(
+                                fontSize: isTablet ? 21 : 19,
+                                fontWeight: FontWeight.w700,
+                                color: Colors.white,
+                                fontFamily: 'Georgia',
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                            Icon(
+                              Icons.arrow_forward,
+                              color: Colors.white,
+                              size: isTablet ? 24 : 22,
+                            ),
+                          ],
                         ),
                       ),
                     ),
@@ -230,14 +273,26 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
 
   /// Additive: new users — only the in-app new logo (no Old→New row).
   Widget _welcomeSingleNewLogo({required bool isTablet}) {
-    final iconSize = isTablet ? 128.0 : 110.0;
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(20),
-      child: Image.asset(
-        'assets/new_logos.jpg',
-        height: iconSize,
-        width: iconSize,
-        fit: BoxFit.contain,
+    final iconSize = isTablet ? 170.0 : 150.0;
+    return Container(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(32),
+        boxShadow: [
+          BoxShadow(
+            color: _kWelcomeBrown.withOpacity(0.35),
+            blurRadius: 18,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(32),
+        child: Image.asset(
+          'assets/new_logos.jpg',
+          height: iconSize,
+          width: iconSize,
+          fit: BoxFit.cover,
+        ),
       ),
     );
   }
@@ -311,22 +366,20 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
 
   Widget _welcomeGoldDivider() {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 28),
+      padding: const EdgeInsets.symmetric(horizontal: 40),
       child: Row(
         children: [
-          _welcomeDividerDot(),
           Expanded(
             child: Container(
               height: 1,
               color: _kWelcomeGold.withOpacity(0.8),
             ),
           ),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 8),
-            child: Icon(
-              Icons.add,
-              size: 14,
-              color: _kWelcomeGold,
+          const Padding(
+            padding: EdgeInsets.symmetric(horizontal: 10),
+            child: Text(
+              '✝',
+              style: TextStyle(fontSize: 16, color: _kWelcomeGold),
             ),
           ),
           Expanded(
@@ -335,49 +388,38 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
               color: _kWelcomeGold.withOpacity(0.8),
             ),
           ),
-          _welcomeDividerDot(),
         ],
       ),
     );
   }
 
-  Widget _welcomeDividerDot() {
-    return Container(
-      width: 5,
-      height: 5,
-      decoration: BoxDecoration(
-        color: _kWelcomeGold.withOpacity(0.85),
-        shape: BoxShape.rectangle,
-        borderRadius: BorderRadius.circular(1),
-      ),
-    );
-  }
 }
 
 class _WelcomeFeatureCard extends StatelessWidget {
   const _WelcomeFeatureCard({
-    required this.iconAsset,
+    this.icon,
+    this.iconAsset,
     required this.label,
     required this.isTablet,
   });
 
-  final String iconAsset;
+  final IconData? icon;
+  final String? iconAsset;
   final String label;
   final bool isTablet;
 
+  static const Color _gold = Color(0xFFB8862E);
+
   @override
   Widget build(BuildContext context) {
+    final iconSize = isTablet ? 40.0 : 36.0;
     return Container(
-      padding: EdgeInsets.symmetric(
-        horizontal: isTablet ? 6 : 2,
-        vertical: isTablet ? 12 : 8,
-      ),
+      height: isTablet ? 118 : 104,
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.72),
+        color: const Color(0xFFFFF8EC).withOpacity(0.85),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: Colors.white.withOpacity(0.9),
-        ),
+        border: Border.all(color: const Color(0xFFE9D7B8)),
         boxShadow: [
           BoxShadow(
             color: const Color(0xFF5C4033).withOpacity(0.08),
@@ -387,33 +429,30 @@ class _WelcomeFeatureCard extends StatelessWidget {
         ],
       ),
       child: Column(
-        mainAxisSize: MainAxisSize.min,
+        mainAxisAlignment: MainAxisAlignment.center,
         children: [
           SizedBox(
-            height: isTablet ? 98 : 88,
-            width: double.infinity,
-            child: ClipRect(
-              child: Align(
-                alignment: Alignment.center,
-                child: Transform.scale(
-                  scale: isTablet ? 1.12 : 1.15,
-                  child: Image.asset(
-                    iconAsset,
-                    height: isTablet ? 72 : 64,
+            height: iconSize,
+            width: iconSize,
+            child: iconAsset != null
+                ? Image.asset(
+                    iconAsset!,
+                    color: _gold,
+                    colorBlendMode: BlendMode.srcIn,
                     fit: BoxFit.contain,
-                  ),
-                ),
-              ),
-            ),
+                  )
+                : Icon(icon, size: iconSize, color: _gold),
           ),
-          SizedBox(height: isTablet ? 8 : 6),
+          SizedBox(height: isTablet ? 10 : 8),
           Text(
             label,
             textAlign: TextAlign.center,
+            maxLines: 2,
             style: TextStyle(
-              fontSize: isTablet ? 11.5 : 10,
-              fontWeight: FontWeight.w500,
-              color: _WelcomeScreenState._kWelcomeInk.withOpacity(0.88),
+              fontSize: isTablet ? 16 : 14.5,
+              fontWeight: FontWeight.w600,
+              fontFamily: 'Georgia',
+              color: _WelcomeScreenState._kWelcomeInk,
               height: 1.2,
             ),
           ),

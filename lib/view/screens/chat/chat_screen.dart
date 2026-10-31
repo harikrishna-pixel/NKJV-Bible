@@ -36,6 +36,7 @@ import 'package:url_launcher/url_launcher_string.dart';
 import 'package:biblebookapp/controller/dashboard_controller.dart';
 import 'package:biblebookapp/view/screens/dashboard/home_screen.dart';
 import 'package:biblebookapp/view/widget/ai_gemini_privacy_banner.dart';
+import 'package:biblebookapp/view/widget/credits_sheets.dart';
 import 'package:biblebookapp/controller/dpProvider.dart';
 import 'package:biblebookapp/view/screens/category_detail_screen/view/image_detail_screen.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
@@ -86,6 +87,159 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
 
   // Wallet credits (loaded from local storage immediately)
   int _currentCredits = 0;
+  // Low-credit hints: AI Premium skips credits; answer length sets the cost.
+  bool _skipCredits = false;
+  String _answerLength = 'small';
+  static const Color _kCreditsAmber = Color(0xFFE08A1E);
+
+  int get _answerCost => WalletService.getChatCostForLength(_answerLength);
+
+  /// Credit chip turns amber below 20 credits (not for AI Premium).
+  bool get _creditsLow => !_skipCredits && _currentCredits < 20;
+
+  String get _answerLengthLabel => switch (_answerLength) {
+        'medium' => 'Medium',
+        'large' => 'Large',
+        _ => 'Small',
+      };
+
+  Future<void> _pickAnswerLength() async {
+    final picked = await showModalBottomSheet<String>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) {
+        final isDark = CommanColor.isDarkTheme(ctx);
+        final ink = isDark ? Colors.white : const Color(0xFF4A2C17);
+        Widget option(String value, String title) {
+          final cost = WalletService.getChatCostForLength(value);
+          final selected = value == _answerLength;
+          return ListTile(
+            title: Text(title,
+                style: TextStyle(fontWeight: FontWeight.w700, color: ink)),
+            subtitle: Text('$cost credits per answer',
+                style: TextStyle(color: ink.withOpacity(0.7))),
+            trailing: Icon(
+              selected ? Icons.check_circle : Icons.radio_button_unchecked,
+              color: selected ? const Color(0xFF8D6E63) : ink.withOpacity(0.5),
+            ),
+            onTap: () => Navigator.of(ctx).pop(value),
+          );
+        }
+
+        return SafeArea(
+          child: Container(
+            margin: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: isDark ? const Color(0xFF2C2118) : const Color(0xFFFFFAF4),
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const SizedBox(height: 8),
+                option('small', 'Small'),
+                option('medium', 'Medium'),
+                option('large', 'Large'),
+                const SizedBox(height: 8),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+    if (picked == null || picked == _answerLength) return;
+    await WalletService.setAnswerLength(picked);
+    if (mounted) setState(() => _answerLength = picked);
+  }
+
+  /// Above the input: "Running low" banner + "Each answer uses N credits".
+  Widget _buildCreditHints(double screenWidth, bool isDark) {
+    if (_skipCredits) return const SizedBox.shrink();
+    final cost = _answerCost;
+    final answersLeft = cost > 0 ? _currentCredits ~/ cost : 0;
+    final muted = isDark
+        ? Colors.white.withOpacity(0.7)
+        : CommanColor.whiteBlack(context).withOpacity(0.65);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (answersLeft == 1)
+          Container(
+            margin: const EdgeInsets.only(bottom: 8),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            decoration: BoxDecoration(
+              color: const Color(0xFF2A1A10),
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.warning_rounded,
+                    size: 18, color: Colors.white),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text.rich(
+                    TextSpan(
+                      style: const TextStyle(
+                          fontSize: 13.5, color: Colors.white),
+                      children: [
+                        const TextSpan(text: 'Running low. '),
+                        TextSpan(
+                          text:
+                              '1 ${_answerLengthLabel.toLowerCase()} answer',
+                          style: const TextStyle(
+                            fontWeight: FontWeight.w700,
+                            color: Color(0xFFF4C46A),
+                          ),
+                        ),
+                        const TextSpan(text: ' left.'),
+                      ],
+                    ),
+                  ),
+                ),
+                GestureDetector(
+                  onTap: () async {
+                    await CreditsSheets.showOutOfCredits(
+                      context,
+                      from: CreditsSheetFrom.chat,
+                      needed: cost,
+                    );
+                    _loadCreditsFromLocal();
+                  },
+                  child: const Text(
+                    'Earn free →',
+                    style: TextStyle(
+                      fontSize: 13.5,
+                      fontWeight: FontWeight.w700,
+                      color: Color(0xFFF4C46A),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        GestureDetector(
+          onTap: _pickAnswerLength,
+          child: Padding(
+            padding: const EdgeInsets.only(left: 6, bottom: 2),
+            child: Text.rich(
+              TextSpan(
+                style: TextStyle(
+                    fontSize: screenWidth > 450 ? 13 : 12, color: muted),
+                children: [
+                  const TextSpan(text: 'Each answer uses '),
+                  TextSpan(
+                    text: '$cost credits',
+                    style: const TextStyle(fontWeight: FontWeight.w700),
+                  ),
+                  TextSpan(text: ' · $_answerLengthLabel ⌄'),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
   Timer? _creditsTimer;
 
   // Recent conversations
@@ -1441,9 +1595,16 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     try {
       // Get credits from local storage (WalletService uses SharedPreferences)
       final credits = await WalletService.getCredits();
-      if (mounted && credits != _currentCredits) {
+      final skip = await BibleInfo.shouldSkipChatPrayerCredits();
+      final length = await WalletService.getAnswerLength();
+      if (mounted &&
+          (credits != _currentCredits ||
+              skip != _skipCredits ||
+              length != _answerLength)) {
         setState(() {
           _currentCredits = credits;
+          _skipCredits = skip;
+          _answerLength = length;
         });
       }
     } catch (e) {
@@ -1478,6 +1639,20 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   }
 
   Future<void> _showInsufficientCreditsDialog() async {
+    final chatCost = await WalletService.getChatCost();
+    if (!mounted) return;
+    // Out-of-credits sheet (plans / watch ad / buy credits, or refill for
+    // Lifetime users).
+    await CreditsSheets.showOutOfCredits(
+      context,
+      from: CreditsSheetFrom.chat,
+      needed: chatCost,
+    );
+    _loadCreditsFromLocal();
+  }
+
+  // ignore: unused_element
+  Future<void> _showInsufficientCreditsAlertLegacy() async {
     final credits = await WalletService.getCredits();
     final chatCost = await WalletService.getChatCost();
 
@@ -2482,18 +2657,22 @@ Remember: You are assisting users with the ${BibleInfo.bible_shortName}, so prov
                                           child: Icon(
                                             Icons.account_balance_wallet,
                                             size: screenWidth > 450 ? 22 : 20,
-                                            color: isDark
-                                                ? Colors.white
-                                                : const Color(0xFF8D6E63),
+                                            color: _creditsLow
+                                                ? _kCreditsAmber
+                                                : (isDark
+                                                    ? Colors.white
+                                                    : const Color(0xFF8D6E63)),
                                           ),
                                         ),
                                         const SizedBox(width: 6),
                                         Text(
                                           '$_currentCredits',
                                           style: TextStyle(
-                                            color: isDark
-                                                ? Colors.white
-                                                : const Color(0xFF8D6E63),
+                                            color: _creditsLow
+                                                ? _kCreditsAmber
+                                                : (isDark
+                                                    ? Colors.white
+                                                    : const Color(0xFF8D6E63)),
                                             fontSize:
                                                 screenWidth > 450 ? 14 : 13,
                                             fontWeight: FontWeight.w700,
@@ -5094,6 +5273,7 @@ Your 3 questions (exactly 3 lines):''';
             SizedBox(
               height: 10,
             ),
+            _buildCreditHints(screenWidth, isDark),
             Row(
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [

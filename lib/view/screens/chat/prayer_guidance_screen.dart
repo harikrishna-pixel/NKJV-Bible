@@ -18,6 +18,7 @@ import 'package:biblebookapp/view/constants/theme_provider.dart';
 import 'package:biblebookapp/view/screens/category_detail_screen/view/image_detail_screen.dart';
 import 'package:biblebookapp/streak_flow/pour_out_worries_screen.dart';
 import 'package:biblebookapp/view/screens/chat/chat_translations.dart';
+import 'package:biblebookapp/view/screens/chat/prayer_request_screen.dart';
 import 'package:biblebookapp/view/screens/dashboard/constants.dart';
 import 'package:biblebookapp/view/screens/dashboard/setting_screen.dart';
 import 'package:biblebookapp/view/screens/prayer_wall/post_prayer_screen.dart';
@@ -26,6 +27,7 @@ import 'package:biblebookapp/view/screens/prayer_wall/prayer_wall_screen.dart';
 import 'package:biblebookapp/view/screens/prayer_wall/prayer_wall_service.dart';
 import 'package:biblebookapp/view/screens/wallet/wallet_screen.dart';
 import 'package:biblebookapp/view/widget/ai_gemini_privacy_banner.dart';
+import 'package:biblebookapp/view/widget/credits_sheets.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/gestures.dart';
 import 'package:url_launcher/url_launcher_string.dart';
@@ -495,7 +497,21 @@ class _PrayerGuidanceScreenState extends State<PrayerGuidanceScreen>
           ))
       .toList();
 
-  void _showInsufficientCreditsDialog() {
+  /// Out-of-credits sheet ("This prayer needs N credits", or refill for
+  /// Lifetime users).
+  Future<void> _showInsufficientCreditsDialog([int? needed]) async {
+    final cost = needed ?? await WalletService.getChatCost();
+    if (!mounted) return;
+    await CreditsSheets.showOutOfCredits(
+      context,
+      from: CreditsSheetFrom.prayer,
+      needed: cost,
+    );
+    _loadCreditsFromLocal();
+  }
+
+  // ignore: unused_element
+  void _showInsufficientCreditsSnackLegacy() {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Row(
@@ -554,7 +570,87 @@ class _PrayerGuidanceScreenState extends State<PrayerGuidanceScreen>
     return "$text\n\nRead more at: $storeLink";
   }
 
-  Future<void> _sendPrayerRequest(int categoryIndex) async {
+  /// Default "Your prayer request" text per category (Myself / family / other).
+  Map<PrayerFor, String> _defaultPrayerRequests(int categoryIndex) {
+    const defaults = <int, List<String>>{
+      0: [
+        'Lord, thank You for Your goodness, the blessings in my life, and Your continued guidance.',
+        'Lord, thank You for my family, for Your love over us, and for every blessing You give us.',
+        'Lord, thank You for their life, and Your continued blessings and guidance.',
+      ],
+      1: [
+        'Lord, please forgive me where I have fallen short, and help me forgive those who have hurt me.',
+        'Lord, please bring forgiveness and healing to my family, and help us extend grace to one another.',
+        'Lord, please help them receive Your forgiveness and find the grace to forgive others.',
+      ],
+      2: [
+        'Lord, please give me wisdom and clear direction for the decisions in front of me.',
+        'Lord, please guide my family and give us wisdom for the choices we face together.',
+        'Lord, please give them wisdom and clear direction for the path ahead.',
+      ],
+      3: [
+        'Lord, I bring my worries to You. Please calm my heart and fill me with Your peace.',
+        'Lord, please calm every worry in my family and fill our home with Your peace.',
+        'Lord, please calm their worries and fill their heart with Your peace.',
+      ],
+      4: [
+        'Lord, please bring healing to my body, mind, and spirit, and restore my strength.',
+        'Lord, please bring healing and strength to my family in body, mind, and spirit.',
+        'Lord, please bring healing to their body, mind, and spirit, and restore their strength.',
+      ],
+      5: [
+        'Lord, please protect my family, bring us closer together, and fill our home with Your love.',
+        'Lord, please keep my family united, protected, and close to You.',
+        'Lord, please protect their family and fill their home with Your love and unity.',
+      ],
+    };
+    final list = defaults[categoryIndex];
+    if (list != null) {
+      return {
+        PrayerFor.myself: list[0],
+        PrayerFor.family: list[1],
+        PrayerFor.someoneElse: list[2],
+      };
+    }
+    final focus = categoryIndex < _categoryInstructionalSubtitles.length
+        ? _categoryInstructionalSubtitles[categoryIndex]
+        : '';
+    return {
+      PrayerFor.myself: focus,
+      PrayerFor.family: focus,
+      PrayerFor.someoneElse: focus,
+    };
+  }
+
+  /// Screens 2–4: "Your Prayer Request" (+ credit amount), then generate.
+  Future<void> _openPrayerRequest(int categoryIndex) async {
+    if (_isLoading) return;
+    final skipCredits = await BibleInfo.shouldSkipChatPrayerCredits();
+    final savedLength = await WalletService.getAnswerLength();
+    if (!mounted) return;
+    final result = await Navigator.of(context).push<PrayerRequestResult>(
+      MaterialPageRoute(
+        builder: (_) => PrayerRequestScreen(
+          categoryTitle: _categories[categoryIndex].title,
+          categorySubtitle:
+              categoryIndex < _categoryInstructionalSubtitles.length
+                  ? _categoryInstructionalSubtitles[categoryIndex]
+                  : '',
+          categoryIconAsset: _categoryIconAsset(categoryIndex),
+          defaultRequests: _defaultPrayerRequests(categoryIndex),
+          skipCredits: skipCredits,
+          initialAnswerLength: savedLength,
+        ),
+      ),
+    );
+    if (result == null || !mounted) return;
+    await _sendPrayerRequest(categoryIndex, request: result);
+  }
+
+  Future<void> _sendPrayerRequest(
+    int categoryIndex, {
+    PrayerRequestResult? request,
+  }) async {
     if (_isLoading) return;
 
     // Stop any currently playing prayer audio so only one audio plays at a time
@@ -567,12 +663,17 @@ class _PrayerGuidanceScreenState extends State<PrayerGuidanceScreen>
       return;
     }
 
+    // Length / cost for this prayer: the amount picked on "Choose Credit
+    // Amount" (this prayer only), otherwise the saved setting as before.
+    final prayerAnswerLength =
+        request?.answerLength ?? await WalletService.getAnswerLength();
+    final prayerCost = WalletService.getChatCostForLength(prayerAnswerLength);
+
     // Credits check (same as Chat) — AR AI Premium skips; Lifetime still uses credits.
     if (!await BibleInfo.shouldSkipChatPrayerCredits()) {
-      final chatCost = await WalletService.getChatCost();
-      final hasCredits = await WalletService.getCredits() >= chatCost;
+      final hasCredits = await WalletService.getCredits() >= prayerCost;
       if (!hasCredits) {
-        _showInsufficientCreditsDialog();
+        _showInsufficientCreditsDialog(prayerCost);
         return;
       }
     }
@@ -591,7 +692,7 @@ class _PrayerGuidanceScreenState extends State<PrayerGuidanceScreen>
       final url = Uri.parse(_baseUrl);
 
       // Answer length instruction (same as ChatScreen)
-      final answerLength = await WalletService.getAnswerLength();
+      final answerLength = prayerAnswerLength;
       String answerLengthInstruction = '';
       switch (answerLength) {
         case 'small':
@@ -609,6 +710,39 @@ class _PrayerGuidanceScreenState extends State<PrayerGuidanceScreen>
         default:
           answerLengthInstruction =
               'Provide an appropriate answer based on the question.';
+      }
+
+      // Details from "Your Prayer Request" (screens 2 / 3), if any.
+      var personalInstruction = '';
+      if (request != null) {
+        final b = StringBuffer()
+          ..writeln()
+          ..writeln('Personalize the prayer with these details from the user:');
+        switch (request.prayerFor) {
+          case PrayerFor.myself:
+            b.writeln(
+                '- Praying for: the user themselves (write in first person: I / me).');
+            break;
+          case PrayerFor.family:
+            b.writeln("- Praying for: the user's family.");
+            break;
+          case PrayerFor.someoneElse:
+            b.writeln('- Praying for: someone else.');
+            if (request.name.isNotEmpty) {
+              b.writeln('- Their name: ${request.name}');
+            }
+            if (request.relationship.isNotEmpty) {
+              b.writeln('- Relationship to the user: ${request.relationship}');
+            }
+            break;
+        }
+        b.writeln('- Prayer request: ${request.request}');
+        if (request.details.isNotEmpty) {
+          b.writeln('- Additional details: ${request.details}');
+        }
+        b.writeln(
+            'Write the prayer itself only; do not repeat these instructions.');
+        personalInstruction = b.toString();
       }
 
       // Determine language instruction based on chatLanguage
@@ -783,7 +917,7 @@ ${answerLengthInstruction}
 
 Task:
 ${category.prompt}
-''';
+$personalInstruction''';
 
       final response = await http.post(
         url,
@@ -844,7 +978,7 @@ ${category.prompt}
       if (!isErrorResponse) {
         await WidgetPromptService.notePrayerGenerated();
         if (!await BibleInfo.shouldSkipChatPrayerCredits()) {
-          final chatCost = await WalletService.getChatCost();
+          final chatCost = prayerCost;
           await WalletService.deductCredits(chatCost);
           if (mounted && requestId == _prayerRequestGeneration) {
             final prefs = await SharedPreferences.getInstance();
@@ -1009,7 +1143,7 @@ ${category.prompt}
       final chatCost = await WalletService.getChatCost();
       final hasCredits = await WalletService.getCredits() >= chatCost;
       if (!hasCredits) {
-        _showInsufficientCreditsDialog();
+        _showInsufficientCreditsDialog(chatCost);
         return;
       }
     }
@@ -4786,7 +4920,7 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
 
                                         return InkWell(
                                           onTap: () {
-                                            _sendPrayerRequest(categoryIndex);
+                                            _openPrayerRequest(categoryIndex);
                                           },
                                           borderRadius:
                                               BorderRadius.circular(16),

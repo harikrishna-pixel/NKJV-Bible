@@ -1518,10 +1518,10 @@ class FaithJourneyDialog {
       builder: (ctx) {
         final mq = MediaQuery.of(ctx).size;
         final isTablet = mq.width > 600;
-        const titleColor = Color(0xFF2C2118);
+        const titleColor = Color(0xFF3D2914);
         const bodyColor = Color(0xFF5C4033);
         const topicsColor = Color(0xFF3D2914);
-        const crossColor = Color(0xFF2C2118);
+        const crossColor = Color(0xFF5C3317);
         return Dialog(
           backgroundColor: Colors.transparent,
           insetPadding: EdgeInsets.zero,
@@ -1531,9 +1531,11 @@ class FaithJourneyDialog {
               width: double.infinity,
               height: double.infinity,
               decoration: BoxDecoration(
+                // Parchment with open Bible at the bottom (reference UI).
                 image: const DecorationImage(
-                  image: AssetImage('assets/lightMode/day_bg.png'),
-                  fit: BoxFit.fill,
+                  image: AssetImage('assets/onboarding/bible_ready_bg.jpg'),
+                  fit: BoxFit.cover,
+                  alignment: Alignment.bottomCenter,
                 ),
               ),
               child: SafeArea(
@@ -1545,23 +1547,30 @@ class FaithJourneyDialog {
                     children: [
                       const Spacer(flex: 2),
                       SizedBox(
-                        width: isTablet ? 120 : 96,
-                        height: isTablet ? 120 : 96,
+                        width: isTablet ? 190 : 160,
+                        height: isTablet ? 190 : 160,
                         child: Stack(
                           alignment: Alignment.center,
                           children: [
+                            CustomPaint(
+                              size: Size(
+                                isTablet ? 190 : 160,
+                                isTablet ? 190 : 160,
+                              ),
+                              painter: const _GlowRaysPainter(),
+                            ),
                             Container(
                               width: isTablet ? 120 : 96,
                               height: isTablet ? 120 : 96,
                               decoration: BoxDecoration(
                                 shape: BoxShape.circle,
-                                color: const Color(0xFFF3E4C0),
+                                color: const Color(0xFFF8EACB),
                                 boxShadow: [
                                   BoxShadow(
-                                    color: const Color(0xFFE8D49A)
-                                        .withValues(alpha: 0.85),
-                                    blurRadius: 28,
-                                    spreadRadius: 6,
+                                    color: const Color(0xFFF3DDA6)
+                                        .withValues(alpha: 0.9),
+                                    blurRadius: 30,
+                                    spreadRadius: 8,
                                   ),
                                 ],
                               ),
@@ -1617,7 +1626,8 @@ class FaithJourneyDialog {
                         ),
                         textAlign: TextAlign.center,
                       ),
-                      const Spacer(flex: 3),
+                      // Keep the text above the Bible in the background.
+                      const Spacer(flex: 5),
                       SizedBox(
                         width: double.infinity,
                         height: isTablet ? 60 : 54,
@@ -1700,9 +1710,8 @@ class FaithJourneyDialog {
                             decoration: BoxDecoration(
                               gradient: const LinearGradient(
                                 colors: [
-                                  Color(0xFF763201),
-                                  Color(0xFFD5821F),
-                                  Color(0xFF763201),
+                                  Color(0xFF8A5530),
+                                  Color(0xFF5C3317),
                                 ],
                               ),
                               borderRadius: BorderRadius.circular(14),
@@ -1715,6 +1724,7 @@ class FaithJourneyDialog {
                                   Text(
                                     'Start now',
                                     style: TextStyle(
+                                      fontFamily: 'Georgia',
                                       fontSize: isTablet ? 20 : 18,
                                       fontWeight: FontWeight.w700,
                                       color: Colors.white,
@@ -1752,6 +1762,35 @@ class FaithJourneyDialog {
       },
     );
   }
+}
+
+/// Soft gold sun rays behind the cross badge (reference UI).
+class _GlowRaysPainter extends CustomPainter {
+  const _GlowRaysPainter();
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final center = size.center(Offset.zero);
+    final outer = size.shortestSide / 2;
+    final inner = outer * 0.62;
+    final paint = Paint()
+      ..color = const Color(0xFFE2B866).withValues(alpha: 0.55)
+      ..strokeWidth = 1.4
+      ..strokeCap = StrokeCap.round;
+    const rays = 28;
+    for (var i = 0; i < rays; i++) {
+      final a = (i / rays) * 2 * math.pi;
+      final len = i.isEven ? outer : outer * 0.86;
+      canvas.drawLine(
+        center + Offset(math.cos(a), math.sin(a)) * inner,
+        center + Offset(math.cos(a), math.sin(a)) * len,
+        paint,
+      );
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _GlowRaysPainter oldDelegate) => false;
 }
 
 class _CrossPainter extends CustomPainter {
