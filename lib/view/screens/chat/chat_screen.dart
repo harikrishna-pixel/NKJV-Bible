@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:get/get.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
@@ -87,6 +88,37 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
 
   // Wallet credits (loaded from local storage immediately)
   int _currentCredits = 0;
+  /// Measured height of the overlaid composer (input + credit hints).
+  double _composerHeight = 0;
+  double _lastKeyboardInset = 0;
+
+  /// Bottom space the chat list keeps free for the composer and keyboard.
+  double _composerSpace(BuildContext context) {
+    final composer = _composerHeight > 0
+        ? _composerHeight + 8
+        : MediaQuery.viewPaddingOf(context).bottom + 96;
+    return composer + MediaQuery.viewInsetsOf(context).bottom;
+  }
+
+  /// Keyboard opening: if the user was at the latest message, keep it in view.
+  @override
+  void didChangeMetrics() {
+    super.didChangeMetrics();
+    final views = WidgetsBinding.instance.platformDispatcher.views;
+    if (views.isEmpty) return;
+    final view = views.first;
+    final inset = view.viewInsets.bottom / view.devicePixelRatio;
+    final opening = inset > _lastKeyboardInset + 1;
+    _lastKeyboardInset = inset;
+    if (!opening || !_scrollController.hasClients) return;
+    final pos = _scrollController.position;
+    if (pos.maxScrollExtent - pos.pixels > 120) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !_scrollController.hasClients) return;
+      _scrollController.jumpTo(_scrollController.position.maxScrollExtent);
+    });
+  }
+
   // Low-credit hints: AI Premium skips credits; answer length sets the cost.
   bool _skipCredits = false;
   String _answerLength = 'small';
@@ -3143,13 +3175,9 @@ Remember: You are assisting users with the ${BibleInfo.bible_shortName}, so prov
                                     _buildRecentConversations(
                                         screenWidth, isDark),
                                   ],
-                                  // Room for the overlaid composer. Kept stable while
-                                  // the keyboard opens so the page does not jump.
-                                  SizedBox(
-                                    height: MediaQuery.viewPaddingOf(context)
-                                            .bottom +
-                                        96,
-                                  ),
+                                  // Room for the overlaid composer (its real
+                                  // height incl. credit hints) and keyboard.
+                                  SizedBox(height: _composerSpace(context)),
                                 ],
                               ),
                             )
@@ -3159,7 +3187,7 @@ Remember: You are assisting users with the ${BibleInfo.bible_shortName}, so prov
                                 screenWidth > 450 ? 20 : 16,
                                 screenWidth > 450 ? 20 : 16,
                                 screenWidth > 450 ? 20 : 16,
-                                MediaQuery.viewPaddingOf(context).bottom + 96,
+                                _composerSpace(context),
                               ),
                               itemCount: _messages.length +
                                   (_isLoading ? 1 : 0) +
@@ -3191,7 +3219,16 @@ Remember: You are assisting users with the ${BibleInfo.bible_shortName}, so prov
                     left: 0,
                     right: 0,
                     bottom: MediaQuery.viewInsetsOf(context).bottom,
-                    child: _buildInputArea(screenWidth, isDark),
+                    child: _MeasureSize(
+                      onChange: (size) {
+                        if (!mounted ||
+                            (size.height - _composerHeight).abs() < 0.5) {
+                          return;
+                        }
+                        setState(() => _composerHeight = size.height);
+                      },
+                      child: _buildInputArea(screenWidth, isDark),
+                    ),
                   ),
                 ],
               ),
@@ -5258,13 +5295,22 @@ Your 3 questions (exactly 3 lines):''';
     final Color sendBgColor = !_isLoading
         ? CommanColor.lightDarkPrimary(context)
         : CommanColor.lightDarkPrimary(context).withOpacity(0.3);
+    // Same colour as the page so chat text never shows through the composer.
+    final pageBg = isVintage
+        ? (isDark ? CommanColor.black : themeProvider.backgroundColor)
+        : (isDark ? CommanColor.darkPrimaryColor : themeProvider.backgroundColor);
     return Container(
       padding: EdgeInsets.symmetric(
         horizontal: screenWidth > 450 ? 12 : 10,
         vertical: screenWidth > 450 ? 8 : 6,
       ),
       decoration: BoxDecoration(
-        color: Colors.transparent,
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [pageBg.withOpacity(0), pageBg.withOpacity(0.97)],
+          stops: const [0, 0.22],
+        ),
       ),
       child: SafeArea(
         top: false,
@@ -5556,5 +5602,40 @@ class _ChatTapFeedbackIconState extends State<_ChatTapFeedbackIcon>
         child: widget.child,
       ),
     );
+  }
+}
+
+/// Reports its child's laid-out size (used to keep the chat list clear of the
+/// overlaid composer, whose height changes with the credit hints).
+class _MeasureSize extends SingleChildRenderObjectWidget {
+  const _MeasureSize({required this.onChange, required Widget child})
+      : super(child: child);
+
+  final ValueChanged<Size> onChange;
+
+  @override
+  RenderObject createRenderObject(BuildContext context) =>
+      _MeasureSizeRender(onChange);
+
+  @override
+  void updateRenderObject(
+      BuildContext context, covariant _MeasureSizeRender renderObject) {
+    renderObject.onChange = onChange;
+  }
+}
+
+class _MeasureSizeRender extends RenderProxyBox {
+  _MeasureSizeRender(this.onChange);
+
+  ValueChanged<Size> onChange;
+  Size? _last;
+
+  @override
+  void performLayout() {
+    super.performLayout();
+    final s = size;
+    if (_last == s) return;
+    _last = s;
+    WidgetsBinding.instance.addPostFrameCallback((_) => onChange(s));
   }
 }

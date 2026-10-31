@@ -117,7 +117,8 @@ class _SettingScreenState extends State<SettingScreen>
       ),
       row(
         label: 'Premium plan',
-        value: s?.planLabel,
+        // Like the drawer: "Active" once purchased; Free taps → paywall.
+        value: s == null ? null : (isFree ? 'Free' : 'Active'),
         chevron: isFree,
         onTap: isFree
             ? () async {
@@ -126,13 +127,22 @@ class _SettingScreenState extends State<SettingScreen>
               }
             : null,
       ),
-      row(
-        label: 'Restore purchases',
-        onTap: () async {
-          await WalletEntry.restore(context);
-          await _loadWalletSummary();
-        },
-      ),
+      // Free: Restore purchases. Premium: plan details instead.
+      if (isFree)
+        row(
+          label: 'Restore purchases',
+          onTap: () async {
+            await WalletEntry.restore(context);
+            await _loadWalletSummary();
+          },
+        )
+      else
+        row(
+          label: 'Plan details',
+          value: s.planInfo,
+          chevron: false,
+          onTap: null,
+        ),
       SizedBox(height: screenWidth < 380 ? 10 : 12),
     ];
   }

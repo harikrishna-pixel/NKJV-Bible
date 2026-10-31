@@ -388,7 +388,18 @@ class _KeepGoingSheetState extends State<_KeepGoingSheet>
   }
 
   Future<void> _openLegal(String url) async {
-    await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
+    var opened = false;
+    try {
+      opened = await launchUrl(
+        Uri.parse(url),
+        mode: LaunchMode.inAppBrowserView,
+      );
+    } catch (e) {
+      debugPrint('CreditsSheets: open $url failed: $e');
+    }
+    if (!opened) {
+      Constants.showToast('Could not open the link. Please try again.', 2000);
+    }
   }
 
   Widget _planChip(String label, bool selected, {String? badge}) {
@@ -591,13 +602,18 @@ class _KeepGoingSheetState extends State<_KeepGoingSheet>
 }
 
 Widget _link(String text, VoidCallback onTap) => GestureDetector(
+      behavior: HitTestBehavior.opaque,
       onTap: onTap,
-      child: Text(
-        text,
-        style: const TextStyle(
-          fontSize: 12,
-          color: _muted,
-          decoration: TextDecoration.underline,
+      // Bigger touch area than the 12 pt text alone.
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 10),
+        child: Text(
+          text,
+          style: const TextStyle(
+            fontSize: 12,
+            color: _muted,
+            decoration: TextDecoration.underline,
+          ),
         ),
       ),
     );

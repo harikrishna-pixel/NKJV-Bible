@@ -1,4 +1,5 @@
 import 'package:biblebookapp/services/wallet_service.dart';
+import 'package:biblebookapp/view/constants/constant.dart';
 import 'package:biblebookapp/view/constants/share_preferences.dart';
 import 'package:biblebookapp/view/screens/dashboard/constants.dart';
 import 'package:biblebookapp/view/screens/intro_subcribtion_screen.dart';
@@ -6,6 +7,7 @@ import 'package:biblebookapp/view/screens/paywall_navigation.dart';
 import 'package:biblebookapp/view/screens/wallet/wallet_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 /// Read-only wallet summary for the Wallet entry points (Menu, Settings,
@@ -16,7 +18,21 @@ class WalletSummary {
     required this.unlimited,
     required this.shortCost,
     required this.planLabel,
+    this.expiry,
   });
+
+  /// Saved premium access date on this device (Apple handles renewals).
+  final DateTime? expiry;
+
+  bool get isFree => planLabel == 'Free';
+
+  /// Premium users: "Lifetime access" / "Valid until 30 Oct 2027".
+  String get planInfo {
+    if (planLabel == 'Lifetime') return 'Lifetime access';
+    final e = expiry;
+    if (e == null) return 'Premium';
+    return 'Valid until ${DateFormat('d MMM yyyy').format(e)}';
+  }
 
   final int credits;
 
@@ -44,11 +60,15 @@ class WalletSummary {
     final label = !active
         ? 'Free'
         : (plan == 'platinum' ? 'Lifetime' : 'Premium');
+    final rawExpiry = prefs.getString('isRewardAdViewTime');
     return WalletSummary(
       credits: credits,
       unlimited: unlimited,
       shortCost: WalletService.getChatCostForLength('small'),
       planLabel: label,
+      expiry: (rawExpiry == null || rawExpiry.isEmpty)
+          ? null
+          : DateTime.tryParse(rawExpiry),
     );
   }
 }
@@ -79,7 +99,13 @@ class WalletEntry {
   }
 
   /// Existing Restore flow (same invisible purchase screen the paywall uses).
+  /// If a premium plan is already active on this device, just say so instead
+  /// of running Restore again.
   static Future<void> restore(BuildContext context) async {
+    if (await BibleInfo.hasActivePremiumPlan()) {
+      Constants.showToast('Purchases Already Restored', 2500);
+      return;
+    }
     if (!await SubscriptionScreen.isDashboardIapEnabled()) return;
     final ar = BibleInfo.isAutoRenewablePaywallMode;
     final six = ar

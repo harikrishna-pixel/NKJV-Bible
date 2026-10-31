@@ -141,19 +141,28 @@ class _ProfileWalletCardState extends State<_ProfileWalletCard> {
                   child: const Text('Buy credits'),
                 ),
               ),
-              if (isFree) ...[
+              if (s != null) ...[
                 const SizedBox(width: 10),
                 Expanded(
+                  // Like the drawer: "Premium Active" once purchased (no
+                  // action); Free → opens the paywall.
                   child: OutlinedButton.icon(
-                    onPressed: () async {
-                      await WalletEntry.openPremium();
-                      await _load();
-                    },
-                    icon: const Icon(Icons.workspace_premium_outlined,
-                        size: 18),
-                    label: const Text('Premium'),
+                    onPressed: isFree
+                        ? () async {
+                            await WalletEntry.openPremium();
+                            await _load();
+                          }
+                        : null,
+                    icon: Icon(
+                      isFree
+                          ? Icons.workspace_premium_outlined
+                          : Icons.verified_rounded,
+                      size: 18,
+                    ),
+                    label: Text(isFree ? 'Premium' : 'Premium Active'),
                     style: OutlinedButton.styleFrom(
                       foregroundColor: ink,
+                      disabledForegroundColor: ink,
                       side: BorderSide(color: ink.withOpacity(0.35)),
                       padding: const EdgeInsets.symmetric(vertical: 12),
                       shape: RoundedRectangleBorder(
@@ -165,21 +174,47 @@ class _ProfileWalletCardState extends State<_ProfileWalletCard> {
               ],
             ],
           ),
-          TextButton(
-            onPressed: () async {
-              await WalletEntry.restore(context);
-              await _load();
-            },
-            child: Text(
-              'Restore purchases',
-              style: TextStyle(
-                fontSize: 13,
-                color: ink.withOpacity(0.75),
-                decoration: TextDecoration.underline,
-                decorationColor: ink.withOpacity(0.75),
+          // Free: Restore purchases. Premium: plan details instead.
+          if (isFree)
+            TextButton(
+              onPressed: () async {
+                await WalletEntry.restore(context);
+                await _load();
+              },
+              child: Text(
+                'Restore purchases',
+                style: TextStyle(
+                  fontSize: 13,
+                  color: ink.withOpacity(0.75),
+                  decoration: TextDecoration.underline,
+                  decorationColor: ink.withOpacity(0.75),
+                ),
+              ),
+            )
+          else
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.verified_rounded,
+                      size: 16, color: ink.withOpacity(0.75)),
+                  const SizedBox(width: 6),
+                  Flexible(
+                    child: Text(
+                      s.planLabel == 'Lifetime'
+                          ? s.planInfo
+                          : '${s.planLabel} · ${s.planInfo}',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: ink.withOpacity(0.8),
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
-          ),
         ],
       ),
     );
