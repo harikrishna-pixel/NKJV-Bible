@@ -810,6 +810,13 @@ class _SubscriptionScreenState extends State<SubscriptionScreen>
         if (BibleInfo.isArOneMonthProductId(_products[i].id)) return i;
       }
     }
+    // AR paywall 1 Year card: use the auto-renew 1-year product it displays,
+    // not the classic non-renewing one-year SKU.
+    if (slot == 1 && BibleInfo.isArOneYearProductId(widget.oneYearPlan)) {
+      for (var i = 0; i < _products.length; i++) {
+        if (BibleInfo.isArOneYearProductId(_products[i].id)) return i;
+      }
+    }
     for (var i = 0; i < _products.length; i++) {
       if (_planSlotForProductId(_products[i].id) == slot) {
         return i;
@@ -1266,6 +1273,16 @@ class _SubscriptionScreenState extends State<SubscriptionScreen>
             orElse: () => null,
           );
       if (oneMonth != null) prod = oneMonth;
+    } else if (widget.initialSelectedPlanIndex == 1 &&
+        BibleInfo.isArOneYearProductId(widget.oneYearPlan)) {
+      // AR paywall 1 Year card: buy the auto-renew 1-year product it displays.
+      // If the store didn't return it, keep the existing product (no change).
+      final arOneYear = _products.cast<ProductDetails?>().firstWhere(
+            (p) => p != null && BibleInfo.isArOneYearProductId(p.id),
+            orElse: () => null,
+          );
+      if (arOneYear != null) prod = arOneYear;
+      _pendingBuyProductId = prod.id;
     } else {
       _pendingBuyProductId = prod.id;
     }
