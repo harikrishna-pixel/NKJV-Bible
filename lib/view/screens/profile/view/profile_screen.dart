@@ -18,6 +18,7 @@ import 'package:biblebookapp/view/screens/authenitcation/view/widget/own_referra
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:biblebookapp/view/screens/prayer_wall/prayer_wall_local_store.dart';
 import 'package:biblebookapp/view/screens/prayer_wall/prayer_wall_screen.dart';
+import 'package:biblebookapp/view/widget/wallet_entry.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:provider/provider.dart' as P;
@@ -26,6 +27,164 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart' as p;
 import '../../../../core/notifiers/cache.notifier.dart';
+
+/// My Account > Wallet card: balance, Buy credits, Premium, Restore purchases.
+class _ProfileWalletCard extends StatefulWidget {
+  const _ProfileWalletCard();
+
+  @override
+  State<_ProfileWalletCard> createState() => _ProfileWalletCardState();
+}
+
+class _ProfileWalletCardState extends State<_ProfileWalletCard> {
+  WalletSummary? _s;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    final s = await WalletSummary.load();
+    if (mounted) setState(() => _s = s);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final ink = _profileInk(context);
+    final s = _s;
+    final isFree = s == null || s.planLabel == 'Free';
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(14, 14, 14, 8),
+      decoration: BoxDecoration(
+        color: CommanColor.lightDarkPrimary200(context).withOpacity(0.28),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                decoration: const BoxDecoration(
+                  color: Color(0xFF472F1F),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.account_balance_wallet_outlined,
+                    color: Colors.white, size: 20),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Wallet',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                        fontFamily: 'Georgia',
+                        color: ink,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      'Credits are used for AI features',
+                      style: TextStyle(
+                          fontSize: 12, color: ink.withOpacity(0.62)),
+                    ),
+                  ],
+                ),
+              ),
+              if (s != null)
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Text(
+                      s.unlimited ? 'Unlimited' : '${s.credits}',
+                      style: TextStyle(
+                        fontSize: s.unlimited ? 15 : 22,
+                        fontWeight: FontWeight.w800,
+                        color: ink,
+                      ),
+                    ),
+                    if (!s.unlimited)
+                      Text(
+                        '≈ ${s.shortAnswers} AI answers',
+                        style: TextStyle(
+                            fontSize: 11, color: ink.withOpacity(0.62)),
+                      ),
+                  ],
+                ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: ElevatedButton(
+                  onPressed: () async {
+                    await WalletEntry.openWallet();
+                    await _load();
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF5C3317),
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  child: const Text('Buy credits'),
+                ),
+              ),
+              if (isFree) ...[
+                const SizedBox(width: 10),
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: () async {
+                      await WalletEntry.openPremium();
+                      await _load();
+                    },
+                    icon: const Icon(Icons.workspace_premium_outlined,
+                        size: 18),
+                    label: const Text('Premium'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: ink,
+                      side: BorderSide(color: ink.withOpacity(0.35)),
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ],
+          ),
+          TextButton(
+            onPressed: () async {
+              await WalletEntry.restore(context);
+              await _load();
+            },
+            child: Text(
+              'Restore purchases',
+              style: TextStyle(
+                fontSize: 13,
+                color: ink.withOpacity(0.75),
+                decoration: TextDecoration.underline,
+                decorationColor: ink.withOpacity(0.75),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
 
 Color _profileInk(BuildContext context) {
   return CommanColor.whiteBlack(context);
@@ -702,6 +861,9 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
                                     ),
                                   ),
                                 ),
+                                SizedBox(height: mheight * 0.016),
+                                // Wallet (Apple review path: My Account > Wallet).
+                                const _ProfileWalletCard(),
                                 SizedBox(height: mheight * 0.016),
                                 InkWell(
                                   onTap: () {

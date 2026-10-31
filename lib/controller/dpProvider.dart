@@ -55,10 +55,10 @@ class DBHelper {
 
   Future<dynamic> get db async {
     if (_db != null && _db.isOpen == true) {
-      return _db;
-    }
-    _db = await initDatabase();
-    return _db;
+        return _db;
+      }
+        _db = await initDatabase();
+        return _db;
   }
 
   /// Same as [db] — useful for diagnostics snippets.
@@ -168,8 +168,8 @@ class DBHelper {
       try {
         return await sqlcipher.openDatabase(
           path,
-          version: 3,
-          password: password,
+        version: 3,
+        password: password,
           onCreate: _onCreate,
           onUpgrade: onUpgrade,
         );
@@ -181,10 +181,10 @@ class DBHelper {
     // 2) Fallback: open as plain sqlite. Fixes situations where the file
     // on disk isn't actually encrypted (or password/encryption format mismatch).
     return await plain.openDatabase(
-      path,
-      version: 3,
+            path,
+            version: 3,
       onCreate: _onCreate,
-      onUpgrade: onUpgrade,
+            onUpgrade: onUpgrade,
     );
   }
 
@@ -972,9 +972,9 @@ class DBMigrationHelper {
           print(
               "copyUserDataFromLegacyIfNeeded: removed legacy $_legacyEncryptedName (target exists).");
         } else {
-          await File(legacyPath).rename(newNamePath);
-          print(
-              "copyUserDataFromLegacyIfNeeded: renamed $_legacyEncryptedName → $_encryptedDbName");
+        await File(legacyPath).rename(newNamePath);
+        print(
+            "copyUserDataFromLegacyIfNeeded: renamed $_legacyEncryptedName → $_encryptedDbName");
         }
       } catch (e) {
         print("copyUserDataFromLegacyIfNeeded: rename error: $e");
@@ -1251,18 +1251,18 @@ class DBMigrationHelper {
         try {
           await newDb.transaction((txn) async {
             final batch = txn.batch();
-            for (final row in rows) {
-              final mappedRow =
-                  _mapAndFilterRow(targetTableName, row, targetColumns);
-              if (mappedRow.isNotEmpty) {
+        for (final row in rows) {
+          final mappedRow =
+              _mapAndFilterRow(targetTableName, row, targetColumns);
+            if (mappedRow.isNotEmpty) {
                 batch.insert(targetTableName, mappedRow,
-                    conflictAlgorithm: sqlcipher.ConflictAlgorithm.ignore);
-              }
+                  conflictAlgorithm: sqlcipher.ConflictAlgorithm.ignore);
+            }
             }
             await batch.commit(noResult: true, continueOnError: true);
           });
-        } catch (e) {
-          debugPrint("testapp Insert error in '$targetTableName': $e");
+          } catch (e) {
+            debugPrint("testapp Insert error in '$targetTableName': $e");
         }
         if (rows.isNotEmpty) {
           debugPrint(
@@ -1682,7 +1682,7 @@ class DBMigrationHelper {
           if (stillMissing > 0) allCopied = false;
           print(
               'copyUserDataFromLegacyIfNeeded: $tableName legacy=${rows.length} inserted=${missing.length} stillMissing=$stillMissing');
-        } catch (e) {
+    } catch (e) {
           allCopied = false;
           print('copyUserDataFromLegacyIfNeeded: table $tableName error: $e');
         }
@@ -1699,7 +1699,7 @@ class DBMigrationHelper {
         await File(sourceDbPath).rename('$sourceDbPath.migrated');
         print(
             'copyUserDataFromLegacyIfNeeded: all rows verified, renamed legacy DB to $sourceDbPath.migrated');
-      } catch (e) {
+    } catch (e) {
         print('copyUserDataFromLegacyIfNeeded: rename legacy DB failed: $e');
       }
     }

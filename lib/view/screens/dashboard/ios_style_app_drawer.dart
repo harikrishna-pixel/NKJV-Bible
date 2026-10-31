@@ -1,6 +1,7 @@
 import 'package:biblebookapp/home_widget/widget_prompt_service.dart';
 import 'package:biblebookapp/view/constants/colors.dart';
 import 'package:biblebookapp/view/constants/images.dart';
+import 'package:biblebookapp/view/widget/wallet_entry.dart';
 import 'package:flutter/material.dart';
 
 /// Accordion iOS-style cream drawer (collapsed rows + expanded sub-items).
@@ -188,11 +189,19 @@ class _IosStyleAppDrawerState extends State<IosStyleAppDrawer>
     Future.microtask(action);
   }
 
+  WalletSummary? _wallet;
+
+  Future<void> _loadWallet() async {
+    final s = await WalletSummary.load();
+    if (mounted) setState(() => _wallet = s);
+  }
+
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _loadWidgetsRowState();
+    _loadWallet();
   }
 
   @override
@@ -205,6 +214,7 @@ class _IosStyleAppDrawerState extends State<IosStyleAppDrawer>
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
       _loadWidgetsRowState();
+      _loadWallet();
     }
   }
 
@@ -395,6 +405,15 @@ class _IosStyleAppDrawerState extends State<IosStyleAppDrawer>
             ),
             const SizedBox(height: 8),
           ],
+          // Wallet entry (Apple review path: Menu > Wallet).
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: _WalletCard(
+              subtitle: _wallet?.menuSubtitle ?? '',
+              onTap: () => _closeDrawerThen(WalletEntry.openWallet),
+            ),
+          ),
+          const SizedBox(height: 4),
           _NavLinkRow(
             icon: Icons.person_outline_rounded,
             asset: 'assets/home icons/My Account.png',
@@ -716,6 +735,73 @@ class _PremiumBanner extends StatelessWidget {
                   size: 22,
                 ),
               ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Menu > Wallet card: "Wallet" + "100 credits · ≈ 5 AI answers".
+class _WalletCard extends StatelessWidget {
+  const _WalletCard({required this.subtitle, required this.onTap});
+
+  final String subtitle;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = _DrawerPalette.of(context);
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(16),
+        child: Container(
+          padding: const EdgeInsets.fromLTRB(12, 12, 10, 12),
+          decoration: BoxDecoration(
+            color: colors.premiumBg,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: colors.premiumBorder),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: colors.iconTile,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(Icons.account_balance_wallet_outlined,
+                    color: colors.premiumAccent, size: 22),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Wallet',
+                      style: TextStyle(
+                        fontFamily: 'Georgia',
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                        color: colors.ink,
+                      ),
+                    ),
+                    if (subtitle.isNotEmpty) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        subtitle,
+                        style: TextStyle(fontSize: 12, color: colors.muted),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              Icon(Icons.chevron_right_rounded, color: colors.muted),
             ],
           ),
         ),

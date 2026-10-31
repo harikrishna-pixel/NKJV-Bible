@@ -14,6 +14,7 @@ import 'package:biblebookapp/view/screens/prayer_wall/prayer_wall_screen.dart';
 import 'package:biblebookapp/view/screens/intro_subcribtion_screen.dart';
 import 'package:biblebookapp/view/screens/paywall_navigation.dart';
 import 'package:biblebookapp/view/widget/webview.dart';
+import 'package:biblebookapp/view/widget/wallet_entry.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:internet_connection_checker_plus/internet_connection_checker_plus.dart';
 import 'package:day_night_time_picker/day_night_time_picker.dart';
@@ -53,9 +54,93 @@ class SettingScreen extends StatefulWidget {
 
 class _SettingScreenState extends State<SettingScreen>
     with WidgetsBindingObserver {
+  WalletSummary? _walletSummary;
+
+  Future<void> _loadWalletSummary() async {
+    final s = await WalletSummary.load();
+    if (mounted) setState(() => _walletSummary = s);
+  }
+
+  /// Wallet & Purchases (Apple review path): Wallet, Premium plan, Restore.
+  List<Widget> _buildWalletPurchasesSection(double screenWidth) {
+    final s = _walletSummary;
+    Widget row({
+      required String label,
+      String? value,
+      bool chevron = true,
+      required VoidCallback? onTap,
+    }) {
+      return Padding(
+        padding: EdgeInsets.symmetric(
+            horizontal: 20, vertical: screenWidth < 380 ? 7 : 10),
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: onTap,
+          child: Row(
+            children: [
+              Text(
+                label,
+                style: CommanStyle.bw16500(context)
+                    .copyWith(color: _settingsRowInk(context)),
+              ),
+              const Spacer(),
+              if (value != null)
+                Text(
+                  value,
+                  style: CommanStyle.bw16500(context).copyWith(
+                    color: _settingsRowInk(context).withOpacity(0.7),
+                  ),
+                ),
+              if (chevron)
+                Icon(
+                  Icons.navigate_next,
+                  color: _settingsRowInk(context),
+                  size: 24,
+                ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    final isFree = s == null || s.planLabel == 'Free';
+    return [
+      _buildSettingsSectionHeader('Wallet & Purchases', screenWidth),
+      const SizedBox(height: 5),
+      row(
+        label: 'Wallet & Credits',
+        value: s == null ? null : (s.unlimited ? 'Unlimited' : '${s.credits}'),
+        onTap: () async {
+          await WalletEntry.openWallet();
+          await _loadWalletSummary();
+        },
+      ),
+      row(
+        label: 'Premium plan',
+        value: s?.planLabel,
+        chevron: isFree,
+        onTap: isFree
+            ? () async {
+                await WalletEntry.openPremium();
+                await _loadWalletSummary();
+              }
+            : null,
+      ),
+      row(
+        label: 'Restore purchases',
+        onTap: () async {
+          await WalletEntry.restore(context);
+          await _loadWalletSummary();
+        },
+      ),
+      SizedBox(height: screenWidth < 380 ? 10 : 12),
+    ];
+  }
+
   @override
   void initState() {
     super.initState();
+    _loadWalletSummary();
     getNotificationDetails();
     WidgetsBinding.instance.addObserver(this);
   }
@@ -1257,6 +1342,7 @@ class _SettingScreenState extends State<SettingScreen>
                   screenWidth: screenWidth,
                 ),
                 SizedBox(height: screenWidth < 380 ? 10 : 12),
+                ..._buildWalletPurchasesSection(screenWidth),
                 _buildSettingsSectionHeader('Verse of the Day', screenWidth),
                 const SizedBox(
                   height: 5,
