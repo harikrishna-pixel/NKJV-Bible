@@ -37,31 +37,26 @@ class _MilestoneLifetimeIapScreenState extends State<MilestoneLifetimeIapScreen>
   void _loadOneYearPlanPrice() {
     final products = PaywallPreloadService.getPreloadedProducts();
     for (final product in products) {
-      final id = product.id.toLowerCase();
-      // Only the 1-year product — never 2-year.
-      if (id.contains('oneyear')) {
-        if (mounted) {
-          setState(() {
-            _oneYearPrice = product.price;
-          });
+      // Same 1-year SKU as the main paywall (auto-renew), never classic non-renewing.
+      if (BibleInfo.isAutoRenewablePaywallMode) {
+        if (!BibleInfo.isArOneYearProductId(product.id)) continue;
+      } else {
+        final id = product.id.toLowerCase();
+        if (!id.contains('oneyear') || BibleInfo.isArOneYearProductId(product.id)) {
+          continue;
         }
-        return;
       }
+      if (mounted) {
+        setState(() {
+          _oneYearPrice = product.price;
+        });
+      }
+      return;
     }
   }
 
-  /// Premium already active on this device (any plan, incl. a purchase made in
-  /// a previous app version) — same expiry the app uses for ad-free/premium.
-  Future<bool> _hasActivePremium() async {
-    final raw =
-        await SharPreferences.getString(SharPreferences.isRewardAdViewTime);
-    if (raw == null || raw.isEmpty) return false;
-    try {
-      return DateTime.parse(raw).isAfter(DateTime.now());
-    } catch (_) {
-      return false;
-    }
-  }
+  /// Same premium check as the main paywall (plan + expiry, incl. previous version).
+  Future<bool> _hasActivePremium() => BibleInfo.hasActivePremiumPlan();
 
   /// Same Restore alert as the main paywall's "already on this plan" dialog.
   Future<bool> _askRestore(BuildContext context) async {
@@ -110,8 +105,10 @@ class _MilestoneLifetimeIapScreenState extends State<MilestoneLifetimeIapScreen>
   Future<void> _openInvisibleLifetimePurchase(BuildContext context) async {
     final sixMonth = await SharPreferences.getString('sixMonthPlan') ??
         BibleInfo.sixMonthPlanid;
-    final oneYear =
-        await SharPreferences.getString('oneYearPlan') ?? BibleInfo.oneYearPlanid;
+    final oneYear = BibleInfo.isAutoRenewablePaywallMode
+        ? BibleInfo.arOneYearPlanid
+        : (await SharPreferences.getString('oneYearPlan') ??
+            BibleInfo.oneYearPlanid);
     final lifeTime =
         await SharPreferences.getString('lifeTimePlan') ?? BibleInfo.lifeTimePlanid;
 
@@ -149,11 +146,14 @@ class _MilestoneLifetimeIapScreenState extends State<MilestoneLifetimeIapScreen>
       ),
     );
 
-    // If purchase succeeded, close this offer screen and return to previous screen.
-    if (ok == true && context.mounted) {
-      if (Get.isRegistered<DashBoardController>()) {
-        await Get.find<DashBoardController>().refreshPremiumStatusFromPrefs();
-      }
+    if (!context.mounted) return;
+    if (Get.isRegistered<DashBoardController>()) {
+      await Get.find<DashBoardController>().refreshPremiumStatusFromPrefs();
+    }
+    // Close after success, or if premium is now active even when the host
+    // did not return true (iOS restored / already-owned).
+    final success = ok == true || await BibleInfo.hasActivePremiumPlan();
+    if (success && context.mounted) {
       Navigator.of(context).maybePop(true);
     }
   }

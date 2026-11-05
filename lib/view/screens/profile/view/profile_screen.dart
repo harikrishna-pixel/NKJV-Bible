@@ -14,8 +14,12 @@ import 'package:biblebookapp/view/screens/profile/bloc/user_bloc.dart';
 import 'package:biblebookapp/view/screens/profile/model/library_status_model.dart';
 import 'package:biblebookapp/view/screens/profile/view/edit_profile_screen.dart';
 import 'package:biblebookapp/core/api/auth/profile_update.api.dart';
+import 'package:biblebookapp/view/screens/authenitcation/view/login_screen.dart';
+import 'package:biblebookapp/view/screens/authenitcation/view/signup_screen.dart';
 import 'package:biblebookapp/view/screens/authenitcation/view/widget/own_referral_code_dialog.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:biblebookapp/view/screens/books/digital_products_library_store.dart';
+import 'package:biblebookapp/view/screens/books/my_digital_library_screen.dart';
 import 'package:biblebookapp/view/screens/prayer_wall/prayer_wall_local_store.dart';
 import 'package:biblebookapp/view/screens/prayer_wall/prayer_wall_screen.dart';
 import 'package:biblebookapp/view/widget/wallet_entry.dart';
@@ -221,6 +225,103 @@ class _ProfileWalletCardState extends State<_ProfileWalletCard> {
   }
 }
 
+/// Account > My Digital Library (purchased/saved BookAds products).
+class _ProfileDigitalLibraryRow extends StatefulWidget {
+  const _ProfileDigitalLibraryRow();
+
+  @override
+  State<_ProfileDigitalLibraryRow> createState() =>
+      _ProfileDigitalLibraryRowState();
+}
+
+class _ProfileDigitalLibraryRowState extends State<_ProfileDigitalLibraryRow> {
+  int _count = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    final items = await DigitalProductsLibraryStore.load();
+    if (mounted) setState(() => _count = items.length);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final ink = _profileInk(context);
+    final subtitle = _count <= 0
+        ? 'Your purchased products'
+        : '$_count Product${_count == 1 ? '' : 's'}';
+    return InkWell(
+      onTap: () async {
+        await Get.to(() => const MyDigitalLibraryScreen());
+        await _load();
+      },
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 14),
+        decoration: BoxDecoration(
+          color: CommanColor.lightDarkPrimary200(context).withOpacity(0.28),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 40,
+              height: 40,
+              decoration: const BoxDecoration(
+                color: Color(0xFF472F1F),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.layers_outlined,
+                color: Colors.white,
+                size: 20,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'My Digital Library',
+                    style: TextStyle(
+                      letterSpacing: BibleInfo.letterSpacing,
+                      fontSize: BibleInfo.fontSizeScale * 16,
+                      fontWeight: FontWeight.w700,
+                      fontFamily: 'Georgia',
+                      color: ink,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    subtitle,
+                    style: TextStyle(
+                      letterSpacing: BibleInfo.letterSpacing,
+                      fontSize: BibleInfo.fontSizeScale * 12,
+                      fontWeight: FontWeight.w400,
+                      color: ink.withOpacity(0.62),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Icon(
+              Icons.chevron_right,
+              color: ink.withOpacity(0.7),
+              size: 24,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 Color _profileInk(BuildContext context) {
   return CommanColor.whiteBlack(context);
 }
@@ -356,6 +457,9 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
   String? _referredBy = '';
   int? _referralRewardClaimed;
   String? _profileImageUrl;
+  bool _loginChecked = false;
+  bool _signedIn = false;
+  bool get _showSignedOut => _loginChecked && !_signedIn;
   loadDB() async {
     final db = DBHelper();
     if (mounted) {
@@ -394,9 +498,14 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
     final referralCode = await cacheprovider.readCache(
         key: OwnReferralCodeDialog.referralCacheKey);
     final referredBy = await cacheprovider.readCache(key: 'referred_by');
+    final dataUser = await cacheprovider.readCache(key: 'user');
 
     debugPrint(' name is $dataname');
     if (!mounted) return;
+
+    _loginChecked = true;
+    _signedIn = dataname != null ||
+        (dataUser != null && dataUser.toString().trim().isNotEmpty);
 
     if (dataname != null) {
       setState(() {
@@ -459,6 +568,211 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
     routeObserver.unsubscribe(this);
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
+  }
+
+  Widget _signedOutRow({
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required VoidCallback onTap,
+    Color? background,
+  }) {
+    final ink = _profileInk(context);
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 14),
+        decoration: BoxDecoration(
+          color: background ??
+              CommanColor.lightDarkPrimary200(context).withOpacity(0.28),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 40,
+              height: 40,
+              decoration: const BoxDecoration(
+                color: Color(0xFF472F1F),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(icon, color: Colors.white, size: 20),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: TextStyle(
+                      letterSpacing: BibleInfo.letterSpacing,
+                      fontSize: BibleInfo.fontSizeScale * 16,
+                      fontWeight: FontWeight.w700,
+                      fontFamily: 'Georgia',
+                      color: ink,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    subtitle,
+                    style: TextStyle(
+                      letterSpacing: BibleInfo.letterSpacing,
+                      fontSize: BibleInfo.fontSizeScale * 12,
+                      fontWeight: FontWeight.w400,
+                      color: ink.withOpacity(0.62),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Icon(Icons.chevron_right, color: ink.withOpacity(0.7), size: 24),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Account when not signed in: Sign In / Create Account + the same sections.
+  Widget _buildSignedOutAccount(BuildContext context) {
+    final ink = _profileInk(context);
+    final gap = MediaQuery.of(context).size.height * 0.014;
+    return SingleChildScrollView(
+      padding: const EdgeInsets.fromLTRB(20, 0, 20, 28),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Center(
+            child: Container(
+              width: 84,
+              height: 84,
+              decoration: const BoxDecoration(
+                color: Color(0xFFFBD5B2),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(Icons.person_outline_rounded,
+                  size: 46, color: Color(0xFF472F1F)),
+            ),
+          ),
+          const SizedBox(height: 14),
+          Text(
+            'Use Your Account',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: BibleInfo.fontSizeScale * 22,
+              fontWeight: FontWeight.w700,
+              fontFamily: 'Georgia',
+              color: ink,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            'Sign in to sync your data across devices, keep it safe, and access more features.',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: BibleInfo.fontSizeScale * 13,
+              height: 1.35,
+              color: ink.withOpacity(0.68),
+            ),
+          ),
+          const SizedBox(height: 18),
+          SizedBox(
+            height: 48,
+            child: ElevatedButton(
+              onPressed: () => Get.to(() => LoginScreen(hasSkip: false)),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF5C3317),
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+              child: const Text(
+                'Sign In',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w700,
+                  fontFamily: 'Georgia',
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 10),
+          SizedBox(
+            height: 48,
+            child: OutlinedButton(
+              onPressed: () => Get.to(() => SignupScreen()),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: ink,
+                side: BorderSide(color: ink.withOpacity(0.45)),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+              child: const Text(
+                'Create Account',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                  fontFamily: 'Georgia',
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 20),
+          _signedOutRow(
+            icon: Icons.menu_book_outlined,
+            title: 'My Library',
+            subtitle: 'Bookmarks, Highlights, Underlines, Notes',
+            onTap: () => Get.to(() => LibraryScreen(initialIndex: 0),
+                transition: Transition.cupertinoDialog,
+                duration: const Duration(milliseconds: 300)),
+          ),
+          SizedBox(height: gap),
+          _signedOutRow(
+            icon: Icons.account_balance_wallet_outlined,
+            title: 'Wallet',
+            subtitle: 'Credits for AI features & digital products',
+            onTap: () => WalletEntry.openWallet(),
+          ),
+          SizedBox(height: gap),
+          const _ProfileDigitalLibraryRow(),
+          SizedBox(height: gap),
+          _signedOutRow(
+            icon: Icons.cloud_outlined,
+            title: 'Backup & Sync',
+            subtitle: 'Keep your data safe across devices',
+            onTap: () async {
+              await SharPreferences.setString('OpenAd', '1');
+              if (!context.mounted) return;
+              await showDialog(
+                context: context,
+                builder: (context) => const MainBackupDialog(),
+              );
+            },
+          ),
+          SizedBox(height: gap),
+          _signedOutRow(
+            icon: Icons.card_giftcard_outlined,
+            title: 'Get Free Credits',
+            subtitle: 'Refer friends & earn credits!',
+            background: const Color(0xFFE8C989).withOpacity(0.28),
+            onTap: () => Get.to(() => LoginScreen(hasSkip: false)),
+          ),
+          SizedBox(height: gap),
+          _signedOutRow(
+            icon: Icons.volunteer_activism_outlined,
+            title: 'Prayer Profile',
+            subtitle: 'View your Prayer Wall profile',
+            onTap: () => Get.to(() => const PrayerWallScreen(
+                  openMyProfile: true,
+                )),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -569,7 +883,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
                     ),
                     Expanded(
                         flex: 2,
-                        child: Text("Profile",
+                        child: Text(_showSignedOut ? "Account" : "Profile",
                             textAlign: TextAlign.center,
                             style: CommanStyle.appBarStyle(context)
                                 .copyWith(color: _profileInk(context)))),
@@ -579,6 +893,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
                         child: Row(
                           mainAxisAlignment: MainAxisAlignment.end,
                           children: [
+                            if (!_showSignedOut)
                             GestureDetector(
                               onTap: () async {
                                 confirmLogoutAccount(context);
@@ -625,6 +940,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
                         Text(message ?? '')
                       ],
                     )
+                        : _showSignedOut
+                        ? _buildSignedOutAccount(context)
                         : userState.isLoading
                         ? const Center(
                       child: CircularProgressIndicator.adaptive(),
@@ -897,8 +1214,10 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
                                   ),
                                 ),
                                 SizedBox(height: mheight * 0.016),
-                                // Wallet (Apple review path: My Account > Wallet).
+                                // Wallet (Apple review path: Account > Wallet).
                                 const _ProfileWalletCard(),
+                                SizedBox(height: mheight * 0.016),
+                                const _ProfileDigitalLibraryRow(),
                                 SizedBox(height: mheight * 0.016),
                                 InkWell(
                                   onTap: () {

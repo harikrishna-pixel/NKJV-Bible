@@ -9,7 +9,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:provider/provider.dart';
 
-/// "Your Faith Journey" full screen: calendar, streak cards, milestones.
+/// "Your Faith Journey" full screen: calendar and streak cards.
 /// Shown when user taps info (i) on Daily Journey instead of the pop-up dialog.
 class YourFaithJourneyScreen extends StatefulWidget {
   const YourFaithJourneyScreen({super.key});
@@ -251,21 +251,6 @@ class _YourFaithJourneyScreenState extends State<YourFaithJourneyScreen> {
                       ),
                       const SizedBox(height: 12),
                       _totalDaysCard(context, textColor, panelColor),
-                      const SizedBox(height: 20),
-                      Align(
-                        alignment: Alignment.centerLeft,
-                        child: Text(
-                          'Recent Milestones',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.w700,
-                            color: textColor,
-                            fontFamily: 'Georgia',
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      _milestonesList(context, textColor, panelColor),
                       const SizedBox(height: 24),
                     ],
                   ),
@@ -782,125 +767,4 @@ class _YourFaithJourneyScreenState extends State<YourFaithJourneyScreen> {
     );
   }
 
-  Widget _milestonesList(
-      BuildContext context, Color textColor, Color panelColor) {
-    final items = <({String title, String date})>[];
-    if (_completedDates.isNotEmpty) {
-      final sorted = List<String>.from(_completedDates)..sort();
-      final first = sorted.first;
-      try {
-        final d = DateTime.parse(first);
-        items.add((
-          title: 'First Prayer Completed',
-          date: '${_monthName(d.month)} ${d.day}, ${d.year}',
-        ));
-      } catch (_) {}
-      if (_bestStreak >= 7) {
-        int foundAt = -1;
-        int run = 0;
-        for (int i = 0; i < sorted.length; i++) {
-          if (i > 0) {
-            try {
-              final prev = DateTime.parse(sorted[i - 1]);
-              final cur = DateTime.parse(sorted[i]);
-              final diff =
-                  cur.difference(DateTime(prev.year, prev.month, prev.day)).inDays;
-              if (diff == 1) {
-                run++;
-                if (run >= 6) {
-                  foundAt = i;
-                  break;
-                }
-              } else {
-                run = 0;
-              }
-            } catch (_) {
-              run = 0;
-            }
-          } else {
-            run = 1;
-          }
-        }
-        if (foundAt >= 0) {
-          try {
-            final d = DateTime.parse(sorted[foundAt]);
-            items.insert(
-              0,
-              (
-                title: '7 Day Streak Achieved',
-                date: '${_monthName(d.month)} ${d.day}, ${d.year}',
-              ),
-            );
-          } catch (_) {}
-        }
-      }
-    }
-    if (items.isEmpty) {
-      items.add((
-        title: 'Complete your first 4 steps',
-        date: '',
-      ));
-    }
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: panelColor,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: textColor.withOpacity(0.2)),
-      ),
-      child: Column(
-        children: items
-            .map((e) => Padding(
-                  padding: const EdgeInsets.only(bottom: 12),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Icon(
-                        e.title.startsWith('7')
-                            ? Icons.emoji_events
-                            : Icons.check_circle_outline,
-                        color: _gold,
-                        size: 24,
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              e.title,
-                              style: TextStyle(
-                                fontSize: 15,
-                                fontWeight: FontWeight.w600,
-                                color: textColor,
-                                fontFamily: 'Georgia',
-                              ),
-                            ),
-                            if (e.date.isNotEmpty)
-                              Text(
-                                e.date,
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  color: textColor.withOpacity(0.8),
-                                  fontFamily: 'Georgia',
-                                ),
-                              ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ))
-            .toList(),
-      ),
-    );
-  }
-
-  String _monthName(int m) {
-    const names = [
-      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
-    ];
-    return names[m - 1];
-  }
 }

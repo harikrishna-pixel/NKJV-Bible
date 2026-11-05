@@ -1,7 +1,6 @@
 import 'package:biblebookapp/home_widget/widget_prompt_service.dart';
 import 'package:biblebookapp/view/constants/colors.dart';
 import 'package:biblebookapp/view/constants/images.dart';
-import 'package:biblebookapp/view/widget/wallet_entry.dart';
 import 'package:flutter/material.dart';
 
 /// Accordion iOS-style cream drawer (collapsed rows + expanded sub-items).
@@ -189,19 +188,11 @@ class _IosStyleAppDrawerState extends State<IosStyleAppDrawer>
     Future.microtask(action);
   }
 
-  WalletSummary? _wallet;
-
-  Future<void> _loadWallet() async {
-    final s = await WalletSummary.load();
-    if (mounted) setState(() => _wallet = s);
-  }
-
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _loadWidgetsRowState();
-    _loadWallet();
   }
 
   @override
@@ -214,7 +205,6 @@ class _IosStyleAppDrawerState extends State<IosStyleAppDrawer>
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
       _loadWidgetsRowState();
-      _loadWallet();
     }
   }
 
@@ -351,20 +341,21 @@ class _IosStyleAppDrawerState extends State<IosStyleAppDrawer>
       ),
     ];
 
+    // More = outside Account (mock): Digital Products, Backup, apps, contact.
     final moreChildren = <_DrawerSubItem>[
+      if (widget.showBooks)
+        _DrawerSubItem(
+          label: 'Digital Products',
+          icon: Icons.layers_outlined,
+          asset: 'assets/home icons/book.png',
+          onTap: widget.onBooksTap,
+        ),
       _DrawerSubItem(
         label: 'Backup & Sync',
         icon: Icons.cloud_upload_outlined,
         asset: 'assets/home icons/Frame 3631.png',
         onTap: widget.onBackupTap,
       ),
-      if (widget.showBooks)
-        _DrawerSubItem(
-          label: 'Christian Books',
-          icon: Icons.menu_book_outlined,
-          asset: 'assets/home icons/book.png',
-          onTap: widget.onBooksTap,
-        ),
       if (widget.showEProducts)
         _DrawerSubItem(
           label: 'e-Products',
@@ -405,19 +396,12 @@ class _IosStyleAppDrawerState extends State<IosStyleAppDrawer>
             ),
             const SizedBox(height: 8),
           ],
-          // Wallet entry (Apple review path: Menu > Wallet).
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: _WalletCard(
-              subtitle: _wallet?.menuSubtitle ?? '',
-              onTap: () => _closeDrawerThen(WalletEntry.openWallet),
-            ),
-          ),
-          const SizedBox(height: 4),
+          // Account hub (Wallet / library / sync live inside Account, not here).
           _NavLinkRow(
             icon: Icons.person_outline_rounded,
             asset: 'assets/home icons/My Account.png',
-            label: 'My Account',
+            label: 'Account',
+            subtitle: 'Profile, wallet, library & sync.',
             onTap: () => _closeDrawerThen(widget.onAccountTap),
           ),
           _sectionDivider(),
@@ -474,6 +458,7 @@ class _IosStyleAppDrawerState extends State<IosStyleAppDrawer>
           _AccordionSection(
             icon: Icons.more_horiz_rounded,
             label: 'More',
+            subtitle: 'Digital products, backup & more.',
             expanded: _expandedKey == 'more',
             onHeaderTap: () => _toggle('more'),
             children: moreChildren,
@@ -743,88 +728,24 @@ class _PremiumBanner extends StatelessWidget {
   }
 }
 
-/// Menu > Wallet card: "Wallet" + "100 credits · ≈ 5 AI answers".
-class _WalletCard extends StatelessWidget {
-  const _WalletCard({required this.subtitle, required this.onTap});
-
-  final String subtitle;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = _DrawerPalette.of(context);
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(16),
-        child: Container(
-          padding: const EdgeInsets.fromLTRB(12, 12, 10, 12),
-          decoration: BoxDecoration(
-            color: colors.premiumBg,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: colors.premiumBorder),
-          ),
-          child: Row(
-            children: [
-              Container(
-                width: 40,
-                height: 40,
-                decoration: BoxDecoration(
-                  color: colors.iconTile,
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Icon(Icons.account_balance_wallet_outlined,
-                    color: colors.premiumAccent, size: 22),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Wallet',
-                      style: TextStyle(
-                        fontFamily: 'Georgia',
-                        fontSize: 15,
-                        fontWeight: FontWeight.w700,
-                        color: colors.ink,
-                      ),
-                    ),
-                    if (subtitle.isNotEmpty) ...[
-                      const SizedBox(height: 2),
-                      Text(
-                        subtitle,
-                        style: TextStyle(fontSize: 12, color: colors.muted),
-                      ),
-                    ],
-                  ],
-                ),
-              ),
-              Icon(Icons.chevron_right_rounded, color: colors.muted),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
 class _NavLinkRow extends StatelessWidget {
   const _NavLinkRow({
     required this.icon,
     required this.label,
     required this.onTap,
     this.asset,
+    this.subtitle,
   });
 
   final IconData icon;
   final String? asset;
   final String label;
+  final String? subtitle;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
+    final colors = _DrawerPalette.of(context);
     return InkWell(
       onTap: onTap,
       child: Padding(
@@ -834,19 +755,35 @@ class _NavLinkRow extends StatelessWidget {
             _IconTile(icon: icon, asset: asset),
             const SizedBox(width: 14),
             Expanded(
-              child: Text(
-                label,
-                style: TextStyle(
-                  fontFamily: 'Georgia',
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                  color: _DrawerPalette.of(context).ink,
-                ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    label,
+                    style: TextStyle(
+                      fontFamily: 'Georgia',
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                      color: colors.ink,
+                    ),
+                  ),
+                  if (subtitle != null && subtitle!.isNotEmpty) ...[
+                    const SizedBox(height: 2),
+                    Text(
+                      subtitle!,
+                      style: TextStyle(
+                        fontSize: 12,
+                        height: 1.25,
+                        color: colors.muted,
+                      ),
+                    ),
+                  ],
+                ],
               ),
             ),
             Icon(
               Icons.chevron_right_rounded,
-              color: _DrawerPalette.of(context).ink,
+              color: colors.ink,
               size: 22,
             ),
           ],
@@ -865,10 +802,12 @@ class _AccordionSection extends StatelessWidget {
     required this.children,
     required this.onItemTap,
     required this.useIconRail,
+    this.subtitle,
   });
 
   final IconData icon;
   final String label;
+  final String? subtitle;
   final bool expanded;
   final VoidCallback onHeaderTap;
   final List<_DrawerSubItem> children;
@@ -877,6 +816,7 @@ class _AccordionSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = _DrawerPalette.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -889,21 +829,37 @@ class _AccordionSection extends StatelessWidget {
                 _IconTile(icon: icon),
                 const SizedBox(width: 14),
                 Expanded(
-                  child: Text(
-                    label,
-                    style: TextStyle(
-                      fontFamily: 'Georgia',
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                      color: _DrawerPalette.of(context).ink,
-                    ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        label,
+                        style: TextStyle(
+                          fontFamily: 'Georgia',
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                          color: colors.ink,
+                        ),
+                      ),
+                      if (subtitle != null && subtitle!.isNotEmpty) ...[
+                        const SizedBox(height: 2),
+                        Text(
+                          subtitle!,
+                          style: TextStyle(
+                            fontSize: 12,
+                            height: 1.25,
+                            color: colors.muted,
+                          ),
+                        ),
+                      ],
+                    ],
                   ),
                 ),
                 Icon(
                   expanded
                       ? Icons.keyboard_arrow_down_rounded
                       : Icons.chevron_right_rounded,
-                  color: _DrawerPalette.of(context).ink,
+                  color: colors.ink,
                   size: 22,
                 ),
               ],

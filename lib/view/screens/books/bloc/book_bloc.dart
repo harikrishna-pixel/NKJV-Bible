@@ -1,8 +1,8 @@
 import 'package:biblebookapp/controller/api_service.dart';
 import 'package:biblebookapp/utils/book_apps_helper.dart';
 import 'package:biblebookapp/view/constants/constant.dart';
+import 'package:biblebookapp/view/screens/books/model/book_category_model.dart';
 import 'package:biblebookapp/view/screens/books/model/book_model.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
@@ -17,6 +17,7 @@ class BookBloc extends ChangeNotifier {
   bool loadTimedOut = false;
   String? loadStatusMessage;
   List<BookModel> books = [];
+  List<BookCategoryModel> categories = [];
   int _loadToken = 0;
 
   void cancelLoading({required String message}) {
@@ -40,15 +41,32 @@ class BookBloc extends ChangeNotifier {
     int? token;
     try {
       if (!isLoading && !isLastPage) {
-        // Don't check connectivity upfront - it can be unreliable on first time
-        // Proceed with API call and handle errors if they occur
         token = ++_loadToken;
         loadTimedOut = false;
         loadStatusMessage = null;
         isLoading = true;
         customNotifyListeners();
-        final data = await getBookCategories(id);
+        final cats = await getBookCategoryList(id);
         if (token != _loadToken) return;
+        categories = cats;
+        final data = <BookModel>[];
+        for (final cat in cats) {
+          final catId = int.tryParse(cat.categoryId);
+          if (catId == null) continue;
+          final listed = await getBookListing(catId);
+          if (token != _loadToken) return;
+          data.addAll(listed.map((b) => b.copyWith(
+                categoryId: cat.categoryId,
+                categoryTitle: cat.categoryTitle,
+              )));
+        }
+        // Some apps' getAppInfo `book_ads_app_id` holds a BookAds category id
+        // (e.g. 18), which has no categories as an app id.
+        if (cats.isEmpty) {
+          final listed = await getBookListing(id);
+          if (token != _loadToken) return;
+          data.addAll(listed);
+        }
         if (data.isEmpty) {
           isLastPage = true;
         }
@@ -63,22 +81,17 @@ class BookBloc extends ChangeNotifier {
       if (token != null && token != _loadToken) return;
       isLoading = false;
       customNotifyListeners();
-      // Check if error is related to internet connection
-      // Only show toast if it's a clear network error
-      if (e.toString().contains('host lookup') || 
+      if (e.toString().contains('host lookup') ||
           e.toString().contains('No Internet Connection') ||
           e.toString().contains('SocketException') ||
           e.toString().contains('Failed host lookup')) {
         Constants.showToast("No internet connection");
       }
-      // Don't rethrow - allow the UI to show empty state gracefully
     }
   }
 
-  // to indicate whether the state provider is disposed or not
   bool _isDisposed = false;
 
-  // use the notifyListeners as below
   customNotifyListeners() {
     if (!_isDisposed) {
       notifyListeners();

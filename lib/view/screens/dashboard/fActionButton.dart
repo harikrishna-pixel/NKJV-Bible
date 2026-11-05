@@ -105,6 +105,9 @@ class floatingButtonState extends State<floatingButton>
   StreamSubscription<void>? _completeSubscription;
   StreamSubscription<Duration>? _positionSubscription;
   bool _handlingMp3Complete = false;
+  /// Fires next chapter slightly before EOF so iOS keeps the audio session
+  /// alive (onPlayerComplete alone often never starts the next track in BG).
+  bool _nearEndAdvanceStarted = false;
   bool _isAudioSheetOpen = false;
   bool _audioSheetUiAlive = false;
   bool _fullPlayerUiAlive = false;
@@ -255,7 +258,10 @@ class floatingButtonState extends State<floatingButton>
         _pausedForPhoneCall = false;
         unawaited(_prefetchNextChapterAudio());
       } else if (state == PlayerState.paused && wasPlaying) {
-        _markPausedIfPhoneCall();
+        // Chapter auto-next briefly pauses while swapping sources — not a call.
+        if (!_handlingMp3Complete && !isNext) {
+          _markPausedIfPhoneCall();
+        }
       } else if (state == PlayerState.completed) {
         _handleMp3PlayerComplete();
       }
@@ -276,6 +282,16 @@ class floatingButtonState extends State<floatingButton>
       position = p;
       setState(() {});
       _fullPlayerSetState?.call(() {});
+      // Near chapter end: finish prefetch so minimize / screen-off auto-next
+      // has a local file ready (network load often fails in background).
+      if (isAudioPlaying &&
+          !_readerUseTts &&
+          !repeat &&
+          duration.inSeconds > 20 &&
+          p.inSeconds >= duration.inSeconds - 45) {
+        unawaited(_prefetchNextChapterAudio());
+      }
+      _maybeStartNextChapterBeforeEof(p);
     });
 
     // Additive: keep auto-next alive while FAB State is alive (sheet dismiss safe).
@@ -292,9 +308,13 @@ class floatingButtonState extends State<floatingButton>
         state == AppLifecycleState.paused ||
         state == AppLifecycleState.hidden) {
       _audioPlayingBeforeInterrupt = isAudioPlaying ||
-          audioPlayer.state == PlayerState.playing;
+          audioPlayer.state == PlayerState.playing ||
+          _handlingMp3Complete ||
+          isNext;
       Future.delayed(const Duration(milliseconds: 400), () {
         if (!mounted || !_audioPlayingBeforeInterrupt) return;
+        // Auto-next / source swap while minimized must not look like a call.
+        if (_handlingMp3Complete || isNext) return;
         if (audioPlayer.state != PlayerState.playing) {
           _pausedForPhoneCall = true;
           if (mounted) {
@@ -325,6 +345,7 @@ class floatingButtonState extends State<floatingButton>
   }
 
   void _markPausedIfPhoneCall() {
+    if (_handlingMp3Complete || isNext) return;
     final life = WidgetsBinding.instance.lifecycleState;
     if (life != null && life != AppLifecycleState.resumed) {
       _pausedForPhoneCall = true;
@@ -465,38 +486,130 @@ class floatingButtonState extends State<floatingButton>
     return path;
   }
 
-  /// Load + play the next chapter: local prefetched file first (instant,
-  /// works in background), then the stream URL as before.
+  /// Wait for an in-flight prefetch, then optionally download [book]/[chapter]
+  /// now. Prefer local file before streaming in background.
+  Future<String?> _awaitPrefetchedOrDownload(int book, int chapter) async {
+    final key = '$book/$chapter';
+    var path = _takePrefetched(book, chapter);
+    if (path != null) return path;
+
+    if (_prefetching) {
+      for (var i = 0; i < 20; i++) {
+        await Future<void>.delayed(const Duration(milliseconds: 150));
+        path = _takePrefetched(book, chapter);
+        if (path != null) return path;
+        if (!_prefetching && _prefetchedKey != key) break;
+      }
+    }
+
+    // Last chance: short download to disk (stream URL often never starts in BG).
+    try {
+      final base = _recordedAudioBase();
+      if (base == null || base.isEmpty) return null;
+      final res = await http
+          .get(Uri.parse('$base/$key.mp3'))
+          .timeout(const Duration(seconds: 8));
+      if (res.statusCode != 200 || res.bodyBytes.isEmpty) return null;
+      final dir = await getTemporaryDirectory();
+      final file = File('${dir.path}/bible_audio_${book}_$chapter.mp3');
+      await file.writeAsBytes(res.bodyBytes, flush: true);
+      _playingLocalPath = file.path;
+      debugPrint('Audio auto-next: emergency download ready $key');
+      return file.path;
+    } catch (e) {
+      debugPrint('Audio auto-next: emergency download failed: $e');
+      return null;
+    }
+  }
+
+  /// While still playing, hand off to the next chapter ~0.4s before EOF so the
+  /// audio session never goes idle (fixes minimize / screen-off auto-next).
+  void _maybeStartNextChapterBeforeEof(Duration p) {
+    if (_readerUseTts || repeat || _sleepEndOfChapter) return;
+    if (_handlingMp3Complete || isNext || _nearEndAdvanceStarted) return;
+    if (audioPlayer.state != PlayerState.playing && !isAudioPlaying) return;
+    final totalMs = duration.inMilliseconds;
+    if (totalMs < 4000) return;
+    final remain = totalMs - p.inMilliseconds;
+    if (remain > 450 || remain < 0) return;
+    _nearEndAdvanceStarted = true;
+    debugPrint(
+        'Audio auto-next: near-EOF handoff (${remain}ms left) → next chapter');
+    unawaited(_handleMp3PlayerComplete());
+  }
+
+  /// Load + play the next chapter: local file first (BG-safe), else stream.
   Future<bool> _playNextSource(String? localPath) async {
     debugPrint(localPath != null
         ? 'Audio auto-next: playing from download '
             '($audioBookNum/$audioChapterNum)'
         : 'Audio auto-next: no download ready, streaming '
             '($audioBookNum/$audioChapterNum)');
-    if (localPath == null) {
-      final hasInternet = await InternetConnection().hasInternetAccess;
-      if (!hasInternet) {
-        Constants.showToast("Check your internet connection.");
-        return false;
-      }
+    _pausedForPhoneCall = false;
+    final life = WidgetsBinding.instance.lifecycleState;
+    final inBackground =
+        life != null && life != AppLifecycleState.resumed;
+    // Internet probe can hang/fail in background — skip it there.
+    if (localPath == null && !inBackground) {
+      try {
+        final hasInternet = await InternetConnection()
+            .hasInternetAccess
+            .timeout(const Duration(seconds: 2), onTimeout: () => true);
+        if (!hasInternet) {
+          Constants.showToast("Check your internet connection.");
+          return false;
+        }
+      } catch (_) {}
     }
     var useLocal = localPath != null;
-    for (var attempt = 0; attempt < 2 && mounted; attempt++) {
+    for (var attempt = 0; attempt < 3; attempt++) {
       try {
-        if (useLocal) {
-          await audioPlayer.setSourceDeviceFile(localPath!);
+        await audioPlayer.setReleaseMode(
+            repeat ? ReleaseMode.loop : ReleaseMode.release);
+        // play() sets source + starts in one step (faster than setSource+resume
+        // — critical before iOS suspends after chapter end).
+        if (useLocal && localPath != null) {
+          await audioPlayer.play(
+            DeviceFileSource(localPath),
+            volume: volume,
+            ctx: AudioContext(
+              android: const AudioContextAndroid(
+                isSpeakerphoneOn: false,
+                stayAwake: true,
+                contentType: AndroidContentType.music,
+                usageType: AndroidUsageType.media,
+                audioFocus: AndroidAudioFocus.gain,
+              ),
+              iOS: AudioContextIOS(
+                category: AVAudioSessionCategory.playback,
+              ),
+            ),
+          );
         } else {
-          await audioPlayer.setSourceUrl(audioBaseUrl);
+          await audioPlayer.play(
+            UrlSource(audioBaseUrl),
+            volume: volume,
+            ctx: AudioContext(
+              android: const AudioContextAndroid(
+                isSpeakerphoneOn: false,
+                stayAwake: true,
+                contentType: AndroidContentType.music,
+                usageType: AndroidUsageType.media,
+                audioFocus: AndroidAudioFocus.gain,
+              ),
+              iOS: AudioContextIOS(
+                category: AVAudioSessionCategory.playback,
+              ),
+            ),
+          );
         }
-        await audioPlayer.seek(Duration.zero);
         try {
           await audioPlayer.setPlaybackRate(_playbackSpeed);
-          await audioPlayer.setVolume(volume);
         } catch (_) {}
-        await audioPlayer.resume();
-        if (audioPlayer.state != PlayerState.playing) {
-          await Future.delayed(const Duration(milliseconds: 80));
+        for (var r = 0; r < 5; r++) {
+          if (audioPlayer.state == PlayerState.playing) break;
           await audioPlayer.resume();
+          await Future<void>.delayed(Duration(milliseconds: 80 * (r + 1)));
         }
         if (mounted) {
           _mp3UiSetState(() {
@@ -505,14 +618,17 @@ class floatingButtonState extends State<floatingButton>
             _audioResumePosition = Duration.zero;
           });
         }
-        debugPrint('Audio auto-next: next chapter started '
-            '(app state: ${WidgetsBinding.instance.lifecycleState})');
-        return true;
+        if (audioPlayer.state == PlayerState.playing) {
+          _nearEndAdvanceStarted = false;
+          debugPrint('Audio auto-next: next chapter started '
+              '(app state: ${WidgetsBinding.instance.lifecycleState})');
+          return true;
+        }
+        useLocal = false;
       } catch (e) {
         debugPrint('Error loading next audio (attempt ${attempt + 1}): $e');
-        // Local file failed — retry once from the stream URL.
         useLocal = false;
-        await Future.delayed(const Duration(milliseconds: 500));
+        await Future.delayed(const Duration(milliseconds: 250));
       }
     }
     if (mounted) {
@@ -526,9 +642,9 @@ class floatingButtonState extends State<floatingButton>
 
   /// Same auto-next / repeat behavior as the former sheet-scoped listener.
   Future<void> _handleMp3PlayerComplete() async {
-    if (!mounted) return;
     if (_handlingMp3Complete) return;
     _handlingMp3Complete = true;
+    _pausedForPhoneCall = false;
     try {
       await _advanceMp3AfterComplete();
     } finally {
@@ -627,7 +743,11 @@ class floatingButtonState extends State<floatingButton>
 
       if (audioChapterNum < effectiveLastChapter) {
         // Reader first, then audio — prevents player showing N while header stays behind.
+        final nextBookForUrl = audioBookNum;
         final nextChapter = audioChapterNum + 1;
+        // Resolve local file BEFORE bumping chapter (prefetch key is N+1).
+        final localPath =
+            await _awaitPrefetchedOrDownload(nextBookForUrl, nextChapter);
         audioChapterNum = nextChapter;
         selectedChapter = nextChapter;
         audioBaseUrl =
@@ -645,15 +765,17 @@ class floatingButtonState extends State<floatingButton>
 
         // Audio first so the app keeps playing in the background; the reader
         // follows right after.
-        final played = await _playNextSource(
-            _takePrefetched(audioBookNum, nextChapter));
-        if (!played && !mounted) {
+        final played = await _playNextSource(localPath);
+        if (!played) {
+          _nearEndAdvanceStarted = false;
           releaseAdvanceGuard(delayMs: 0);
           return;
         }
         if (mounted) {
           await updateReadingScreenChapter(nextChapter);
           _mp3UiSetState(() {});
+          // Prefetch the chapter after this one while still in background.
+          unawaited(_prefetchNextChapterAudio());
         }
         _fullPlayerSetState?.call(() {});
         releaseAdvanceGuard();
@@ -675,7 +797,10 @@ class floatingButtonState extends State<floatingButton>
 
           // Update audio book and chapter numbers
           // audioBookNum is 1-indexed for URL (bookNum + 1)
-          audioBookNum = nextBookNum + 1;
+          final nextAudioBookNum = nextBookNum + 1;
+          final localPath =
+              await _awaitPrefetchedOrDownload(nextAudioBookNum, 1);
+          audioBookNum = nextAudioBookNum;
           audioChapterNum = 1;
           currentBookChapterCount =
               nextBookChapterCount; // Update chapter count for new book
@@ -683,7 +808,7 @@ class floatingButtonState extends State<floatingButton>
               "${_recordedAudioBase()}/$audioBookNum/$audioChapterNum.mp3";
 
           // Audio first (background-safe), then move the reader to the new book.
-          await _playNextSource(_takePrefetched(audioBookNum, 1));
+          await _playNextSource(localPath);
 
           // Update reading screen to match next book and first chapter
           // Pass chapter count so it can be updated in the controller

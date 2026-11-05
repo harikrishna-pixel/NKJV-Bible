@@ -891,9 +891,9 @@ switch (theme) {
 case AppCustomTheme.vintage:
 return 'Classic';
 case AppCustomTheme.white:
-return 'Pure Light';
+return 'Light';
 case AppCustomTheme.lightbrown:
-return 'Warm Cream';
+return 'Warm';
 }
 }
 
@@ -1051,7 +1051,7 @@ color: Colors.white, size: 14),
 ),
 const SizedBox(height: 8),
 Text(
-'Dark Mode',
+'Dark',
 textAlign: TextAlign.center,
 style: TextStyle(
 fontSize: isTablet ? 14 : 12,
@@ -1279,8 +1279,6 @@ crossAxisAlignment: CrossAxisAlignment.stretch,
 mainAxisSize: MainAxisSize.min,
 children: [
 SizedBox(height: isTablet ? 12 : 6),
-_buildThemeSelectionCard(isTablet, themes),
-SizedBox(height: isTablet ? 20 : 12),
 _buildPreviewDivider(isTablet),
 SizedBox(height: isTablet ? 12 : 8),
 _buildThemePreviewCard(context, compact: true),
@@ -1292,7 +1290,10 @@ _buildThemePreviewCard(context, compact: true),
 ),
 SliverToBoxAdapter(
 child: SizedBox(
-height: (isTablet ? 64 : 56) + (isTablet ? 14 : 8),
+height: (isTablet ? 140 : 112) +
+    (isTablet ? 16 : 12) +
+    (isTablet ? 64 : 56) +
+    (isTablet ? 32 : 20),
 ),
 ),
 ],
@@ -1307,7 +1308,12 @@ padding: EdgeInsets.fromLTRB(
 child: Center(
 child: ConstrainedBox(
 constraints: BoxConstraints(maxWidth: maxContentWidth),
-child: SizedBox(
+child: Column(
+mainAxisSize: MainAxisSize.min,
+children: [
+_buildThemeSelectionCard(isTablet, themes),
+SizedBox(height: isTablet ? 16 : 12),
+SizedBox(
 width: double.infinity,
 height: isTablet ? 64 : 56,
 child: Container(
@@ -1348,6 +1354,8 @@ color: Colors.white,
 ),
 ),
 ),
+),
+],
 ),
 ),
 ),

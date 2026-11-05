@@ -162,7 +162,7 @@ class _ChatSupportScreenState extends State<ChatSupportScreen> {
     try {
       await speech.listen(
         onResult: (result) {
-          if (!mounted) return;
+          if (!mounted || !_listening || _sending) return;
           final spoken = result.recognizedWords.trim();
           debugPrint('App Support voice result: "$spoken" '
               '(final: ${result.finalResult})');
@@ -218,10 +218,10 @@ class _ChatSupportScreenState extends State<ChatSupportScreen> {
   }
 
   Future<void> _stopVoice() async {
+    if (mounted) setState(() => _listening = false);
     try {
       await _speech?.stop();
     } catch (_) {}
-    if (mounted) setState(() => _listening = false);
   }
 
   /// Answers from support_content JSON when the question matches an FAQ;
@@ -235,6 +235,11 @@ class _ChatSupportScreenState extends State<ChatSupportScreen> {
       final match = content.localMatch(question);
       if (match.best != null || match.suggestions.isNotEmpty) {
         _text.clear();
+        _textBeforeVoice = '';
+        if (match.best != null) {
+          unawaited(
+              SupportFaqHistory.record(match.best!, askedAs: question));
+        }
         setState(() => _local.add(_LocalAnswer(
               question: question,
               faq: match.best,
@@ -258,10 +263,13 @@ class _ChatSupportScreenState extends State<ChatSupportScreen> {
     if (!mounted || _items.isEmpty) return;
     final last = _items.last;
     final isNew = _items.length > before || !identical(last, latest);
-    if (isNew && last.waitingForReply) Constants.showToast(_noAnswerText);
+    if (isNew && last.waitingForReply) {
+      Constants.showToast(_noAnswerText, 3000);
+    }
   }
 
   void _showFaq(SupportFaq faq) {
+    unawaited(SupportFaqHistory.record(faq));
     setState(() => _local.add(_LocalAnswer(question: faq.question, faq: faq)));
     _scrollToEnd();
   }
@@ -341,6 +349,7 @@ class _ChatSupportScreenState extends State<ChatSupportScreen> {
       );
       if (!mounted) return;
       _text.clear();
+      _textBeforeVoice = '';
       setState(() {
         _imagePath = null;
         _error = null;
@@ -477,32 +486,32 @@ class _ChatSupportScreenState extends State<ChatSupportScreen> {
             title: title.isEmpty ? 'App Support' : title,
             subtitle: subtitle,
           ),
-          Expanded(
-            child: _loading
+            Expanded(
+              child: _loading
                 ? Center(child: CircularProgressIndicator(color: p.accent))
-                : RefreshIndicator(
+                  : RefreshIndicator(
                     color: p.accent,
-                    onRefresh: _load,
+                      onRefresh: _load,
                     child: _error != null && _items.isEmpty && _local.isEmpty
-                        ? ListView(
-                            physics: const AlwaysScrollableScrollPhysics(),
-                            children: [
-                              Padding(
-                                padding: const EdgeInsets.all(24),
-                                child: Text(
-                                  _error!,
-                                  textAlign: TextAlign.center,
+                          ? ListView(
+                              physics: const AlwaysScrollableScrollPhysics(),
+                              children: [
+                                Padding(
+                                  padding: const EdgeInsets.all(24),
+                                  child: Text(
+                                    _error!,
+                                    textAlign: TextAlign.center,
                                   style: TextStyle(color: p.ink, fontSize: 15),
                                 ),
-                              ),
-                            ],
-                          )
-                        : ListView.builder(
-                            controller: _scroll,
-                            physics: const AlwaysScrollableScrollPhysics(),
+                                ),
+                              ],
+                            )
+                          : ListView.builder(
+                              controller: _scroll,
+                              physics: const AlwaysScrollableScrollPhysics(),
                             padding: const EdgeInsets.fromLTRB(14, 14, 14, 12),
                             itemCount: _timeline.length,
-                            itemBuilder: (context, index) {
+                              itemBuilder: (context, index) {
                               final entry = _timeline[index];
                               if (entry is _LocalAnswer) {
                                 return _localBubble(entry, p);
@@ -530,11 +539,11 @@ class _ChatSupportScreenState extends State<ChatSupportScreen> {
                                   if (showDay) _dayChip(_dayLabel(date), p),
                                   _bubble(item: item, p: p),
                                 ],
-                              );
-                            },
-                          ),
-                  ),
-          ),
+                                );
+                              },
+                            ),
+                    ),
+            ),
           _composer(p),
         ],
       ),
@@ -955,9 +964,9 @@ class _ChatSupportScreenState extends State<ChatSupportScreen> {
           const SizedBox(height: 10),
           _replyCard(
             p: p,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
                 if (item.waitingForReply)
                   _pendingReply(p)
                 else
@@ -965,7 +974,7 @@ class _ChatSupportScreenState extends State<ChatSupportScreen> {
                     reply,
                     style: TextStyle(color: p.ink, fontSize: 15, height: 1.45),
                   ),
-                if (item.showAiAnswer) ...[
+                  if (item.showAiAnswer) ...[
                   const SizedBox(height: 10),
                   SizedBox(
                     width: double.infinity,
@@ -1055,19 +1064,19 @@ class _ChatSupportScreenState extends State<ChatSupportScreen> {
                 border: Border.all(color: p.border),
               ),
               child: Row(
-                children: [
-                  IconButton(
+              children: [
+                IconButton(
                     tooltip: 'Attach image',
-                    onPressed: _sending ? null : _pickImage,
+                  onPressed: _sending ? null : _pickImage,
                     icon: Icon(Icons.attach_file_rounded, color: p.accent),
-                  ),
-                  Expanded(
-                    child: TextField(
-                      controller: _text,
-                      minLines: 1,
-                      maxLines: 4,
+                ),
+                Expanded(
+                  child: TextField(
+                    controller: _text,
+                    minLines: 1,
+                    maxLines: 4,
                       style: TextStyle(color: p.ink, fontSize: 15),
-                      decoration: InputDecoration(
+                    decoration: InputDecoration(
                         hintText: _listening ? 'Listening…' : hint,
                         hintStyle: TextStyle(color: p.muted, fontSize: 14),
                         border: InputBorder.none,
@@ -1097,16 +1106,16 @@ class _ChatSupportScreenState extends State<ChatSupportScreen> {
                       child: _sending
                           ? const Padding(
                               padding: EdgeInsets.all(11),
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
                                 color: Colors.white,
-                              ),
-                            )
+                          ),
+                        )
                           : const Icon(Icons.send_rounded,
                               color: Colors.white, size: 20),
                     ),
-                  ),
-                ],
+                ),
+              ],
               ),
             ),
           ],

@@ -69,6 +69,7 @@ import 'package:biblebookapp/view/screens/study_plans/study_plans_screen.dart'
 import 'package:popover/popover.dart';
 
 import 'package:biblebookapp/view/widget/verse_item_widget.dart';
+import 'package:biblebookapp/view/widget/wallet_entry.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:internet_connection_checker_plus/internet_connection_checker_plus.dart';
 import 'package:device_info_plus/device_info_plus.dart';
@@ -581,6 +582,166 @@ class _HomeScreenState extends State<HomeScreen>
         });
       }
     });
+  }
+
+  static const _kReadingLifetimeAdInterstitialCountKey =
+      'reading_lifetime_ad_card_interstitial_count';
+  static const _kReadingLifetimeAdCardDismissedKey =
+      'reading_lifetime_ad_card_dismissed';
+
+  Future<void> _loadLifetimeAdCardState() async {
+    final prefs = await SharedPreferences.getInstance();
+    final count =
+        prefs.getInt(_kReadingLifetimeAdInterstitialCountKey) ?? 0;
+    final dismissed =
+        prefs.getBool(_kReadingLifetimeAdCardDismissedKey) ?? false;
+    if (!mounted) return;
+    final adFree = Get.find<DashBoardController>().adFree.value;
+    setState(() {
+      _readingInterstitialShownCount = count;
+      _lifetimeAdCardDismissed = dismissed;
+      _showLifetimeAdCard = !dismissed && !adFree && count >= 5;
+    });
+  }
+
+  Future<void> _persistReadingInterstitialCount() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt(
+        _kReadingLifetimeAdInterstitialCountKey, _readingInterstitialShownCount);
+  }
+
+  Future<void> _persistLifetimeAdCardDismissed() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_kReadingLifetimeAdCardDismissedKey, true);
+  }
+
+  /// Count reading interstitials; show Lifetime card from the 5th onward.
+  void _onReadingInterstitialShown() {
+    if (!mounted) return;
+    final dash = Get.find<DashBoardController>();
+    if (_lifetimeAdCardDismissed || dash.adFree.value) return;
+    _readingInterstitialShownCount++;
+    unawaited(_persistReadingInterstitialCount());
+    if (_readingInterstitialShownCount >= 5 && !_showLifetimeAdCard) {
+      setState(() => _showLifetimeAdCard = true);
+    }
+  }
+
+  Widget _readingLifetimeAdCard(BuildContext context) {
+    final isDark = CommanColor.isDarkTheme(context);
+    final cardBg =
+        isDark ? const Color(0xFF3A2923) : const Color(0xFFFFFAF4);
+    final titleColor =
+        isDark ? const Color(0xFFF5F0E6) : const Color(0xFF4A2C17);
+    final subtitleColor =
+        isDark ? const Color(0xFFD4C4B0) : const Color(0xFF7A6455);
+    final borderColor =
+        isDark ? const Color(0xFF6B5348) : const Color(0xFFE9D7B8);
+    final iconBg =
+        isDark ? const Color(0xFF5A4034) : const Color(0xFFF3E4C8);
+    final iconColor =
+        isDark ? const Color(0xFFE8C989) : const Color(0xFFA9673C);
+    final buttonBg =
+        isDark ? const Color(0xFFCFA03A) : const Color(0xFFA9673C);
+    final buttonFg = isDark ? const Color(0xFF3A2923) : Colors.white;
+
+    return Material(
+      color: cardBg,
+      elevation: 6,
+      shadowColor: Colors.black26,
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: borderColor),
+        ),
+        padding: const EdgeInsets.fromLTRB(12, 10, 4, 10),
+        child: Row(
+          children: [
+            Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: iconBg,
+                shape: BoxShape.circle,
+              ),
+              child: Icon(Icons.menu_book_rounded, size: 22, color: iconColor),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    'Prefer ad-free reading?',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: titleColor,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                      height: 1.2,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    'Lifetime · once · 5,000 credits',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: subtitleColor,
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.w500,
+                      height: 1.2,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            GestureDetector(
+              onTap: () async {
+                await WalletEntry.openPremium();
+                if (!mounted) return;
+                if (Get.find<DashBoardController>().adFree.value) {
+                  setState(() => _showLifetimeAdCard = false);
+                }
+              },
+              child: Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(
+                  color: buttonBg,
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Text(
+                  'See plan',
+                  style: TextStyle(
+                    color: buttonFg,
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+            ),
+            IconButton(
+              visualDensity: VisualDensity.compact,
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+              icon: Icon(Icons.close, size: 18, color: subtitleColor),
+              onPressed: () {
+                setState(() {
+                  _showLifetimeAdCard = false;
+                  _lifetimeAdCardDismissed = true;
+                });
+                unawaited(_persistLifetimeAdCardDismissed());
+              },
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
 //   authObserver(User? user) async {
@@ -1176,6 +1337,9 @@ class _HomeScreenState extends State<HomeScreen>
   bool isLoggedIn = false;
   int swipeCount = 0;
   int _swipeThreshold = 7;
+  int _readingInterstitialShownCount = 0;
+  bool _showLifetimeAdCard = false;
+  bool _lifetimeAdCardDismissed = false;
   int appLaunchCount = 0;
   int appLaunchCountoffer = 0;
   int clickCount = 0;
@@ -1473,6 +1637,7 @@ class _HomeScreenState extends State<HomeScreen>
     if (_hasInitialized) return;
     _hasInitialized = true;
 
+    await _loadLifetimeAdCardState();
     await _loadFontSize();
     // Exit offer / red dot commented out
     // await _refreshExitOfferCooldown();
@@ -2258,6 +2423,8 @@ class _HomeScreenState extends State<HomeScreen>
       },
       onAdShowedFullScreenContent: (ad) async {
         await SharPreferences.setString('OpenAd', '1');
+        // Amen / Mark as Read / post-streak — same Lifetime card counter as swipe.
+        if (mounted) _onReadingInterstitialShown();
       },
     );
 
@@ -4324,6 +4491,16 @@ class _HomeScreenState extends State<HomeScreen>
                         alignment: Alignment.bottomCenter,
                         clipBehavior: Clip.none,
                         children: [
+                          Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              if (_showLifetimeAdCard &&
+                                  !controller.adFree.value)
+                                Padding(
+                                  padding: const EdgeInsets.fromLTRB(
+                                      16, 0, 16, 10),
+                                  child: _readingLifetimeAdCard(context),
+                                ),
                           Row(
                                   mainAxisAlignment:
                                       MainAxisAlignment.spaceBetween,
@@ -4475,6 +4652,8 @@ class _HomeScreenState extends State<HomeScreen>
                       ),
                     ],
                       ),
+                            ],
+                          ),
                         ],
                       ),
                     ),
@@ -4556,6 +4735,7 @@ class _HomeScreenState extends State<HomeScreen>
                         EasyLoading.showInfo('Please wait...');
                         await SharPreferences.setString('OpenAd', '1');
                         _adService.showInterstitialAd();
+                        _onReadingInterstitialShown();
                       }
                     }
                     debugPrint(
@@ -4589,6 +4769,7 @@ class _HomeScreenState extends State<HomeScreen>
                         EasyLoading.showInfo('Please wait...');
                         await SharPreferences.setString('OpenAd', '1');
                         _adService.showInterstitialAd();
+                        _onReadingInterstitialShown();
                       }
                     }
                     debugPrint(
@@ -6120,9 +6301,7 @@ class _HomeScreenState extends State<HomeScreen>
             await _refreshLoggedInFromCache();
             if (!mounted) return;
             Get.to(
-              () => isLoggedIn
-                  ? const ProfileScreen()
-                  : LoginScreen(hasSkip: false),
+              () => const ProfileScreen(),
               transition: Transition.cupertino,
               duration: const Duration(milliseconds: 350),
             );

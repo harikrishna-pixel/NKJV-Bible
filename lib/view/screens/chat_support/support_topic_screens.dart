@@ -1,3 +1,6 @@
+import 'dart:async';
+import 'dart:convert';
+
 import 'package:biblebookapp/view/constants/constant.dart';
 import 'package:biblebookapp/view/screens/chat_support/chat_support_screen.dart';
 import 'package:biblebookapp/view/screens/chat_support/support_content.dart';
@@ -8,6 +11,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:internet_connection_checker_plus/internet_connection_checker_plus.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 // GetX derives the route name from the builder type, which is the same for
@@ -41,8 +45,80 @@ Future<void> openSupportChatIfOnline(
   openSupportChat(question: question, sendToSupport: sendToSupport);
 }
 
-void openSupportFaq(SupportContent content, SupportFaq faq) =>
-    _push(SupportFaqScreen(content: content, faq: faq));
+void openSupportFaq(SupportContent content, SupportFaq faq) {
+  unawaited(SupportFaqHistory.record(faq));
+  _push(SupportFaqScreen(content: content, faq: faq));
+}
+
+/// On-device FAQ views for Support History. Not sent to Chat Support API.
+class SupportFaqHistoryEntry {
+  const SupportFaqHistoryEntry({
+    required this.id,
+    required this.question,
+    this.at,
+  });
+
+  final String id;
+  final String question;
+  final DateTime? at;
+}
+
+class SupportFaqHistory {
+  SupportFaqHistory._();
+
+  static const _key = 'support_faq_view_history_v1';
+
+  static Future<void> record(SupportFaq faq, {String? askedAs}) async {
+    if (faq.id.isEmpty) return;
+    final prefs = await SharedPreferences.getInstance();
+    final list = await _read(prefs);
+    list.removeWhere((e) => e['id']?.toString() == faq.id);
+    list.insert(0, {
+      'id': faq.id,
+      'question': (askedAs != null && askedAs.trim().isNotEmpty)
+          ? askedAs.trim()
+          : faq.question,
+      'at': DateTime.now().toIso8601String(),
+    });
+    if (list.length > 50) {
+      list.removeRange(50, list.length);
+    }
+    await prefs.setString(_key, jsonEncode(list));
+  }
+
+  static Future<List<SupportFaqHistoryEntry>> load() async {
+    final prefs = await SharedPreferences.getInstance();
+    final list = await _read(prefs);
+    return list
+        .map((e) {
+          final id = e['id']?.toString() ?? '';
+          if (id.isEmpty) return null;
+          return SupportFaqHistoryEntry(
+            id: id,
+            question: e['question']?.toString() ?? '',
+            at: DateTime.tryParse(e['at']?.toString() ?? ''),
+          );
+        })
+        .whereType<SupportFaqHistoryEntry>()
+        .toList();
+  }
+
+  static Future<List<Map<String, dynamic>>> _read(
+      SharedPreferences prefs) async {
+    final raw = prefs.getString(_key);
+    if (raw == null || raw.isEmpty) return [];
+    try {
+      final decoded = jsonDecode(raw);
+      if (decoded is! List) return [];
+      return [
+        for (final e in decoded)
+          if (e is Map) Map<String, dynamic>.from(e),
+      ];
+    } catch (_) {
+      return [];
+    }
+  }
+}
 
 void openSupportForm(SupportContent content, SupportFormKind kind,
         {String? prefillType}) =>

@@ -411,7 +411,8 @@ class _ValueChatBodyState extends State<_ValueChatBody> {
       ),
       child: const Text(
         '📖',
-        style: TextStyle(fontSize: 15, height: 1.1),
+        textAlign: TextAlign.center,
+        style: TextStyle(fontSize: 15, height: 1),
       ),
     );
   }

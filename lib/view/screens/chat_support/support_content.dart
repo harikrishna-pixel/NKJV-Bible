@@ -2,10 +2,13 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:biblebookapp/view/screens/dashboard/constants.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
+import 'package:http/http.dart' as http;
 
-/// Reads `assets/support_content.v1.4.json` and applies its visibility,
-/// placeholder and platform rules. Read-only; never sends anything.
+/// Loads support content (live API, else
+/// `assets/support_content.v1.4.json`) and applies its visibility,
+/// placeholder and platform rules.
 class SupportContent {
   SupportContent._(this.raw);
 
@@ -44,14 +47,43 @@ class SupportContent {
 
   static SupportContent? _cache;
 
-  static Future<SupportContent> load() async {
-    final cached = _cache;
-    if (cached != null) return cached;
-    final text = await rootBundle.loadString(assetPath);
-    final content =
-        SupportContent._(Map<String, dynamic>.from(jsonDecode(text) as Map));
+  /// Live support content (same schema as the bundled JSON, under `data`).
+  static const String apiUrl =
+      'https://appsupport.marberx.com/api/support-content/Holy Bible';
+  static const String _apiAuth = 'marberx@123tech';
+
+  /// API first; if it fails, the bundled file.
+  static Future<SupportContent> load({bool forceRefresh = false}) async {
+    if (!forceRefresh) {
+      final cached = _cache;
+      if (cached != null) return cached;
+    }
+    final map = await _fetchFromApi() ??
+        Map<String, dynamic>.from(
+            jsonDecode(await rootBundle.loadString(assetPath)) as Map);
+    final content = SupportContent._(map);
     _cache = content;
     return content;
+  }
+
+  static Future<Map<String, dynamic>?> _fetchFromApi() async {
+    try {
+      final res = await http.get(
+        Uri.parse(apiUrl),
+        headers: {'Authorization': _apiAuth},
+      ).timeout(const Duration(seconds: 8));
+      if (res.statusCode != 200) return null;
+      final body = jsonDecode(res.body);
+      if (body is! Map || body['success'] != true || body['data'] is! Map) {
+        return null;
+      }
+      final data = Map<String, dynamic>.from(body['data'] as Map);
+      if (data['categories'] == null || data['faq'] == null) return null;
+      return data;
+    } catch (e) {
+      debugPrint('SupportContent: API load failed: $e');
+      return null;
+    }
   }
 
   final Map<String, dynamic> raw;

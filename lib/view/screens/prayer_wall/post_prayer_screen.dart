@@ -1,4 +1,5 @@
 import 'package:biblebookapp/view/constants/colors.dart';
+import 'package:biblebookapp/view/constants/constant.dart';
 import 'package:biblebookapp/view/constants/theme_provider.dart';
 import 'package:biblebookapp/view/constants/images.dart';
 import 'package:biblebookapp/core/notifiers/cache.notifier.dart';
@@ -474,10 +475,9 @@ class _PostPrayerScreenState extends State<PostPrayerScreen> {
     // 50-char minimum applies to the prayer request only; the title just
     // needs to be non-empty (checked above).
     if (_isPrayerInputTooShort(words)) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please enter at least 50 characters.'),
-        ),
+      Constants.showToast(
+        'Please enter at least 50 characters in your prayer request.',
+        2500,
       );
       return;
     }

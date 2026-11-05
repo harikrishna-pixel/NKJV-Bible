@@ -338,6 +338,16 @@ class _MultiSelectPaywallState extends State<MultiSelectPaywall> {
     return _dur == _AiDur.oneYear ? 1 : 0;
   }
 
+  /// (1 - yearly / (monthly × 12)) × 100 from store prices. Null if unknown.
+  int? get _yearSavePercent {
+    final monthly = _sixMonth?.rawPrice ?? 0;
+    final yearly = _oneYear?.rawPrice ?? 0;
+    if (monthly <= 0 || yearly <= 0) return null;
+    final percent = (1 - yearly / (monthly * 12)) * 100;
+    if (percent <= 0 || percent >= 100) return null;
+    return percent.round();
+  }
+
   String get _aiPrice {
     final p = _selectedAiProduct;
 
@@ -380,10 +390,15 @@ class _MultiSelectPaywallState extends State<MultiSelectPaywall> {
 
   Future<void> _openLegal(String url) async {
     final uri = Uri.parse(url);
-
-    if (!await canLaunchUrl(uri)) return;
-
-    await launchUrl(uri, mode: LaunchMode.externalApplication);
+    // Do not gate on canLaunchUrl — on some iPads / iPhone 12 builds it
+    // returns false for https and silently no-ops (SE still worked).
+    try {
+      final opened = await launchUrl(uri, mode: LaunchMode.inAppBrowserView);
+      if (opened) return;
+    } catch (_) {}
+    try {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    } catch (_) {}
   }
 
   Future<void> _continueLimited() async {
@@ -1461,8 +1476,13 @@ class _MultiSelectPaywallState extends State<MultiSelectPaywall> {
                     ),
                   ),
                 ),
-                if (_sel == _PwCard.ai && _dur == _AiDur.oneYear)
-                  _SaveFiftyBadge(isTablet: isTablet),
+                if (_sel == _PwCard.ai &&
+                    _dur == _AiDur.oneYear &&
+                    _yearSavePercent != null)
+                  _SaveFiftyBadge(
+                    isTablet: isTablet,
+                    percent: _yearSavePercent!,
+                  ),
               ],
             ),
             SizedBox(height: isTablet ? 18 : 16),
@@ -1807,14 +1827,21 @@ class _MultiSelectPaywallState extends State<MultiSelectPaywall> {
   Widget _buildLegalRow({bool isTablet = false}) {
     Widget link(String label, VoidCallback onTap) {
       return GestureDetector(
+        behavior: HitTestBehavior.opaque,
         onTap: onTap,
-        child: Text(
-          label,
-          style: TextStyle(
-            fontSize: isTablet ? 12 : 11,
-            color: const Color(0xFF9A9080),
-            decoration: TextDecoration.underline,
-            decorationColor: const Color(0xFF9A9080),
+        child: Padding(
+          padding: EdgeInsets.symmetric(
+            horizontal: isTablet ? 6 : 4,
+            vertical: isTablet ? 10 : 8,
+          ),
+          child: Text(
+            label,
+            style: TextStyle(
+              fontSize: isTablet ? 12 : 11,
+              color: const Color(0xFF9A9080),
+              decoration: TextDecoration.underline,
+              decorationColor: const Color(0xFF9A9080),
+            ),
           ),
         ),
       );
@@ -1991,9 +2018,10 @@ class _RadioDot extends StatelessWidget {
 }
 
 class _SaveFiftyBadge extends StatefulWidget {
-  const _SaveFiftyBadge({required this.isTablet});
+  const _SaveFiftyBadge({required this.isTablet, required this.percent});
 
   final bool isTablet;
+  final int percent;
 
   @override
   State<_SaveFiftyBadge> createState() => _SaveFiftyBadgeState();
@@ -2046,7 +2074,7 @@ class _SaveFiftyBadgeState extends State<_SaveFiftyBadge>
           ],
         ),
         child: Text(
-          'Save 50%',
+          'Save ${widget.percent}%',
           style: TextStyle(
             fontSize: isTablet ? 13 : 12,
             fontWeight: FontWeight.w800,

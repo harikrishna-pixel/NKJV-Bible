@@ -54,7 +54,8 @@ bool _isBenignHomeWidgetUpdatesStreamCancel(FlutterErrorDetails details) {
   if (!msg.contains('No active stream to cancel')) return false;
   final ctx = details.context;
   if (ctx == null) return false;
-  return ctx.toStringDeep(minLevel: DiagnosticLevel.hidden)
+  return ctx
+      .toStringDeep(minLevel: DiagnosticLevel.hidden)
       .contains('home_widget/updates');
 }
 

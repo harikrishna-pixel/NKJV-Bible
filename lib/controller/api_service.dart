@@ -14,6 +14,7 @@ import 'package:biblebookapp/utils/debugprint.dart';
 import 'package:biblebookapp/view/constants/assets_constants.dart';
 import 'package:biblebookapp/view/constants/constant.dart';
 import 'package:biblebookapp/view/constants/share_preferences.dart';
+import 'package:biblebookapp/view/screens/books/model/book_category_model.dart';
 import 'package:biblebookapp/view/screens/books/model/book_model.dart';
 import 'package:biblebookapp/view/screens/calendar_screen/model/calendar_model.dart';
 import 'package:biblebookapp/view/screens/dashboard/constants.dart';
@@ -494,7 +495,9 @@ Future<List<BookModel>> getBookListing(int id) async {
       'book_cat_id': "$id",
     });
     final data = jsonDecode(resp.body)['data'];
-    return (data as List).map((e) => BookModel.fromJson(e)).toList();
+    return (data as List)
+        .map((e) => BookModel.fromJson(Map<String, dynamic>.from(e as Map)))
+        .toList();
   } catch (e) {
     DebugConsole.log("book list err - $e");
     if (e.toString().contains('host lookup')) {
@@ -504,20 +507,45 @@ Future<List<BookModel>> getBookListing(int id) async {
   }
 }
 
-Future<List<BookModel>> getBookCategories(int id) async {
+/// BookAds categories for [book_app_id] from getAppInfo `book_ads_app_id`.
+Future<List<BookCategoryModel>> getBookCategoryList(int bookAppId) async {
   try {
     final resp = await http
         .post(Uri.parse(Api.categoryListId), headers: <String, String>{
       'Content-Type': 'application/x-www-form-urlencoded',
     }, body: {
-      'book_app_id': "$id",
+      'book_app_id': "$bookAppId",
     });
     final data = jsonDecode(resp.body)['data'];
-    if ((data as List).isNotEmpty) {
-      return await getBookListing(int.tryParse(data.first['categoryId']) ?? 13);
-    } else {
-      return [];
+    if (data is! List) return [];
+    return data
+        .map((e) =>
+            BookCategoryModel.fromJson(Map<String, dynamic>.from(e as Map)))
+        .toList();
+  } catch (e) {
+    if (e.toString().contains('host lookup')) {
+      throw 'No Internet Connection';
     }
+    rethrow;
+  }
+}
+
+/// All BookAds products for the app id (every category).
+Future<List<BookModel>> getBookCategories(int id) async {
+  try {
+    final categories = await getBookCategoryList(id);
+    if (categories.isEmpty) return [];
+    final books = <BookModel>[];
+    for (final cat in categories) {
+      final catId = int.tryParse(cat.categoryId);
+      if (catId == null) continue;
+      final listed = await getBookListing(catId);
+      books.addAll(listed.map((b) => b.copyWith(
+            categoryId: cat.categoryId,
+            categoryTitle: cat.categoryTitle,
+          )));
+    }
+    return books;
   } catch (e) {
     if (e.toString().contains('host lookup')) {
       throw 'No Internet Connection';

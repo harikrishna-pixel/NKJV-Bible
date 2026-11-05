@@ -11,6 +11,7 @@
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
     <uses-permission android:name="com.android.vending.BILLING"/>
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK"/>
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
     <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
@@ -63,6 +64,21 @@
             android:name="com.google.android.gms.ads.APPLICATION_ID"
             android:value="ca-app-pub-4194577750257069~9699431392"/>
         
+        <!-- Bible audio: background playback + lock-screen controls (just_audio_background) -->
+        <service android:name="com.ryanheise.audioservice.AudioService"
+            android:foregroundServiceType="mediaPlayback"
+            android:exported="true" tools:ignore="Instantiatable">
+            <intent-filter>
+                <action android:name="android.media.browse.MediaBrowserService" />
+            </intent-filter>
+        </service>
+        <receiver android:name="com.ryanheise.audioservice.MediaButtonReceiver"
+            android:exported="true" tools:ignore="Instantiatable">
+            <intent-filter>
+                <action android:name="android.intent.action.MEDIA_BUTTON" />
+            </intent-filter>
+        </receiver>
+
         <!-- Notification Receiver and Service Configurations -->
          <!-- <service android:name="com.dexterous.flutterlocalnotifications.ForegroundService" android:exported="false" android:stopWithTask="false"  /> -->
         <service android:name="com.dexterous.flutterlocalnotifications.services.ForegroundService" android:permission="android.permission.FOREGROUND_SERVICE" android:exported="false"/>

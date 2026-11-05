@@ -15,6 +15,75 @@ For help getting started with Flutter development, view the
 [online documentation](https://docs.flutter.dev/), which offers tutorials,
 samples, guidance on mobile development, and a full API reference.
 
+## Sign in / Login
+
+**Screen:** `lib/view/screens/authenitcation/view/login_screen.dart`
+
+Open from Menu / My Account, Prayer Wall, and other features that require an account.
+
+- **Email** and **password** (password at least 6 characters).
+- **Forgot Password?** opens the reset screen.
+- **Sign Up** opens the registration screen.
+- After a successful login the app goes to **Reading (Home)**.
+- Login from Prayer Wall stays on the Wall (it does not replace Home).
+- If the email is not verified, the app opens **Mail Verification**.
+- The referral-code sheet is **not** shown on login. Enter a friend’s code later in **My Account**.
+
+Cache after login: `userid`, `authtoken`, `name`, `user` (email). Cloud library backup can run about 60 seconds after a successful sign-in (see below).
+
+## Sign up
+
+**Screen:** `lib/view/screens/authenitcation/view/signup_screen.dart`
+
+Create an account to back up and restore the Bible journey across devices.
+
+| Field | Required |
+|--------|----------|
+| Name | Yes |
+| Email | Yes (valid email) |
+| Password | Yes (at least 8 characters) |
+| Confirm Password | Yes (must match) |
+| Referral Code | Optional |
+| Terms & Privacy checkbox | Yes |
+
+- Link at the bottom: **Sign In** (existing account).
+- Optional referral code can also be entered after sign-up from **My Account**.
+
+## Profile (My Account)
+
+**Screen:** `lib/view/screens/profile/view/profile_screen.dart`  
+**Edit:** `lib/view/screens/profile/view/edit_profile_screen.dart`
+
+My Account is for a signed-in user.
+
+- **Edit Profile** — name, photo, country, and related account details. Delete account is on this screen.
+- **Wallet** — credits, Premium, Restore purchases (same Wallet entry as Settings / Menu).
+- **Prayer Profile** — opens Prayer Wall profile.
+- **Library** — bookmarks, highlights, notes, quotes, wallpapers (counts; tap to open My Library).
+- **Referral** — own code (copy / share) and **Enter Referral Code** if none has been applied yet.
+- **Logout** — clears the session on this device.
+
+## Referral code
+
+**Apply a code (friend’s code)**
+
+- Optional field on **Sign Up**.
+- After login: **My Account → Enter Referral Code**.
+- You cannot apply your own code.
+- A code can be applied only once per account. If one is already used, the app shows “Referral code already applied”.
+
+**Share your code**
+
+- Shown on **My Account** when the account has a referral code.
+- Copy or share. The share text includes the app store link and the code.
+- When a friend signs up with that code, **both** accounts get **100 free credits**.
+
+**Files**
+
+- Sign-up / post-login sheet: `lib/view/screens/authenitcation/view/widget/referral_code_bottom_sheet.dart`
+- My Account section + share/copy: `lib/view/screens/authenitcation/view/widget/own_referral_code_dialog.dart`
+- Cached key: `referral_code`
+
 ## Library cloud backup
 
 My Library data (bookmarks, highlights, underlines, notes, wallpaper/quote bookmarks, and calendar entries) can be backed up to the server when the user is signed in. Bible reader/home content is not included. Backups are encrypted (`.enc`) locally; cloud uploads send a `.zip` containing that file.

@@ -2,13 +2,17 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'package:biblebookapp/controller/api_service.dart';
+import 'package:biblebookapp/controller/dashboard_controller.dart';
 import 'package:biblebookapp/services/wallet_service.dart';
 import 'package:biblebookapp/view/constants/colors.dart';
 import 'package:biblebookapp/view/constants/constant.dart';
 import 'package:biblebookapp/view/constants/images.dart';
 import 'package:biblebookapp/view/constants/share_preferences.dart';
 import 'package:biblebookapp/view/constants/theme_provider.dart';
+import 'package:biblebookapp/view/screens/books/books_screen.dart';
+import 'package:intl/intl.dart' show NumberFormat;
 import 'package:biblebookapp/view/screens/dashboard/constants.dart';
+import 'package:biblebookapp/view/widget/wallet_entry.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
@@ -58,6 +62,15 @@ class _WalletScreenState extends State<WalletScreen>
   Timer? _storeLoadFallbackTimer;
   bool _usingFallbackPacks = false;
   bool _iapPriceFallback = false;
+  bool _isPremium = false;
+
+  /// AR Monthly/Yearly AI Premium: show Unlimited instead of credit count.
+  bool _unlimitedAi = false;
+
+  /// Lifetime / platinum ad-free (still uses credits for AI).
+  bool _isLifetime = false;
+  int _bookAdsAppId = 0;
+  bool _showDigitalProducts = false;
 
   // Prevent double-crediting the same purchase/restore event
   static const String _processedWalletPurchaseKey =
@@ -114,7 +127,7 @@ class _WalletScreenState extends State<WalletScreen>
                       const SizedBox(width: 10),
                       Expanded(
                         child: Text(
-                          'Credits',
+                          'Wallet',
                           style: TextStyle(
                             color: titleColor,
                             fontSize: 16,
@@ -280,6 +293,7 @@ class _WalletScreenState extends State<WalletScreen>
     _checkConnectivityAndShowToast();
     // Initialize and load credits immediately from local storage (works offline)
     _initializeCredits();
+    _loadPremiumStatus();
     _refreshClaimCooldown();
     _loadCoinPacks();
     _initStoreInfoIfOnline();
@@ -506,6 +520,53 @@ class _WalletScreenState extends State<WalletScreen>
       } catch (e2) {
         debugPrint('Error loading credits from WalletService: $e2');
       }
+    }
+  }
+
+  Future<void> _loadPremiumStatus() async {
+    final premium = await BibleInfo.hasActivePremiumPlan();
+    final unlimited = await BibleInfo.shouldSkipChatPrayerCredits();
+    final prefs = await SharedPreferences.getInstance();
+    final plan =
+        (prefs.getString('subscription_plan') ?? '').toLowerCase().trim();
+    var lifetime = plan == 'platinum';
+    if (!lifetime && premium && !unlimited) {
+      final rewardTime = prefs.getString('isRewardAdViewTime');
+      final saveTime = DateTime.tryParse(rewardTime ?? '');
+      if (saveTime != null) {
+        lifetime = saveTime.difference(DateTime.now()).inDays > 10000;
+      }
+    }
+    if (unlimited) lifetime = false;
+
+    var bookAdsAppId = 0;
+    var showDigital = false;
+    try {
+      if (Get.isRegistered<DashBoardController>()) {
+        final dash = Get.find<DashBoardController>();
+        bookAdsAppId = dash.bookAdsAppId.value;
+        showDigital = dash.bookAdsStatus.value == 1 && bookAdsAppId > 0;
+      }
+    } catch (_) {}
+    if (bookAdsAppId <= 0) {
+      bookAdsAppId = prefs.getInt('bookAdsAppId') ?? 0;
+      final status = prefs.getInt('bookAdsStatus') ?? 0;
+      showDigital = status == 1 && bookAdsAppId > 0;
+    }
+
+    if (!mounted) return;
+    if (premium != _isPremium ||
+        unlimited != _unlimitedAi ||
+        lifetime != _isLifetime ||
+        bookAdsAppId != _bookAdsAppId ||
+        showDigital != _showDigitalProducts) {
+      setState(() {
+        _isPremium = premium;
+        _unlimitedAi = unlimited;
+        _isLifetime = lifetime;
+        _bookAdsAppId = bookAdsAppId;
+        _showDigitalProducts = showDigital;
+      });
     }
   }
 
@@ -1204,13 +1265,23 @@ class _WalletScreenState extends State<WalletScreen>
           onPressed: () => Get.back(),
         ),
         title: Text(
-          'Credits',
+          'Wallet',
           style: TextStyle(
             color: CommanColor.whiteBlack(context),
             fontSize: screenWidth > 450 ? 22 : 18,
             fontWeight: FontWeight.w600,
           ),
         ),
+        actions: [
+          IconButton(
+            tooltip: 'About Your Credits',
+            onPressed: () => _showAboutYourCreditsSheet(context, isDark),
+            icon: Icon(
+              Icons.info_outline,
+              color: CommanColor.whiteBlack(context),
+            ),
+          ),
+        ],
       ),
       body: Container(
         decoration: isVintage
@@ -1244,53 +1315,7 @@ class _WalletScreenState extends State<WalletScreen>
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // Current Credits Display
-                      Container(
-                        width: double.infinity,
-                        padding: EdgeInsets.all(screenWidth > 450 ? 24 : 20),
-                        decoration: BoxDecoration(
-                          color: isDark
-                              ? const Color(0xFF4A342B)
-                              : Colors.white,
-                          borderRadius: BorderRadius.circular(16),
-                          border: isDark
-                              ? Border.all(
-                                  color: Colors.white.withOpacity(0.85),
-                                  width: 1.5,
-                                )
-                              : null,
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withOpacity(0.1),
-                              blurRadius: 10,
-                              offset: const Offset(0, 4),
-                            ),
-                          ],
-                        ),
-                        child: Column(
-                          children: [
-                            Text(
-                              'Your Credits',
-                              style: TextStyle(
-                                color: CommanColor.whiteBlack(context)
-                                    .withOpacity(0.7),
-                                fontSize: screenWidth > 450 ? 16 : 14,
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                            Text(
-                              '$_currentCredits',
-                              style: TextStyle(
-                                color: isDark
-                                    ? Colors.white
-                                    : CommanColor.lightDarkPrimary(context),
-                                fontSize: screenWidth > 450 ? 48 : 40,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
+                      _buildCreditsStatusCard(context, screenWidth, isDark),
                       const SizedBox(height: 24),
 
                       // Answer Length Selection Section
@@ -1356,6 +1381,20 @@ class _WalletScreenState extends State<WalletScreen>
                         ),
                         const SizedBox(height: 12),
                         ..._buildBuyCreditCards(context, screenWidth, isDark),
+                        const SizedBox(height: 24),
+                      ],
+
+                      if (_showDigitalProducts) ...[
+                        Text(
+                          'Digital Products',
+                          style: TextStyle(
+                            color: CommanColor.whiteBlack(context),
+                            fontSize: screenWidth > 450 ? 20 : 18,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        _buildDigitalProductsRow(context, screenWidth, isDark),
                       ],
                     ],
                   ),
@@ -1365,6 +1404,547 @@ class _WalletScreenState extends State<WalletScreen>
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildCreditsStatusCard(
+    BuildContext context,
+    double screenWidth,
+    bool isDark,
+  ) {
+    final ink = isDark ? Colors.white : const Color(0xFF3D2914);
+    final accent = isDark ? const Color(0xFFF5E6C8) : const Color(0xFF5D4037);
+    final muted = isDark ? Colors.white70 : const Color(0xFF8D7B68);
+    final cardBg = isDark ? const Color(0xFF3A2A22) : const Color(0xFFFFFBF5);
+    final border =
+        isDark ? Colors.white.withOpacity(0.22) : const Color(0xFFE8D9C4);
+
+    return Container(
+      width: double.infinity,
+      padding: EdgeInsets.fromLTRB(
+        screenWidth > 450 ? 22 : 18,
+        screenWidth > 450 ? 20 : 16,
+        screenWidth > 450 ? 16 : 14,
+        screenWidth > 450 ? 20 : 16,
+      ),
+      decoration: BoxDecoration(
+        color: cardBg,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: border),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(isDark ? 0.25 : 0.06),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          _walletCoinStack(isDark, screenWidth > 450 ? 54 : 48),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Your Credits',
+                  style: TextStyle(
+                    color: muted,
+                    fontSize: screenWidth > 450 ? 14 : 12.5,
+                    fontWeight: FontWeight.w500,
+                    letterSpacing: 0.2,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                    NumberFormat.decimalPattern('en_US')
+                        .format(_currentCredits),
+                    style: TextStyle(
+                      fontFamily: 'Georgia',
+                      color: accent,
+                      fontSize: screenWidth > 450 ? 34 : 30,
+                      fontWeight: FontWeight.w700,
+                      height: 1.1,
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          _buildPlanStatusBadge(isDark, ink),
+        ],
+      ),
+    );
+  }
+
+  Widget _walletCoinStack(bool isDark, double size) {
+    final gold = isDark ? const Color(0xFFE8C989) : const Color(0xFFC9A24A);
+    final goldDeep = isDark ? const Color(0xFFCFA03A) : const Color(0xFFA67C2D);
+    final tray =
+        isDark ? Colors.white.withOpacity(0.1) : const Color(0xFFF4E8D4);
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        color: tray,
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          Positioned(
+            left: size * 0.18,
+            top: size * 0.28,
+            child: _coinDisc(size * 0.42, goldDeep),
+          ),
+          Positioned(
+            right: size * 0.16,
+            top: size * 0.18,
+            child: _coinDisc(size * 0.48, gold),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _coinDisc(double size, Color color) {
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            Color.lerp(color, Colors.white, 0.28)!,
+            color,
+            Color.lerp(color, Colors.black, 0.18)!,
+          ],
+        ),
+        border: Border.all(color: Colors.white.withOpacity(0.35), width: 1),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.18),
+            blurRadius: 3,
+            offset: const Offset(0, 1),
+          ),
+        ],
+      ),
+      child: Center(
+        child: Text(
+          '¢',
+          style: TextStyle(
+            color: Colors.white.withOpacity(0.92),
+            fontSize: size * 0.42,
+            fontWeight: FontWeight.w700,
+            height: 1,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPlanStatusBadge(bool isDark, Color ink) {
+    final chipBg =
+        isDark ? Colors.white.withOpacity(0.1) : const Color(0xFFF6EBD7);
+    final chipBorder =
+        isDark ? Colors.white.withOpacity(0.28) : const Color(0xFFDFCAA3);
+    final chipInk = isDark ? const Color(0xFFE8C989) : const Color(0xFF6D4C41);
+
+    if (_unlimitedAi) {
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+        decoration: BoxDecoration(
+          color: chipBg,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: chipBorder),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.end,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.workspace_premium, size: 15, color: chipInk),
+                const SizedBox(width: 4),
+                Text(
+                  'Premium Active',
+                  style: TextStyle(
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.w700,
+                    color: ink,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 2),
+            Text(
+              '∞ Unlimited AI',
+              style: TextStyle(
+                fontSize: 10.5,
+                fontWeight: FontWeight.w600,
+                color: ink.withOpacity(0.65),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    if (_isLifetime || _isPremium) {
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          color: chipBg,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: chipBorder),
+        ),
+        child: Text(
+          _isLifetime ? '∞  Lifetime Plan' : 'Premium Active',
+          style: TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w700,
+            color: chipInk,
+          ),
+        ),
+      );
+    }
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(20),
+        onTap: () async {
+          await WalletEntry.openPremium();
+          await _loadPremiumStatus();
+        },
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          decoration: BoxDecoration(
+            color: chipBg,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: chipBorder),
+          ),
+          child: Text(
+            'Free Plan',
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+              color: chipInk,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDigitalProductsRow(
+    BuildContext context,
+    double screenWidth,
+    bool isDark,
+  ) {
+    return Material(
+      color: isDark ? const Color(0xFF4A342B) : Colors.white,
+      borderRadius: BorderRadius.circular(12),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(12),
+        onTap: () {
+          if (_bookAdsAppId <= 0) {
+            Constants.showToast('Digital products are unavailable right now.');
+            return;
+          }
+          Get.to(() => BooksScreen(bookAdId: _bookAdsAppId));
+        },
+        child: Container(
+          padding: EdgeInsets.all(screenWidth > 450 ? 16 : 14),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(12),
+            border: isDark
+                ? Border.all(color: Colors.white.withOpacity(0.85), width: 1.5)
+                : null,
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.05),
+                blurRadius: 8,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: screenWidth > 450 ? 50 : 45,
+                height: screenWidth > 450 ? 50 : 45,
+                decoration: BoxDecoration(
+                  color: isDark
+                      ? Colors.white.withOpacity(0.12)
+                      : CommanColor.lightDarkPrimary(context).withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(
+                  Icons.layers_outlined,
+                  color: isDark
+                      ? Colors.white
+                      : CommanColor.lightDarkPrimary(context),
+                  size: screenWidth > 450 ? 28 : 24,
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Digital Products',
+                      style: TextStyle(
+                        color: CommanColor.whiteBlack(context),
+                        fontSize: screenWidth > 450 ? 18 : 16,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Study guides, devotionals & more',
+                      style: TextStyle(
+                        color: CommanColor.whiteBlack(context).withOpacity(0.6),
+                        fontSize: screenWidth > 450 ? 14 : 12,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Icon(
+                Icons.chevron_right,
+                color: CommanColor.whiteBlack(context).withOpacity(0.5),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _showAboutYourCreditsSheet(
+    BuildContext context,
+    bool isDark,
+  ) async {
+    // Colors only from isDark — safe inside a tap handler.
+    final bg = isDark ? const Color(0xFF2C2118) : const Color(0xFFFFFBF5);
+    final ink = isDark ? Colors.white : const Color(0xFF3D2914);
+    final muted = isDark ? Colors.white70 : const Color(0xFF7A6455);
+    final iconBg =
+        isDark ? Colors.white.withOpacity(0.1) : const Color(0xFFF3E6D2);
+    final iconColor =
+        isDark ? const Color(0xFFE8C989) : const Color(0xFF6D4C41);
+    final buttonBg = isDark ? const Color(0xFFCFA03A) : const Color(0xFF5D4037);
+    final sheetBorder =
+        isDark ? Colors.white.withOpacity(0.14) : const Color(0xFFE8D9C4);
+
+    final items = _unlimitedAi
+        ? const [
+            (
+              Icons.all_inclusive,
+              'AI is Unlimited for You',
+              'With Premium, AI chat, answers, and prayers are unlimited — no credits used.',
+            ),
+            (
+              Icons.verified_user_outlined,
+              'Your Credits are Safe',
+              'Credits stay in your account for later use.',
+            ),
+            (
+              Icons.layers_outlined,
+              'Use for Digital Products',
+              'Redeem credits for study guides, devotionals, prayer packs and more.',
+            ),
+            (
+              Icons.autorenew,
+              'When Your Plan Ends',
+              'If your subscription expires, AI usage switches back to credits automatically.',
+            ),
+          ]
+        : const [
+            (
+              Icons.auto_awesome,
+              'Credits power AI',
+              'Credits are used for AI features like Bible Chat and Prayer Guidance.',
+            ),
+            (
+              Icons.verified_user_outlined,
+              'Your Credits are Safe',
+              'Credits stay in your account for later use.',
+            ),
+            (
+              Icons.layers_outlined,
+              'Use for Digital Products',
+              'Redeem credits for study guides, devotionals, prayer packs and more.',
+            ),
+            (
+              Icons.workspace_premium_rounded,
+              'Go Premium for Unlimited AI',
+              'Premium unlocks unlimited AI chat and prayer — no credits needed.',
+            ),
+          ];
+
+    await showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (ctx) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(12, 0, 12, 10),
+            child: Container(
+              padding: const EdgeInsets.fromLTRB(20, 10, 20, 18),
+              decoration: BoxDecoration(
+                color: bg,
+                borderRadius: BorderRadius.circular(26),
+                border: Border.all(color: sheetBorder),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.18),
+                    blurRadius: 24,
+                    offset: const Offset(0, 8),
+                  ),
+                ],
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 42,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: muted.withOpacity(0.28),
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Container(
+                    width: 64,
+                    height: 64,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: iconBg,
+                      border: Border.all(
+                        color: isDark
+                            ? Colors.white.withOpacity(0.12)
+                            : const Color(0xFFE2CFA8),
+                      ),
+                    ),
+                    child: Center(
+                      child: _walletCoinStack(isDark, 40),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    'About Your Credits',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: ink,
+                      fontSize: 20,
+                      fontWeight: FontWeight.w700,
+                      fontFamily: 'Georgia',
+                    ),
+                  ),
+                  const SizedBox(height: 18),
+                  for (var i = 0; i < items.length; i++) ...[
+                    if (i > 0) const SizedBox(height: 12),
+                    Container(
+                      padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
+                      decoration: BoxDecoration(
+                        color: isDark
+                            ? Colors.white.withOpacity(0.05)
+                            : const Color(0xFFF8F1E6),
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Container(
+                            width: 40,
+                            height: 40,
+                            decoration: BoxDecoration(
+                              color: isDark
+                                  ? Colors.white.withOpacity(0.1)
+                                  : const Color(0xFFFFFBF5),
+                              borderRadius: BorderRadius.circular(11),
+                              border: Border.all(
+                                color: isDark
+                                    ? Colors.white.withOpacity(0.12)
+                                    : const Color(0xFFE8D9C4),
+                              ),
+                            ),
+                            child: Icon(
+                              items[i].$1,
+                              size: 20,
+                              color: iconColor,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  items[i].$2,
+                                  style: TextStyle(
+                                    color: ink,
+                                    fontSize: 14.5,
+                                    fontWeight: FontWeight.w700,
+                                    height: 1.2,
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  items[i].$3,
+                                  style: TextStyle(
+                                    color: muted,
+                                    fontSize: 12.5,
+                                    height: 1.4,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                  const SizedBox(height: 18),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 52,
+                    child: ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: buttonBg,
+                        foregroundColor:
+                            isDark ? const Color(0xFF3A2923) : Colors.white,
+                        elevation: 0,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(26),
+                        ),
+                      ),
+                      onPressed: () => Navigator.of(ctx).pop(),
+                      child: const Text(
+                        'Got it',
+                        style: TextStyle(
+                          fontFamily: 'Georgia',
+                          fontSize: 16,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 
@@ -1774,6 +2354,9 @@ class _WalletScreenState extends State<WalletScreen>
         break;
     }
 
+    final subtitle =
+        _unlimitedAi ? 'Included with Premium' : '$cost Credits per response';
+
     return Container(
       padding: EdgeInsets.all(screenWidth > 450 ? 16 : 14),
       decoration: BoxDecoration(
@@ -1835,7 +2418,7 @@ class _WalletScreenState extends State<WalletScreen>
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    '$cost Credits per response',
+                    subtitle,
                     style: TextStyle(
                       color: CommanColor.whiteBlack(context).withOpacity(0.6),
                       fontSize: screenWidth > 450 ? 14 : 12,
@@ -1894,7 +2477,7 @@ class _WalletScreenState extends State<WalletScreen>
                   screenWidth,
                   isDark,
                   'small',
-                  'Short Answer - 20 Credits',
+                  _unlimitedAi ? 'Short Answer' : 'Short Answer - 20 Credits',
                   'Simple explanation',
                   20,
                 ),
@@ -1904,7 +2487,7 @@ class _WalletScreenState extends State<WalletScreen>
                   screenWidth,
                   isDark,
                   'medium',
-                  'Medium Answer - 50 Credits',
+                  _unlimitedAi ? 'Medium Answer' : 'Medium Answer - 50 Credits',
                   'Contextual explanation',
                   50,
                 ),
@@ -1914,7 +2497,9 @@ class _WalletScreenState extends State<WalletScreen>
                   screenWidth,
                   isDark,
                   'large',
-                  'Full Study Answer - 100 Credits',
+                  _unlimitedAi
+                      ? 'Full Study Answer'
+                      : 'Full Study Answer - 100 Credits',
                   'Long, detailed explanation',
                   100,
                 ),

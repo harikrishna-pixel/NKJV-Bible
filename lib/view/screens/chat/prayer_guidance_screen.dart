@@ -89,6 +89,8 @@ class _PrayerGuidanceScreenState extends State<PrayerGuidanceScreen>
 
   // Wallet credits (same as Chat screen)
   int _currentCredits = 0;
+  /// AR AI Premium: hide top-bar wallet (Menu / Settings only).
+  bool _skipCredits = false;
   Timer? _creditsTimer;
 
   // Intro answer length selection (shared with Chat intro behaviour)
@@ -426,12 +428,12 @@ class _PrayerGuidanceScreenState extends State<PrayerGuidanceScreen>
   void _startCreatingStepTicks() {
     _creatingStepTimer?.cancel();
     _creatingStepsDone = 0;
-    _creatingStepTimer = Timer.periodic(const Duration(milliseconds: 750), (t) {
+    _creatingStepTimer = Timer.periodic(const Duration(milliseconds: 2000), (t) {
       if (!mounted || !_isLoading) {
         t.cancel();
         return;
       }
-      if (_creatingStepsDone >= 3) {
+      if (_creatingStepsDone >= 2) {
         t.cancel();
         return;
       }
@@ -452,11 +454,12 @@ class _PrayerGuidanceScreenState extends State<PrayerGuidanceScreen>
     while (mounted &&
         requestId == _prayerRequestGeneration &&
         _isLoading &&
-        _creatingStepsDone < 3) {
+        _creatingStepsDone < 2) {
       await Future<void>.delayed(const Duration(milliseconds: 80));
     }
     if (!mounted || requestId != _prayerRequestGeneration) return;
-    if (_creatingStepsDone >= 3) {
+    if (_creatingStepsDone < 3 && mounted) {
+      setState(() => _creatingStepsDone = 3);
       await Future<void>.delayed(const Duration(milliseconds: 400));
     }
     if (!mounted || requestId != _prayerRequestGeneration) return;
@@ -625,6 +628,12 @@ class _PrayerGuidanceScreenState extends State<PrayerGuidanceScreen>
   /// Screens 2–4: "Your Prayer Request" (+ credit amount), then generate.
   Future<void> _openPrayerRequest(int categoryIndex) async {
     if (_isLoading) return;
+    // Offline / no usable network: toast only — do not open request screen.
+    final isConnected = await InternetConnection().hasInternetAccess;
+    if (!isConnected) {
+      Constants.showToast('No Internet Connection', 5000);
+      return;
+    }
     final skipCredits = await BibleInfo.shouldSkipChatPrayerCredits();
     final savedLength = await WalletService.getAnswerLength();
     if (!mounted) return;
@@ -645,6 +654,36 @@ class _PrayerGuidanceScreenState extends State<PrayerGuidanceScreen>
     );
     if (result == null || !mounted) return;
     await _sendPrayerRequest(categoryIndex, request: result);
+  }
+
+  /// Pray for Me → same Prayer Request flow as categories (no category card).
+  Future<void> _openCustomPrayerRequest() async {
+    if (_isLoading) return;
+    final skipCredits = await BibleInfo.shouldSkipChatPrayerCredits();
+    final savedLength = await WalletService.getAnswerLength();
+    if (!mounted) return;
+    final result = await Navigator.of(context).push<PrayerRequestResult>(
+      MaterialPageRoute(
+        builder: (_) => PrayerRequestScreen(
+          categoryTitle: 'My Prayer',
+          categorySubtitle: 'Get guidance based on your need.',
+          categoryIconAsset: null,
+          defaultRequests: const {
+            PrayerFor.myself:
+                'Lord, I bring what is on my heart to You. Please hear my prayer and guide me.',
+            PrayerFor.family:
+                'Lord, I lift my family to You. Please bless, protect, and guide us.',
+            PrayerFor.someoneElse:
+                'Lord, thank You for their life, and Your continued blessings and guidance.',
+          },
+          skipCredits: skipCredits,
+          initialAnswerLength: savedLength,
+          isCustomFlow: true,
+        ),
+      ),
+    );
+    if (result == null || !mounted) return;
+    await _sendCustomPrayerRequest(result.request, request: result);
   }
 
   Future<void> _sendPrayerRequest(
@@ -1121,7 +1160,10 @@ $personalInstruction''';
     });
   }
 
-  Future<void> _sendCustomPrayerRequest(String customRequest) async {
+  Future<void> _sendCustomPrayerRequest(
+    String customRequest, {
+    PrayerRequestResult? request,
+  }) async {
     if (_isLoading) return;
     if (customRequest.trim().isEmpty) {
       Constants.showToast("Please enter your prayer request", 3000);
@@ -1138,12 +1180,15 @@ $personalInstruction''';
       return;
     }
 
+    final prayerAnswerLength =
+        request?.answerLength ?? await WalletService.getAnswerLength();
+    final prayerCost = WalletService.getChatCostForLength(prayerAnswerLength);
+
     // Credits check (same as Chat) — AR AI Premium skips; Lifetime still uses credits.
     if (!await BibleInfo.shouldSkipChatPrayerCredits()) {
-      final chatCost = await WalletService.getChatCost();
-      final hasCredits = await WalletService.getCredits() >= chatCost;
+      final hasCredits = await WalletService.getCredits() >= prayerCost;
       if (!hasCredits) {
-        _showInsufficientCreditsDialog(chatCost);
+        _showInsufficientCreditsDialog(prayerCost);
         return;
       }
     }
@@ -1166,7 +1211,7 @@ $personalInstruction''';
       final url = Uri.parse(_baseUrl);
 
       // Answer length instruction (same as ChatScreen)
-      final answerLength = await WalletService.getAnswerLength();
+      final answerLength = prayerAnswerLength;
       String answerLengthInstruction = '';
       switch (answerLength) {
         case 'small':
@@ -1184,6 +1229,38 @@ $personalInstruction''';
         default:
           answerLengthInstruction =
               'Provide an appropriate answer based on the question.';
+      }
+
+      var personalInstruction = '';
+      if (request != null) {
+        final b = StringBuffer()
+          ..writeln()
+          ..writeln('Personalize the prayer with these details from the user:');
+        switch (request.prayerFor) {
+          case PrayerFor.myself:
+            b.writeln(
+                '- Praying for: the user themselves (write in first person: I / me).');
+            break;
+          case PrayerFor.family:
+            b.writeln("- Praying for: the user's family.");
+            break;
+          case PrayerFor.someoneElse:
+            b.writeln('- Praying for: someone else.');
+            if (request.name.isNotEmpty) {
+              b.writeln('- Their name: ${request.name}');
+            }
+            if (request.relationship.isNotEmpty) {
+              b.writeln('- Relationship to the user: ${request.relationship}');
+            }
+            break;
+        }
+        b.writeln('- Prayer request: ${request.request}');
+        if (request.details.isNotEmpty) {
+          b.writeln('- Additional details: ${request.details}');
+        }
+        b.writeln(
+            'Write the prayer itself only; do not repeat these instructions.');
+        personalInstruction = b.toString();
       }
 
       // Determine language instruction based on chatLanguage
@@ -1359,6 +1436,7 @@ ${answerLengthInstruction}
 Task:
 Write a prayer based on the following request: ${customRequest.trim()}
 Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the request.
+${personalInstruction}
 ''';
 
       final response = await http.post(
@@ -1418,15 +1496,14 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
       if (!isErrorResponse) {
         await WidgetPromptService.notePrayerGenerated();
         if (!await BibleInfo.shouldSkipChatPrayerCredits()) {
-          final chatCost = await WalletService.getChatCost();
-          await WalletService.deductCredits(chatCost);
+          await WalletService.deductCredits(prayerCost);
           if (mounted && requestId == _prayerRequestGeneration) {
             final prefs = await SharedPreferences.getInstance();
             final creditDebitShown =
                 prefs.getBool('prayer_credit_debit_shown') ?? false;
             if (!creditDebitShown) {
               Constants.showToast(
-                  'Used $chatCost credits for this response', 1500);
+                  'Used $prayerCost credits for this response', 1500);
               await prefs.setBool('prayer_credit_debit_shown', true);
             }
             _loadCreditsFromLocal();
@@ -1556,288 +1633,9 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
     );
   }
 
+  /// Legacy entry: now opens the shared Prayer Request screen.
   void _showCustomPrayerDialog(BuildContext context) {
-    final themeProvider = Provider.of<ThemeProvider>(context, listen: false);
-    final isDark = themeProvider.themeMode == ThemeMode.dark;
-    final bgColor = isDark
-        ? CommanColor.darkPrimaryColor
-        : const Color(0xFFF5F0E6);
-
-    // Bottom sheet (not centered dialog) so keyboard does not push/crop the
-    // form or shift the Prayer Guidance background layout.
-    showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (dialogContext) {
-        final keyboardInset = MediaQuery.viewInsetsOf(dialogContext).bottom;
-        return Padding(
-          padding: EdgeInsets.only(bottom: keyboardInset),
-          child: GestureDetector(
-            onTap: () => FocusManager.instance.primaryFocus?.unfocus(),
-            behavior: HitTestBehavior.opaque,
-            child: Container(
-              constraints: BoxConstraints(
-                maxHeight: MediaQuery.sizeOf(dialogContext).height * 0.9,
-              ),
-              decoration: BoxDecoration(
-                color: bgColor,
-                borderRadius: const BorderRadius.vertical(
-                  top: Radius.circular(20),
-                ),
-              ),
-              child: SafeArea(
-                top: false,
-                child: SingleChildScrollView(
-                  keyboardDismissBehavior:
-                      ScrollViewKeyboardDismissBehavior.onDrag,
-                  child: Padding(
-                    padding: const EdgeInsets.all(20),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        Center(
-                          child: Container(
-                            width: 40,
-                            height: 4,
-                            margin: const EdgeInsets.only(bottom: 8),
-                            decoration: BoxDecoration(
-                              color: isDark
-                                  ? Colors.white24
-                                  : const Color(0xFFD0C4B4),
-                              borderRadius: BorderRadius.circular(2),
-                            ),
-                          ),
-                        ),
-                        // Top row: back only (wallet already shown in main header)
-                        Row(
-                          children: [
-                            IconButton(
-                              icon: Icon(
-                                Icons.arrow_back_ios,
-                                size: 20,
-                                color: isDark
-                                    ? Colors.white
-                                    : const Color(0xFF3D2914),
-                              ),
-                              onPressed: () {
-                                FocusManager.instance.primaryFocus?.unfocus();
-                                Navigator.of(dialogContext).pop();
-                                _customPrayerController.clear();
-                              },
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 12),
-                        // Praying hands, title, subtitle
-                        Icon(
-                          Icons.volunteer_activism,
-                          size: 48,
-                          color:
-                              isDark ? Colors.white70 : const Color(0xFF5C4033),
-                        ),
-                        const SizedBox(height: 12),
-                        Text(
-                          'My Prayer',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                            fontSize: 22,
-                            fontWeight: FontWeight.w700,
-                            color:
-                                isDark ? Colors.white : const Color(0xFF3D2914),
-                            fontFamily: 'Georgia',
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          ChatTranslations.get('get_guidance_need', 'EN'),
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                            fontSize: 14,
-                            color: isDark
-                                ? Colors.white70
-                                : const Color(0xFF6D6D6D),
-                          ),
-                        ),
-                        const SizedBox(height: 20),
-                        // Card: What's on your heart, description, field, button
-                        Container(
-                          padding: const EdgeInsets.all(16),
-                          decoration: BoxDecoration(
-                            color: isDark
-                                ? Colors.white.withOpacity(0.08)
-                                : Colors.white,
-                            borderRadius: BorderRadius.circular(16),
-                            border: Border.all(
-                              color: isDark
-                                  ? Colors.white24
-                                  : const Color(0xFFE0D5C8),
-                            ),
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                "What's on your heart today?",
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w700,
-                                  color: isDark
-                                      ? Colors.white
-                                      : const Color(0xFF3D2914),
-                                ),
-                              ),
-                              const SizedBox(height: 6),
-                              Text(
-                                "Let your prayer begin with a thought or feeling.",
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  color: isDark
-                                      ? Colors.white70
-                                      : const Color(0xFF6D6D6D),
-                                ),
-                              ),
-                              const SizedBox(height: 16),
-                              TextField(
-                                controller: _customPrayerController,
-                                maxLines: 4,
-                                maxLength: 300,
-                                onTapOutside: (_) {
-                                  FocusManager.instance.primaryFocus
-                                      ?.unfocus();
-                                },
-                                decoration: InputDecoration(
-                                  hintText: 'Speak from the soul...',
-                                  hintStyle: TextStyle(
-                                    color: isDark
-                                        ? Colors.white70
-                                        : Colors.grey.shade600,
-                                    fontStyle: FontStyle.italic,
-                                  ),
-                                  border: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(12),
-                                    borderSide: BorderSide(
-                                      color: isDark
-                                          ? Colors.white24
-                                          : Colors.grey.shade300,
-                                    ),
-                                  ),
-                                  focusedBorder: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(12),
-                                    borderSide: BorderSide(
-                                      color: isDark
-                                          ? const Color(0xFF8B6F47)
-                                          : const Color(0xFF5C4033),
-                                      width: 1.5,
-                                    ),
-                                  ),
-                                  filled: true,
-                                  fillColor: isDark
-                                      ? Colors.white.withOpacity(0.05)
-                                      : Colors.grey.shade50,
-                                  counterText: '',
-                                ),
-                                style: TextStyle(
-                                  color: isDark
-                                      ? Colors.white
-                                      : CommanColor.black,
-                                  fontSize: 15,
-                                ),
-                              ),
-                              ValueListenableBuilder<TextEditingValue>(
-                                valueListenable: _customPrayerController,
-                                builder: (context, value, _) {
-                                  return Padding(
-                                    padding: const EdgeInsets.only(top: 4),
-                                    child: Align(
-                                      alignment: Alignment.centerRight,
-                                      child: Text(
-                                        '${value.text.length}/300',
-                                        style: TextStyle(
-                                          fontSize: 13,
-                                          color: isDark
-                                              ? Colors.white54
-                                              : Colors.grey.shade600,
-                                        ),
-                                      ),
-                                    ),
-                                  );
-                                },
-                              ),
-                              const SizedBox(height: 16),
-                              SizedBox(
-                                width: double.infinity,
-                                child: ValueListenableBuilder<TextEditingValue>(
-                                  valueListenable: _customPrayerController,
-                                  builder: (context, value, _) {
-                                    final hasText =
-                                        value.text.trim().isNotEmpty;
-                                    return ElevatedButton(
-                                      onPressed: hasText
-                                          ? () async {
-                                              FocusManager
-                                                  .instance.primaryFocus
-                                                  ?.unfocus();
-                                              final isConnected =
-                                                  await InternetConnection()
-                                                      .hasInternetAccess;
-                                              if (!isConnected) {
-                                                Constants.showToast(
-                                                    'No internet connection',
-                                                    5000);
-                                                return;
-                                              }
-                                              final request =
-                                                  _customPrayerController.text
-                                                      .trim();
-                                              Navigator.of(dialogContext)
-                                                  .pop();
-                                              if (request.isNotEmpty &&
-                                                  mounted) {
-                                                await _showPublishOrChatChoice(
-                                                    request);
-                                              }
-                                            }
-                                          : null,
-                                      style: ElevatedButton.styleFrom(
-                                        backgroundColor: isDark
-                                            ? CommanColor.darkPrimaryColor
-                                            : const Color(0xFFD4A574),
-                                        padding: const EdgeInsets.symmetric(
-                                            vertical: 14),
-                                        shape: RoundedRectangleBorder(
-                                          borderRadius:
-                                              BorderRadius.circular(12),
-                                        ),
-                                      ),
-                                      child: Text(
-                                        'Get Prayer',
-                                        style: TextStyle(
-                                          fontSize: 16,
-                                          fontWeight: FontWeight.w700,
-                                          color: isDark
-                                              ? Colors.white
-                                              : const Color(0xFF5C4033),
-                                        ),
-                                      ),
-                                    );
-                                  },
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ),
-        );
-      },
-    );
+    unawaited(_openCustomPrayerRequest());
   }
 
   void _syncMusicIconAnimation() {
@@ -1946,9 +1744,12 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
   Future<void> _loadCreditsFromLocal() async {
     try {
       final credits = await WalletService.getCredits();
-      if (mounted && credits != _currentCredits) {
+      final skip = await BibleInfo.shouldSkipChatPrayerCredits();
+      if (mounted &&
+          (credits != _currentCredits || skip != _skipCredits)) {
         setState(() {
           _currentCredits = credits;
+          _skipCredits = skip;
         });
       }
     } catch (e) {
@@ -1956,9 +1757,33 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
     }
   }
 
-  /// Show the shared "Select Answer Length" intro once, same as Chat screen.
+  static const _kPrayerChooseCreditAmountSeen =
+      'prayer_choose_credit_amount_seen';
+
+  /// First Prayer Guidance open: "Choose Credit Amount" once (not every generate).
+  /// Then fall back to the shared Chat-style intro if that was never seen.
   Future<void> _showPrayerIntroIfNeeded() async {
     final prefs = await SharedPreferences.getInstance();
+    final skipCredits = await BibleInfo.shouldSkipChatPrayerCredits();
+    final creditSeen =
+        prefs.getBool(_kPrayerChooseCreditAmountSeen) ?? false;
+
+    if (!skipCredits && !creditSeen && mounted) {
+      final length = await WalletService.getAnswerLength();
+      if (!mounted) return;
+      setState(() => _introAnswerLength = length);
+      final picked = await PrayerChooseCreditAmountSheet.show(
+        context,
+        initialLength: length,
+      );
+      if (picked != null) {
+        await WalletService.setAnswerLength(picked);
+        if (mounted) setState(() => _introAnswerLength = picked);
+      }
+      await prefs.setBool(_kPrayerChooseCreditAmountSeen, true);
+      return;
+    }
+
     final seenIntro = prefs.getBool('chat_intro_seen') ?? false;
     if (seenIntro || !mounted) return;
 
@@ -4384,65 +4209,68 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
                       Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Container(
-                            padding: EdgeInsets.symmetric(
-                              horizontal: size.width > 450 ? 12 : 10,
-                              vertical: size.width > 450 ? 6 : 5,
-                            ),
-                            decoration: BoxDecoration(
-                  color: isDark
-                      ? (_prayerGuidanceHasAiResponse()
-                          ? Colors.black.withOpacity(0.55)
-                          : CommanColor.darkPrimaryColor.withOpacity(0.55))
-                                  : const Color(0xFFF6F1E9).withOpacity(0.65),
-                              borderRadius: BorderRadius.circular(22),
-                              border: Border.all(
-                    color: isDark
-                        ? Colors.white.withOpacity(0.28)
-                        : const Color(0xFF8D6E63).withOpacity(0.18),
+                          // AR AI Premium: wallet lives in Menu / Settings only.
+                          if (!_skipCredits) ...[
+                            Container(
+                              padding: EdgeInsets.symmetric(
+                                horizontal: size.width > 450 ? 12 : 10,
+                                vertical: size.width > 450 ? 6 : 5,
                               ),
-                            ),
-                            child: InkWell(
-                              borderRadius: BorderRadius.circular(18),
-                              onTap: () {
-                                Get.to(
-                                  () => const WalletScreen(),
-                                  transition: Transition.cupertinoDialog,
-                      duration: const Duration(milliseconds: 300),
-                                )?.then((_) {
-                                  _loadCreditsFromLocal();
-                                });
-                              },
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Icon(
-                                    Icons.account_balance_wallet,
-                                    size: size.width > 450 ? 22 : 20,
-                        color: _prayerGuidanceIsMainScreen()
-                            ? (isDark
-                                        ? Colors.white
-                                : const Color(0xFF8D6E63))
-                            : (isDark ? Colors.white : _kPrayerGuidanceInk),
-                                  ),
-                                  const SizedBox(width: 6),
-                                  Text(
-                                    '$_currentCredits',
-                                    style: TextStyle(
+                              decoration: BoxDecoration(
+                    color: isDark
+                        ? (_prayerGuidanceHasAiResponse()
+                            ? Colors.black.withOpacity(0.55)
+                            : CommanColor.darkPrimaryColor.withOpacity(0.55))
+                                    : const Color(0xFFF6F1E9).withOpacity(0.65),
+                                borderRadius: BorderRadius.circular(22),
+                                border: Border.all(
+                      color: isDark
+                          ? Colors.white.withOpacity(0.28)
+                          : const Color(0xFF8D6E63).withOpacity(0.18),
+                                ),
+                              ),
+                              child: InkWell(
+                                borderRadius: BorderRadius.circular(18),
+                                onTap: () {
+                                  Get.to(
+                                    () => const WalletScreen(),
+                                    transition: Transition.cupertinoDialog,
+                        duration: const Duration(milliseconds: 300),
+                                  )?.then((_) {
+                                    _loadCreditsFromLocal();
+                                  });
+                                },
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(
+                                      Icons.account_balance_wallet,
+                                      size: size.width > 450 ? 22 : 20,
                           color: _prayerGuidanceIsMainScreen()
                               ? (isDark
                                           ? Colors.white
                                   : const Color(0xFF8D6E63))
                               : (isDark ? Colors.white : _kPrayerGuidanceInk),
-                          fontSize: size.width > 450 ? 14 : 13,
-                                      fontWeight: FontWeight.w700,
                                     ),
-                                  ),
-                                ],
+                                    const SizedBox(width: 6),
+                                    Text(
+                                      '$_currentCredits',
+                                      style: TextStyle(
+                            color: _prayerGuidanceIsMainScreen()
+                                ? (isDark
+                                            ? Colors.white
+                                    : const Color(0xFF8D6E63))
+                                : (isDark ? Colors.white : _kPrayerGuidanceInk),
+                            fontSize: size.width > 450 ? 14 : 13,
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                    ),
+                                  ],
+                                ),
                               ),
                             ),
-                          ),
-                          SizedBox(width: size.width > 450 ? 12 : 10),
+                            SizedBox(width: size.width > 450 ? 12 : 10),
+                          ],
                           if (_messages.isNotEmpty)
                             Container(
                               decoration: BoxDecoration(
@@ -4620,8 +4448,8 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
                                                   5000);
                                               return;
                                             }
-                                            // When Pray for Me is tapped, directly show the custom prayer dialog (same popup as the search input used to open)
-                                            _showCustomPrayerDialog(context);
+                                            // Same Prayer Request flow as categories.
+                                            await _openCustomPrayerRequest();
                                           },
                                           borderRadius: BorderRadius.circular(16),
                                           child: Container(

@@ -6,6 +6,7 @@ import 'package:biblebookapp/view/widget/credits_sheets.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 /// Who the prayer is for (screen 2 / 3).
 enum PrayerFor { myself, family, someoneElse }
@@ -43,6 +44,7 @@ class PrayerRequestScreen extends StatefulWidget {
     required this.defaultRequests,
     required this.skipCredits,
     required this.initialAnswerLength,
+    this.isCustomFlow = false,
   });
 
   final String categoryTitle;
@@ -55,6 +57,9 @@ class PrayerRequestScreen extends StatefulWidget {
   /// AI Premium: no credits, so no credit sheet and no cost on the button.
   final bool skipCredits;
   final String initialAnswerLength;
+
+  /// Pray for Me: same request form, no category card / Change.
+  final bool isCustomFlow;
 
   @override
   State<PrayerRequestScreen> createState() => _PrayerRequestScreenState();
@@ -86,22 +91,51 @@ class _PrayerRequestScreenState extends State<PrayerRequestScreen> {
 
   PrayerFor _for = PrayerFor.myself;
   late final TextEditingController _request;
-  final TextEditingController _details = TextEditingController();
+  final TextEditingController _detailsMyself = TextEditingController();
+  final TextEditingController _detailsFamily = TextEditingController();
+  final TextEditingController _detailsSomeone = TextEditingController();
   final TextEditingController _name = TextEditingController();
   String? _relationship;
   int _credits = 0;
+  /// Lightbulb tip: first visit to this Prayer Request screen only.
+  bool _showInfoTip = false;
+  static const _infoTipSeenKey = 'prayer_request_info_tip_seen';
+
+  TextEditingController get _details {
+    switch (_for) {
+      case PrayerFor.family:
+        return _detailsFamily;
+      case PrayerFor.someoneElse:
+        return _detailsSomeone;
+      case PrayerFor.myself:
+        return _detailsMyself;
+    }
+  }
 
   @override
   void initState() {
     super.initState();
     _request = TextEditingController(text: _defaultFor(PrayerFor.myself));
     _request.addListener(_refresh);
-    _details.addListener(_refresh);
+    _detailsMyself.addListener(_refresh);
+    _detailsFamily.addListener(_refresh);
+    _detailsSomeone.addListener(_refresh);
     _name.addListener(_refresh);
     if (!widget.skipCredits) {
       WalletService.getCredits().then((c) {
         if (mounted) setState(() => _credits = c);
       });
+    }
+    _loadInfoTipVisibility();
+  }
+
+  Future<void> _loadInfoTipVisibility() async {
+    final prefs = await SharedPreferences.getInstance();
+    final seen = prefs.getBool(_infoTipSeenKey) ?? false;
+    if (!mounted) return;
+    if (!seen) {
+      setState(() => _showInfoTip = true);
+      await prefs.setBool(_infoTipSeenKey, true);
     }
   }
 
@@ -112,7 +146,9 @@ class _PrayerRequestScreenState extends State<PrayerRequestScreen> {
   @override
   void dispose() {
     _request.dispose();
-    _details.dispose();
+    _detailsMyself.dispose();
+    _detailsFamily.dispose();
+    _detailsSomeone.dispose();
     _name.dispose();
     super.dispose();
   }
@@ -150,8 +186,12 @@ class _PrayerRequestScreenState extends State<PrayerRequestScreen> {
     }
     String? length;
     if (!widget.skipCredits) {
-      length = await _showCreditAmountSheet();
-      if (length == null || !mounted) return;
+      // Use saved answer length — do not ask "Choose Credit Amount" each time.
+      length =
+          const ['small', 'medium', 'large'].contains(widget.initialAnswerLength)
+              ? widget.initialAnswerLength
+              : await WalletService.getAnswerLength();
+      if (!mounted) return;
       // Not enough credits: show the credits sheet here so the typed request
       // stays on this screen.
       final cost = WalletService.getChatCostForLength(length);
@@ -177,20 +217,6 @@ class _PrayerRequestScreenState extends State<PrayerRequestScreen> {
         relationship:
             _for == PrayerFor.someoneElse ? (_relationship ?? '') : '',
         answerLength: length,
-      ),
-    );
-  }
-
-  /// Screen 4: "Choose Credit Amount". Returns 'small' | 'medium' | 'large'.
-  Future<String?> _showCreditAmountSheet() {
-    final isDark = _isDark(context);
-    return showModalBottomSheet<String>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (ctx) => _CreditAmountSheet(
-        initialLength: widget.initialAnswerLength,
-        isDark: isDark,
       ),
     );
   }
@@ -241,8 +267,10 @@ class _PrayerRequestScreenState extends State<PrayerRequestScreen> {
                           children: [
                             _header(ink, muted, isTablet),
                             const SizedBox(height: 16),
-                            _categoryCard(ink, muted, card, border),
-                            const SizedBox(height: 18),
+                            if (!widget.isCustomFlow) ...[
+                              _categoryCard(ink, muted, card, border),
+                              const SizedBox(height: 18),
+                            ],
                             _label('Who are you praying for?', ink),
                             const SizedBox(height: 10),
                             _whoChips(ink, card, border),
@@ -250,7 +278,7 @@ class _PrayerRequestScreenState extends State<PrayerRequestScreen> {
                               const SizedBox(height: 18),
                               _label('Tell us a little about them', ink),
                               const SizedBox(height: 10),
-                              _smallLabel('Name (optional)', muted),
+                              _smallLabel('Name (optional)', ink),
                               const SizedBox(height: 6),
                               _textField(
                                 controller: _name,
@@ -263,7 +291,7 @@ class _PrayerRequestScreenState extends State<PrayerRequestScreen> {
                                 border: border,
                               ),
                               const SizedBox(height: 10),
-                              _smallLabel('Relationship (optional)', muted),
+                              _smallLabel('Relationship (optional)', ink),
                               const SizedBox(height: 6),
                               _relationshipField(ink, muted, card, border),
                             ],
@@ -305,20 +333,25 @@ class _PrayerRequestScreenState extends State<PrayerRequestScreen> {
                             const SizedBox(height: 14),
                             _label('Additional details (optional)', ink),
                             const SizedBox(height: 8),
-                            _textField(
-                              controller: _details,
-                              hint:
-                                  "Share anything specific you'd like to include...\n(e.g. a situation, a person, or something on your heart)",
-                              maxLength: 500,
-                              maxLines: 4,
-                              minLines: 3,
-                              ink: ink,
-                              muted: muted,
-                              card: card,
-                              border: border,
+                            KeyedSubtree(
+                              key: ValueKey(_for),
+                              child: _textField(
+                                controller: _details,
+                                hint:
+                                    "Share anything specific you'd like to include...\n(e.g. a situation, a person, or something on your heart)",
+                                maxLength: 500,
+                                maxLines: 4,
+                                minLines: 3,
+                                ink: ink,
+                                muted: muted,
+                                card: card,
+                                border: border,
+                              ),
                             ),
-                            const SizedBox(height: 14),
-                            _infoCard(ink, muted, isDark),
+                            if (_showInfoTip) ...[
+                              const SizedBox(height: 14),
+                              _infoCard(ink, muted, isDark),
+                            ],
                           ],
                         ),
                       ),
@@ -378,6 +411,12 @@ class _PrayerRequestScreenState extends State<PrayerRequestScreen> {
   }
 
   Widget _header(Color ink, Color muted, bool isTablet) {
+    final title = widget.isCustomFlow
+        ? "What's on your heart today?"
+        : 'Your Prayer Request';
+    final subtitle = widget.isCustomFlow
+        ? "Share your prayer, and we'll create a meaningful, Bible-based prayer just for you."
+        : 'Take a moment to make this prayer your own.';
     return Column(
       children: [
         Container(
@@ -398,7 +437,7 @@ class _PrayerRequestScreenState extends State<PrayerRequestScreen> {
         ),
         const SizedBox(height: 10),
         Text(
-          'Your Prayer Request',
+          title,
           textAlign: TextAlign.center,
           style: TextStyle(
             fontFamily: 'Georgia',
@@ -409,10 +448,33 @@ class _PrayerRequestScreenState extends State<PrayerRequestScreen> {
         ),
         const SizedBox(height: 4),
         Text(
-          'Take a moment to make this prayer your own.',
+          subtitle,
           textAlign: TextAlign.center,
-          style: TextStyle(fontSize: 14, color: muted),
+          style: TextStyle(fontSize: 14, color: muted, height: 1.35),
         ),
+        if (widget.isCustomFlow) ...[
+          const SizedBox(height: 14),
+          Row(
+            children: [
+              Expanded(
+                child: Divider(
+                  color: muted.withValues(alpha: 0.35),
+                  thickness: 1,
+                ),
+              ),
+              const Padding(
+                padding: EdgeInsets.symmetric(horizontal: 10),
+                child: Icon(Icons.favorite, size: 16, color: _gold),
+              ),
+              Expanded(
+                child: Divider(
+                  color: muted.withValues(alpha: 0.35),
+                  thickness: 1,
+                ),
+              ),
+            ],
+          ),
+        ],
       ],
     );
   }
@@ -488,9 +550,19 @@ class _PrayerRequestScreenState extends State<PrayerRequestScreen> {
         ),
       );
 
-  Widget _smallLabel(String text, Color muted) => Text(
+  List<Shadow> _onPhotoShadow(Color ink) {
+    if (ink == Colors.white || ink == Colors.white70) return const [];
+    return const [Shadow(color: Color(0xF5FFF8F0), blurRadius: 8)];
+  }
+
+  Widget _smallLabel(String text, Color ink) => Text(
         text,
-        style: TextStyle(fontSize: 13, color: muted),
+        style: TextStyle(
+          fontSize: 13,
+          fontWeight: FontWeight.w600,
+          color: ink,
+          shadows: _onPhotoShadow(ink),
+        ),
       );
 
   Widget _whoChips(Color ink, Color card, Color border) {
@@ -551,6 +623,7 @@ class _PrayerRequestScreenState extends State<PrayerRequestScreen> {
     required Color muted,
     required Color card,
     required Color border,
+    required Color ink,
     String? counter,
   }) {
     OutlineInputBorder outline(Color c, [double w = 1]) => OutlineInputBorder(
@@ -563,7 +636,12 @@ class _PrayerRequestScreenState extends State<PrayerRequestScreen> {
       filled: true,
       fillColor: card,
       counterText: counter,
-      counterStyle: TextStyle(color: muted, fontSize: 11),
+      counterStyle: TextStyle(
+        color: ink,
+        fontSize: 12,
+        fontWeight: FontWeight.w600,
+        shadows: _onPhotoShadow(ink),
+      ),
       contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       border: outline(border),
       enabledBorder: outline(border),
@@ -593,6 +671,7 @@ class _PrayerRequestScreenState extends State<PrayerRequestScreen> {
         muted: muted,
         card: card,
         border: border,
+        ink: ink,
         counter: '${controller.text.length}/$maxLength',
       ),
     );
@@ -612,6 +691,7 @@ class _PrayerRequestScreenState extends State<PrayerRequestScreen> {
         muted: muted,
         card: card,
         border: border,
+        ink: ink,
         counter: '',
       ),
       items: _relationships
@@ -723,9 +803,11 @@ class _PrayerRequestScreenState extends State<PrayerRequestScreen> {
   }
 }
 
-/// Screen 4: "Choose Credit Amount" (20 / 50 / 100 = small / medium / large).
-class _CreditAmountSheet extends StatefulWidget {
-  const _CreditAmountSheet({
+/// "Choose Credit Amount" (20 / 50 / 100 = small / medium / large).
+/// Shown once on first Prayer Guidance open; Generate uses the saved length after.
+class PrayerChooseCreditAmountSheet extends StatefulWidget {
+  const PrayerChooseCreditAmountSheet({
+    super.key,
     required this.initialLength,
     required this.isDark,
   });
@@ -733,11 +815,31 @@ class _CreditAmountSheet extends StatefulWidget {
   final String initialLength;
   final bool isDark;
 
+  static Future<String?> show(
+    BuildContext context, {
+    required String initialLength,
+  }) {
+    final isDark =
+        Provider.of<ThemeProvider>(context, listen: false).themeMode ==
+            ThemeMode.dark;
+    return showModalBottomSheet<String>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => PrayerChooseCreditAmountSheet(
+        initialLength: initialLength,
+        isDark: isDark,
+      ),
+    );
+  }
+
   @override
-  State<_CreditAmountSheet> createState() => _CreditAmountSheetState();
+  State<PrayerChooseCreditAmountSheet> createState() =>
+      _PrayerChooseCreditAmountSheetState();
 }
 
-class _CreditAmountSheetState extends State<_CreditAmountSheet> {
+class _PrayerChooseCreditAmountSheetState
+    extends State<PrayerChooseCreditAmountSheet> {
   static const _brown = Color(0xFF6D4C41);
   static const _brownDark = Color(0xFF4E342E);
   static const _ink = Color(0xFF3D2914);

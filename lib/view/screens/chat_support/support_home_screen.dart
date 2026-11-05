@@ -21,9 +21,12 @@ class _SupportHomeScreenState extends State<SupportHomeScreen> {
   @override
   void initState() {
     super.initState();
-    SupportContent.load().then((c) {
-      if (mounted) setState(() => _content = c);
-    });
+    _loadContent();
+  }
+
+  Future<void> _loadContent() async {
+    final c = await SupportContent.load(forceRefresh: true);
+    if (mounted) setState(() => _content = c);
   }
 
   @override
@@ -58,9 +61,13 @@ class _SupportHomeScreenState extends State<SupportHomeScreen> {
         icon: Icon(Icons.history_rounded,
             color: p.isDark ? Colors.white : p.ink),
       ),
-      body: ListView(
-        padding: const EdgeInsets.fromLTRB(16, 18, 16, 20),
-        children: [
+      body: RefreshIndicator(
+        color: p.accent,
+        onRefresh: _loadContent,
+        child: ListView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: const EdgeInsets.fromLTRB(16, 18, 16, 20),
+          children: [
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -168,6 +175,7 @@ class _SupportHomeScreenState extends State<SupportHomeScreen> {
             ),
           ),
         ],
+        ),
       ),
     );
   }
@@ -184,7 +192,7 @@ class SupportHistoryScreen extends StatefulWidget {
 }
 
 class _SupportHistoryScreenState extends State<SupportHistoryScreen> {
-  List<SupportQuestion> _items = const [];
+  List<_HistoryRow> _rows = const [];
   bool _loading = true;
   String? _error;
 
@@ -196,24 +204,48 @@ class _SupportHistoryScreenState extends State<SupportHistoryScreen> {
 
   Future<void> _load() async {
     setState(() {
-      _loading = _items.isEmpty;
+      _loading = _rows.isEmpty;
       _error = null;
     });
     try {
       final userId = await ChatSupportApi.resolveUserId();
-      final items = await ChatSupportApi.fetchQuestions(userId);
+      final tickets = await ChatSupportApi.fetchQuestions(userId);
+      final faqs = await SupportFaqHistory.load();
       if (!mounted) return;
       setState(() {
-        _items = items;
+        _rows = _mergeHistory(tickets, faqs);
         _loading = false;
       });
     } catch (e) {
+      final faqs = await SupportFaqHistory.load();
       if (!mounted) return;
-      setState(() {
-        _loading = false;
-        _error = e.toString();
-      });
+      if (faqs.isNotEmpty) {
+        setState(() {
+          _rows = _mergeHistory(const [], faqs);
+          _loading = false;
+          _error = null;
+        });
+      } else {
+        setState(() {
+          _loading = false;
+          _error = e.toString();
+        });
+      }
     }
+  }
+
+  List<_HistoryRow> _mergeHistory(
+      List<SupportQuestion> tickets, List<SupportFaqHistoryEntry> faqs) {
+    final rows = <_HistoryRow>[
+      for (final t in tickets) _HistoryRow.ticket(t),
+      for (final f in faqs) _HistoryRow.faq(f),
+    ];
+    rows.sort((a, b) {
+      final at = a.at ?? DateTime.fromMillisecondsSinceEpoch(0);
+      final bt = b.at ?? DateTime.fromMillisecondsSinceEpoch(0);
+      return bt.compareTo(at);
+    });
+    return rows;
   }
 
   Future<void> _openChat() async {
@@ -247,7 +279,7 @@ class _SupportHistoryScreenState extends State<SupportHistoryScreen> {
     Widget body;
     if (_loading) {
       body = Center(child: CircularProgressIndicator(color: p.accent));
-    } else if (_error != null && _items.isEmpty) {
+    } else if (_error != null && _rows.isEmpty) {
       body = ListView(
         physics: const AlwaysScrollableScrollPhysics(),
         padding: const EdgeInsets.all(24),
@@ -257,7 +289,7 @@ class _SupportHistoryScreenState extends State<SupportHistoryScreen> {
               style: TextStyle(color: p.ink, fontSize: 15)),
         ],
       );
-    } else if (_items.isEmpty) {
+    } else if (_rows.isEmpty) {
       body = ListView(
         physics: const AlwaysScrollableScrollPhysics(),
         padding: const EdgeInsets.fromLTRB(24, 60, 24, 24),
@@ -276,9 +308,44 @@ class _SupportHistoryScreenState extends State<SupportHistoryScreen> {
       body = ListView.builder(
         physics: const AlwaysScrollableScrollPhysics(),
         padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
-        itemCount: _items.length,
+        itemCount: _rows.length,
         itemBuilder: (context, i) {
-          final item = _items[i];
+          final row = _rows[i];
+          if (row.faq != null) {
+            final saved = row.faq!;
+            final title = saved.question.split('\n').first.trim();
+            final date = saved.at == null
+                ? ''
+                : DateFormat('MMM d, yyyy · h:mm a').format(saved.at!);
+            return SupportTile(
+              icon: Icons.menu_book_outlined,
+              title: title.isEmpty ? 'Support article' : title,
+              subtitle: date,
+              trailing: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  SupportStatusChip(
+                    label: statuses['resolved']?.toString() ?? 'Resolved',
+                    style: styles['resolved']?.toString() ?? 'neutral',
+                  ),
+                  Icon(Icons.chevron_right_rounded, color: p.muted, size: 20),
+                ],
+              ),
+              onTap: () {
+                final faq = widget.content.faq(saved.id);
+                if (faq == null) return;
+                Get.to(
+                  () => _FaqHistoryDetailScreen(
+                    faq: faq,
+                    askedQuestion: saved.question,
+                    askedAt: saved.at,
+                  ),
+                  transition: Transition.cupertino,
+                );
+              },
+            );
+          }
+          final item = row.ticket!;
           final resolved = item.showAiAnswer || item.showHumanAnswer;
           final key = resolved ? 'resolved' : 'in_progress';
           final title = item.question.split('\n').first.trim();
@@ -352,6 +419,150 @@ class _SupportHistoryScreenState extends State<SupportHistoryScreen> {
             ),
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _HistoryRow {
+  _HistoryRow.ticket(SupportQuestion ticket)
+      : ticket = ticket,
+        faq = null,
+        at = ticket.createdAt;
+
+  _HistoryRow.faq(SupportFaqHistoryEntry faq)
+      : faq = faq,
+        ticket = null,
+        at = faq.at;
+
+  final SupportQuestion? ticket;
+  final SupportFaqHistoryEntry? faq;
+  final DateTime? at;
+}
+
+/// Chat-style Q&A for a saved predefined FAQ (not a support-team thread).
+class _FaqHistoryDetailScreen extends StatelessWidget {
+  const _FaqHistoryDetailScreen({
+    required this.faq,
+    required this.askedQuestion,
+    this.askedAt,
+  });
+
+  final SupportFaq faq;
+  final String askedQuestion;
+  final DateTime? askedAt;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = SupportPalette.of(context);
+    final text = TextStyle(color: p.ink, fontSize: 15, height: 1.45);
+    final steps = faq.steps;
+    final question =
+        askedQuestion.trim().isEmpty ? faq.question : askedQuestion.trim();
+    final at = askedAt ?? DateTime.now();
+
+    return SupportScaffold(
+      title: 'Support History',
+      body: ListView(
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 28),
+        children: [
+          Align(
+            alignment: Alignment.centerRight,
+            child: Container(
+              constraints: const BoxConstraints(maxWidth: 300),
+              padding: const EdgeInsets.fromLTRB(14, 10, 14, 8),
+              decoration: BoxDecoration(
+                color: p.isDark
+                    ? const Color(0xFF4A382C)
+                    : const Color(0xFFEBDDC8),
+                borderRadius: const BorderRadius.only(
+                  topLeft: Radius.circular(16),
+                  topRight: Radius.circular(4),
+                  bottomLeft: Radius.circular(16),
+                  bottomRight: Radius.circular(16),
+                ),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Text(question,
+                      style:
+                          TextStyle(color: p.ink, fontSize: 15, height: 1.4)),
+                  const SizedBox(height: 4),
+                  Text(DateFormat('h:mm a').format(at),
+                      style: TextStyle(fontSize: 10.5, color: p.muted)),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 10),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: 32,
+                height: 32,
+                decoration: BoxDecoration(
+                  color: p.iconBg,
+                  shape: BoxShape.circle,
+                  border: Border.all(color: p.border),
+                ),
+                child: Icon(Icons.menu_book_outlined,
+                    size: 17, color: p.accent),
+              ),
+              const SizedBox(width: 8),
+              Flexible(
+                child: Container(
+                  constraints: const BoxConstraints(maxWidth: 320),
+                  padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+                  decoration: BoxDecoration(
+                    color: p.card,
+                    borderRadius: const BorderRadius.only(
+                      topLeft: Radius.circular(4),
+                      topRight: Radius.circular(16),
+                      bottomLeft: Radius.circular(16),
+                      bottomRight: Radius.circular(16),
+                    ),
+                    border: Border.all(color: p.border),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      if (faq.answerTitle.isNotEmpty) ...[
+                        Text(faq.answerTitle,
+                            style: TextStyle(
+                                color: p.ink,
+                                fontSize: 15.5,
+                                fontWeight: FontWeight.w700)),
+                        const SizedBox(height: 6),
+                      ],
+                      if (faq.body.isNotEmpty) Text(faq.body, style: text),
+                      for (var i = 0; i < steps.length; i++)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 6),
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text('${i + 1}. ',
+                                  style: text.copyWith(
+                                      fontWeight: FontWeight.w700,
+                                      color: p.accent)),
+                              Expanded(child: Text(steps[i], style: text)),
+                            ],
+                          ),
+                        ),
+                      for (final para in faq.extraParagraphs)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 8),
+                          child: Text(para, style: text),
+                        ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }

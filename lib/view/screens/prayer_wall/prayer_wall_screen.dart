@@ -683,6 +683,9 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
     _queueTickTimer?.cancel();
     _queueTickTimer = Timer.periodic(const Duration(seconds: 1), (_) {
       if (!mounted) return;
+      // iPad: setState here rebuilds Prayer Profile and dismisses the ⋮
+      // popover / Current dropdown (anchor invalidation). Skip while there.
+      if (_showingHistory) return;
       if (_queueMsRemaining <= 0) {
         _queueTickTimer?.cancel();
         unawaited(_refreshQueue());
@@ -1257,6 +1260,14 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
     if (_profileMenuBusy || _showingBlocked) return;
     _profileMenuBusy = true;
     try {
+      // iPad: same pattern as Prayer Detail ⋯ / Chat — delay so the opening
+      // tap-up does not land on the menu barrier and dismiss it immediately.
+      final tablet = isTabletLayout(context);
+      if (tablet) {
+        showTapShield(context, duration: const Duration(milliseconds: 280));
+        await Future<void>.delayed(const Duration(milliseconds: 280));
+        if (!mounted || _showingBlocked) return;
+      }
       await _showPrayerProfileOverflowMenu(buttonContext);
     } finally {
       _profileMenuBusy = false;
@@ -1312,22 +1323,27 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
       items: [
         PopupMenuItem<String>(
           value: 'blocked',
-          child: Row(
-            children: [
-              Icon(
-                Icons.block_outlined,
-                size: 20,
-                color: isDark ? Colors.white : brown,
-              ),
-              const SizedBox(width: 10),
-              Text(
-                count == 0 ? 'Block List' : 'Block List ($count)',
-                style: TextStyle(
-                  fontWeight: FontWeight.w600,
-                  color: isDark ? Colors.white : ink,
+          // iPad: a repeat tap on the dimmed area right after the menu opens
+          // would close it before "Block List" can be tapped.
+          child: DelayedBarrierDismiss(
+            enabled: isTabletLayout(context),
+            child: Row(
+              children: [
+                Icon(
+                  Icons.block_outlined,
+                  size: 20,
+                  color: isDark ? Colors.white : brown,
                 ),
-              ),
-            ],
+                const SizedBox(width: 10),
+                Text(
+                  count == 0 ? 'Block List' : 'Block List ($count)',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w600,
+                    color: isDark ? Colors.white : ink,
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ],
@@ -3141,14 +3157,17 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
     final isBlocked = _isItemBlocked(item);
     final canBlock = !_isMyPrayer(item);
     // iPad: a stray drag/scroll while the sheet is still sliding up (< half
-    // open) makes Flutter dismiss it right away. Disable drag-to-close there
-    // and host it on the root navigator; Cancel / outside tap still close it.
+    // open) makes Flutter dismiss it right away. Repeat taps on ⋯ also land
+    // on the dimmed overlay and close it. Disable drag/outside-tap there and
+    // host it on the root navigator; Cancel / Report / Block still close it.
     final isTablet = MediaQuery.of(context).size.shortestSide >= 600;
+    if (isTablet) showTapShield(context);
 
     final action = await showModalBottomSheet<String>(
       context: context,
       useRootNavigator: isTablet,
       enableDrag: !isTablet,
+      isDismissible: !isTablet,
       backgroundColor: Colors.transparent,
       builder: (ctx) {
         return DelayedBarrierDismiss(

@@ -108,7 +108,7 @@ class _SettingScreenState extends State<SettingScreen>
       _buildSettingsSectionHeader('Wallet & Purchases', screenWidth),
       const SizedBox(height: 5),
       row(
-        label: 'Wallet & Credits',
+        label: 'Wallet',
         value: s == null ? null : (s.unlimited ? 'Unlimited' : '${s.credits}'),
         onTap: () async {
           await WalletEntry.openWallet();
