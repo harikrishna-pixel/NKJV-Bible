@@ -278,6 +278,14 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
     _onFocusOrMetricsChanged();
   }
 
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // Timer and countdown pause in background; reload queue on return.
+    if (state == AppLifecycleState.resumed && mounted && !_showingHistory) {
+      unawaited(_refreshQueue());
+    }
+  }
+
   Future<void> _loadAuthAndLocalName() async {
     try {
       final authtoken = await _cacheNotifier.readCache(key: 'authtoken');
@@ -654,8 +662,13 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
         PrayerWallService.fetchPrayerQueue(),
       ]);
       if (!mounted) return;
-      final current = results[0] as PrayerQueueCurrentResult;
-      final list = results[1] as PrayerQueueListResult;
+      var current = results[0] as PrayerQueueCurrentResult;
+      var list = results[1] as PrayerQueueListResult;
+      final hybrid = PrayerHybridRotation.apply(current, list);
+      if (hybrid != null) {
+        current = hybrid.current;
+        list = hybrid.list;
+      }
       setState(() {
         _queueCurrent = current;
         _queueList = list;

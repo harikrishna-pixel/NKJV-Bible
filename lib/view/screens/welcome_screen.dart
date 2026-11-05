@@ -46,6 +46,50 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
   /// null while loading flag; false = new user (single logo); true = upgrader.
   bool? _showLogoComparison;
 
+  // Glow centre in `_kWelcomeBg` (941×1672): 50% across, 31.8% down.
+  static const double _kBgAspect = 941 / 1672;
+  static const double _kBgGlowY = 0.318;
+  final GlobalKey _logoKey = GlobalKey();
+  double? _logoCenterY;
+
+  void _measureLogo() {
+    if (!mounted) return;
+    final box = _logoKey.currentContext?.findRenderObject();
+    if (box is! RenderBox || !box.hasSize) return;
+    final y = box.localToGlobal(Offset(0, box.size.height / 2)).dy;
+    if (_logoCenterY == null || (y - _logoCenterY!).abs() > 0.5) {
+      setState(() => _logoCenterY = y);
+    }
+  }
+
+  /// Background sized/shifted so its glow sits behind the logo on any screen.
+  Widget _welcomeBackground(Size size) {
+    final logoY = _logoCenterY;
+    if (logoY == null) {
+      return Image.asset(
+        _kWelcomeBg,
+        fit: BoxFit.cover,
+        alignment: Alignment.center,
+        width: double.infinity,
+        height: double.infinity,
+      );
+    }
+    var h = size.height;
+    if (size.width / _kBgAspect > h) h = size.width / _kBgAspect;
+    final coverBottom = (size.height - logoY) / (1 - _kBgGlowY);
+    if (coverBottom > h) h = coverBottom;
+    final coverTop = logoY / _kBgGlowY;
+    if (coverTop > h) h = coverTop;
+    final w = h * _kBgAspect;
+    return Positioned(
+      top: logoY - _kBgGlowY * h,
+      left: (size.width - w) / 2,
+      width: w,
+      height: h,
+      child: Image.asset(_kWelcomeBg, fit: BoxFit.fill),
+    );
+  }
+
   @override
   void initState() {
     super.initState();
@@ -68,18 +112,13 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
   Widget build(BuildContext context) {
     final size = MediaQuery.of(context).size;
     final isTablet = size.width > 600;
+    WidgetsBinding.instance.addPostFrameCallback((_) => _measureLogo());
 
     return Scaffold(
       body: Stack(
         fit: StackFit.expand,
         children: [
-          Image.asset(
-            _kWelcomeBg,
-            fit: BoxFit.cover,
-            alignment: Alignment.center,
-            width: double.infinity,
-            height: double.infinity,
-          ),
+          _welcomeBackground(size),
           SafeArea(
             child: Column(
               children: [
@@ -267,6 +306,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
   Widget _welcomeSingleNewLogo({required bool isTablet}) {
     final iconSize = isTablet ? 170.0 : 150.0;
     return Container(
+      key: _logoKey,
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(32),
         boxShadow: [
@@ -428,7 +468,6 @@ class _WelcomeFeatureCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final iconSize = isTablet ? 72.0 : 56.0;
-    final labelHeight = isTablet ? 42.0 : 36.0;
     return Container(
       height: isTablet ? 156 : 132,
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
@@ -463,24 +502,18 @@ class _WelcomeFeatureCard extends StatelessWidget {
                   : Icon(icon, size: iconSize * 0.85, color: _gold),
             ),
           ),
-          SizedBox(height: isTablet ? 10 : 8),
-          SizedBox(
-            height: labelHeight,
-            width: double.infinity,
-            child: Center(
-              child: Text(
-                label,
-                textAlign: TextAlign.center,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  fontSize: isTablet ? 16 : 14.5,
-                  fontWeight: FontWeight.w600,
-                  fontFamily: 'Georgia',
-                  color: _WelcomeScreenState._kWelcomeInk,
-                  height: 1.2,
-                ),
-              ),
+          SizedBox(height: isTablet ? 6 : 4),
+          Text(
+            label,
+            textAlign: TextAlign.center,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              fontSize: isTablet ? 16 : 14.5,
+              fontWeight: FontWeight.w600,
+              fontFamily: 'Georgia',
+              color: _WelcomeScreenState._kWelcomeInk,
+              height: 1.2,
             ),
           ),
         ],

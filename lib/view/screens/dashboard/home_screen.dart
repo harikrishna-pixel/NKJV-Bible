@@ -30,6 +30,8 @@ import 'package:biblebookapp/view/screens/category_detail_screen/view/image_deta
 import 'package:biblebookapp/view/screens/dashboard/add_widget_intro_screen.dart';
 import 'package:biblebookapp/view/screens/dashboard/ios_style_app_drawer.dart';
 import 'package:biblebookapp/view/screens/journey/connection_insights_screen.dart';
+import 'package:biblebookapp/view/screens/connection_paths/connection_paths_screen.dart';
+import 'package:biblebookapp/view/screens/milestones/milestones_screen.dart';
 import 'package:biblebookapp/view/screens/journey/reading_progress_screen.dart';
 import 'package:biblebookapp/view/screens/dashboard/social_link_screen.dart';
 import 'package:biblebookapp/view/screens/verse_topics/verse_topics_screen.dart';
@@ -6405,6 +6407,22 @@ class _HomeScreenState extends State<HomeScreen>
             () => const ConnectionInsightsScreen(),
             transition: Transition.cupertino,
             duration: const Duration(milliseconds: 350),
+          );
+        },
+        onConnectionPathsTap: () {
+          SharPreferences.setString('OpenAd', '1');
+          Get.to(
+            () => const ConnectionPathsScreen(),
+            transition: Transition.cupertino,
+            duration: const Duration(milliseconds: 250),
+          );
+        },
+        onMilestonesTap: () {
+          SharPreferences.setString('OpenAd', '1');
+          Get.to(
+            () => const MilestonesScreen(),
+            transition: Transition.cupertino,
+            duration: const Duration(milliseconds: 250),
           );
         },
         onWallpapersTap: () async {

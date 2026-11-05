@@ -111,11 +111,14 @@ class _PostPrayerScreenState extends State<PostPrayerScreen> {
   // Anonymous posting UI disabled for now; posts use author name when provided.
   bool _isAnonymous = false;
   bool _submitting = false;
+
   /// 0 = Share Your Prayer, 1 = Review Your Prayer.
   int _step = 0;
   bool _creatingAi = false;
+
   /// Raw words from the Type Your Prayer step (any language).
   String _rawPrayerWords = '';
+
   /// Encoded original+AI payload for POST; the details field stays tag-free.
   String _encodedDetails = '';
   bool _openingDetailsComposer = false;
@@ -173,8 +176,7 @@ class _PostPrayerScreenState extends State<PostPrayerScreen> {
     }
   }
 
-  String _clip(String s, int max) =>
-      s.length <= max ? s : s.substring(0, max);
+  String _clip(String s, int max) => s.length <= max ? s : s.substring(0, max);
 
   /// Opens Type Your Prayer → Review & Confirm; stores original + AI in details.
   Future<void> _openDetailsComposer() async {
@@ -185,9 +187,7 @@ class _PostPrayerScreenState extends State<PostPrayerScreen> {
       final seedWords = _rawPrayerWords.isNotEmpty
           ? _rawPrayerWords
           : (PrayerDualDescription.myWords(existingDesc) ??
-              (PrayerDualDescription.isDual(existingDesc)
-                  ? ''
-                  : existingDesc));
+              (PrayerDualDescription.isDual(existingDesc) ? '' : existingDesc));
       final nav = Navigator.of(context);
       // Drop a leftover Type Your Prayer so back cannot stack another one.
       _popUntilPostAPrayer(nav);
@@ -311,14 +311,12 @@ class _PostPrayerScreenState extends State<PostPrayerScreen> {
       }
 
       // Author name always from Bible Profile (cache `name`), not a form field.
-      final loginName =
-          (await CacheNotifier().readCache(key: 'name') ?? '')
-              .toString()
-              .trim();
+      final loginName = (await CacheNotifier().readCache(key: 'name') ?? '')
+          .toString()
+          .trim();
       final savedName =
           (await PrayerWallLocalStore.loadLastDisplayName() ?? '').trim();
-      final effectiveName =
-          loginName.isNotEmpty ? loginName : savedName;
+      final effectiveName = loginName.isNotEmpty ? loginName : savedName;
 
       // Additive: profile photo URL for Prayer Wall post (profile_image).
       final cachedImage =
@@ -330,16 +328,13 @@ class _PostPrayerScreenState extends State<PostPrayerScreen> {
                   cachedImage.startsWith('https://')))
           ? cachedImage
           : null;
-      print(
-          'Post prayer profile_image URL → ${profileImageUrl ?? "none"}');
+      print('Post prayer profile_image URL → ${profileImageUrl ?? "none"}');
 
       // Additive: login email (cached as key `user`).
-      final cachedEmail =
-          (await CacheNotifier().readCache(key: 'user') ?? '')
-              .toString()
-              .trim();
-      final email =
-          cachedEmail.isNotEmpty ? cachedEmail : null;
+      final cachedEmail = (await CacheNotifier().readCache(key: 'user') ?? '')
+          .toString()
+          .trim();
+      final email = cachedEmail.isNotEmpty ? cachedEmail : null;
       print('Post prayer email → ${email ?? "none"}');
 
       final created = await PrayerWallService.createPrayer(
@@ -348,9 +343,8 @@ class _PostPrayerScreenState extends State<PostPrayerScreen> {
         prayerCategory: _category,
         isAnonymous: _isAnonymous,
         prayerDuration: _durationDays,
-        userName: (!_isAnonymous && effectiveName.isNotEmpty)
-            ? effectiveName
-            : null,
+        userName:
+            (!_isAnonymous && effectiveName.isNotEmpty) ? effectiveName : null,
         profileImage: profileImageUrl,
         email: email,
       );
@@ -404,9 +398,8 @@ class _PostPrayerScreenState extends State<PostPrayerScreen> {
           description: details,
           category: _category,
           isAnonymous: _isAnonymous,
-          authorName: _isAnonymous || effectiveName.isEmpty
-              ? null
-              : effectiveName,
+          authorName:
+              _isAnonymous || effectiveName.isEmpty ? null : effectiveName,
           authorUserId: posterUserId?.trim(),
           email: email,
           profileImage: profileImageUrl,
@@ -541,17 +534,15 @@ class _PostPrayerScreenState extends State<PostPrayerScreen> {
     final themeProvider = Provider.of<ThemeProvider>(context);
     final isVintage =
         themeProvider.currentCustomTheme == AppCustomTheme.vintage;
-    final usesLightCustom = themeProvider.currentCustomTheme ==
-            AppCustomTheme.white ||
-        themeProvider.currentCustomTheme == AppCustomTheme.lightbrown;
+    final usesLightCustom =
+        themeProvider.currentCustomTheme == AppCustomTheme.white ||
+            themeProvider.currentCustomTheme == AppCustomTheme.lightbrown;
     final isDark =
         themeProvider.themeMode == ThemeMode.dark && !usesLightCustom;
     final brown = const Color(0xFF5C4033);
     final cream = isDark
         ? CommanColor.darkPrimaryColor
-        : (isVintage
-            ? const Color(0xFFF5F0E6)
-            : themeProvider.backgroundColor);
+        : (isVintage ? const Color(0xFFF5F0E6) : themeProvider.backgroundColor);
     final dateFmt = DateFormat('MMMM d, yyyy');
 
     return PopScope(
@@ -565,390 +556,434 @@ class _PostPrayerScreenState extends State<PostPrayerScreen> {
         _closePostAPrayer(context);
       },
       child: FocusScope(
-      child: Scaffold(
-        resizeToAvoidBottomInset: false,
-        body: Container(
-          width: double.infinity,
-          height: double.infinity,
-          decoration: isVintage
-              ? BoxDecoration(
-                  image: DecorationImage(
-                    image: AssetImage(Images.bgImage(context)),
-                    fit: BoxFit.cover,
-                  ),
-                )
-              : BoxDecoration(color: cream),
-          child: Scaffold(
-            resizeToAvoidBottomInset: false,
-            backgroundColor: Colors.transparent,
-            body: SafeArea(
-        child: Column(
-          children: [
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
-              decoration: BoxDecoration(
-                color: brown,
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.12),
-                    blurRadius: 4,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
-              ),
-              child: Row(
-                children: [
-                  IconButton(
-                    icon: Icon(
-                      _step == 1 ? Icons.arrow_back : Icons.close,
-                      color: Colors.white,
+        child: Scaffold(
+          resizeToAvoidBottomInset: false,
+          body: Container(
+            width: double.infinity,
+            height: double.infinity,
+            decoration: isVintage
+                ? BoxDecoration(
+                    image: DecorationImage(
+                      image: AssetImage(Images.bgImage(context)),
+                      fit: BoxFit.cover,
                     ),
-                    onPressed: () {
-                      if (_step == 1) {
-                        setState(() => _step = 0);
-                      } else {
-                        _closePostAPrayer(context);
-                      }
-                    },
-                  ),
-                  Expanded(
-                    child: Center(
-                      child: Text(
-                        _step == 1
-                            ? 'Review Your Prayer'
-                            : 'Share Your Prayer',
-                        textAlign: TextAlign.center,
-                        style: const TextStyle(
-                          fontFamily: 'Georgia',
-                          fontSize: 18,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.white,
-                        ),
-                      ),
-                    ),
-                  ),
-                  // Balance the close button so the title stays centered.
-                  const SizedBox(width: 48),
-                ],
-              ),
-            ),
-            Expanded(
-              child: _step == 1
-                  ? Column(
-                      children: [
-                        Expanded(
-                          child: SingleChildScrollView(
-                            keyboardDismissBehavior:
-                                ScrollViewKeyboardDismissBehavior.onDrag,
-                            padding: const EdgeInsets.fromLTRB(20, 16, 20, 12),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.stretch,
-                              children: _reviewStepChildren(brown, isDark),
-                            ),
-                          ),
-                        ),
-                        Padding(
-                          padding: EdgeInsets.fromLTRB(
-                            20,
-                            8,
-                            20,
-                            16 + MediaQuery.of(context).viewInsets.bottom,
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
-                            children: [
-                              Row(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Icon(
-                                    Icons.info_outline,
-                                    size: 18,
-                                    color: isDark
-                                        ? const Color(0xFFF6F1E9)
-                                        : brown.withOpacity(0.75),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  Expanded(
-                                    child: Text(
-                                      'Both your original request and this enhanced version will be shared.',
-                                      style: TextStyle(
-                                        fontSize: 13,
-                                        height: 1.35,
-                                        color: isDark
-                                            ? const Color(0xFFF6F1E9)
-                                            : brown.withOpacity(0.75),
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 18),
-                              SizedBox(
-                                width: double.infinity,
-                                child: ElevatedButton(
-                                  onPressed: _submitting ? null : _submit,
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: brown,
-                                    foregroundColor: Colors.white,
-                                    disabledBackgroundColor: brown,
-                                    disabledForegroundColor: Colors.white,
-                                    padding: const EdgeInsets.symmetric(
-                                        vertical: 16),
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(28),
-                                    ),
-                                  ),
-                                  child: _submitting
-                                      ? const SizedBox(
-                                          height: 22,
-                                          width: 22,
-                                          child: CircularProgressIndicator(
-                                            strokeWidth: 2,
-                                            color: Colors.white,
-                                          ),
-                                        )
-                                      : const Text(
-                                          'Post Prayer Request',
-                                          style: TextStyle(
-                                            fontWeight: FontWeight.w700,
-                                            fontSize: 16,
-                                          ),
-                                        ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    )
-                  : SingleChildScrollView(
-                keyboardDismissBehavior:
-                    ScrollViewKeyboardDismissBehavior.onDrag,
-                padding: EdgeInsets.fromLTRB(
-                  20,
-                  16,
-                  20,
-                  24 + MediaQuery.of(context).viewInsets.bottom,
-                ),
+                  )
+                : BoxDecoration(color: cream),
+            child: Scaffold(
+              resizeToAvoidBottomInset: false,
+              backgroundColor: Colors.transparent,
+              body: SafeArea(
                 child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    if (_step == 0) ...[
-                    Text(
-                      'We would be honored to pray with you.',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: isDark ? Colors.white70 : const Color(0xFF6D6D6D),
-                      ),
-                    ),
-                    const SizedBox(height: 20),
-                    _label('Prayer Title', brown, isDark),
-                    const SizedBox(height: 8),
-                    TextField(
-                      controller: _titleCtrl,
-                      focusNode: _titleFocus,
-                      maxLength: 120,
-                      enabled: !_creatingAi && !_submitting,
-                      textCapitalization: TextCapitalization.sentences,
-                      onTap: () => _keepOnlyTextFocus(_titleFocus),
-                      style: TextStyle(color: isDark ? Colors.white : brown),
-                      decoration: _fieldDecoration(
-                        'Give your prayer a short title',
-                        isDark,
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    _label('Your Prayer Request', brown, isDark),
-                    const SizedBox(height: 8),
-                    TextField(
-                      controller: _detailsCtrl,
-                      focusNode: _requestFocus,
-                      maxLines: 5,
-                      maxLength: 500,
-                      enabled: !_creatingAi && !_submitting,
-                      textCapitalization: TextCapitalization.sentences,
-                      onTap: () => _keepOnlyTextFocus(_requestFocus),
-                      style: TextStyle(color: isDark ? Colors.white : brown),
-                      decoration: _fieldDecoration(
-                        'Share what is on your heart...',
-                        isDark,
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    _label('Category (Optional)', brown, isDark),
-                    const SizedBox(height: 8),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: _categories.map((c) {
-                        final sel = _category == c;
-                        return ChoiceChip(
-                          label: Text(c),
-                          selected: sel,
-                          onSelected: (_) => setState(() => _category = c),
-                          selectedColor: brown,
-                          checkmarkColor: Colors.white,
-                          surfaceTintColor: Colors.transparent,
-                          shadowColor: Colors.transparent,
-                          selectedShadowColor: Colors.transparent,
-                          color: WidgetStateProperty.resolveWith((states) {
-                            if (states.contains(WidgetState.selected)) {
-                              return brown;
-                            }
-                            return isDark
-                                ? Colors.white.withOpacity(0.1)
-                                : Colors.white;
-                          }),
-                          labelStyle: TextStyle(
-                            color: sel
-                                ? Colors.white
-                                : (isDark ? Colors.white : brown),
-                            fontWeight: FontWeight.w500,
-                          ),
-                          backgroundColor: isDark
-                              ? Colors.white.withOpacity(0.1)
-                              : Colors.white,
-                          side: BorderSide(
-                            color: sel
-                                ? brown
-                                : (isDark
-                                    ? Colors.white.withOpacity(0.45)
-                                    : Colors.grey.shade400),
-                            width: sel ? 1.5 : 1,
-                          ),
-                        );
-                      }).toList(),
-                    ),
-                    const SizedBox(height: 16),
-                    _label('Prayer Duration', brown, isDark),
-                    const SizedBox(height: 4),
-                    Text(
-                      'Select the duration for your prayer post',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: isDark ? Colors.white60 : Colors.grey.shade700,
-                      ),
-                    ),
-                    const SizedBox(height: 10),
-                    Row(
-                      children: [
-                        _durationChip('7 Days', 7, brown, isDark),
-                        const SizedBox(width: 8),
-                        _durationChip('14 Days', 14, brown, isDark),
-                        const SizedBox(width: 8),
-                        _durationChip('30 Days', 30, brown, isDark),
-                      ],
-                    ),
-                    const SizedBox(height: 10),
-                    Text(
-                      'Active: ${dateFmt.format(_startDate)} to ${dateFmt.format(_endDate)}',
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: isDark ? Colors.white70 : const Color(0xFF6D6D6D),
-                      ),
-                    ),
-                    // const SizedBox(height: 16),
-                    // _label('Credit Cost', brown, isDark),
-                    // const SizedBox(height: 6),
-                    // Text(
-                    //   'Total Cost: $_totalCredits Credits',
-                    //   style: TextStyle(
-                    //     fontSize: 16,
-                    //     fontWeight: FontWeight.w600,
-                    //     color: isDark ? Colors.white : brown,
-                    //   ),
-                    // ),
-                    const SizedBox(height: 12),
-                    _label('Post as', brown, isDark),
-                    const SizedBox(height: 8),
-                    _postAsTile(
-                      brown: brown,
-                      isDark: isDark,
-                      selected: !_isAnonymous,
-                      title: 'My Profile',
-                      subtitle:
-                          'Show your name and profile to the community.',
-                      onTap: () => setState(() => _isAnonymous = false),
-                    ),
-                    const SizedBox(height: 8),
-                    _postAsTile(
-                      brown: brown,
-                      isDark: isDark,
-                      selected: _isAnonymous,
-                      title: 'Anonymous',
-                      subtitle: 'Share without showing your name.',
-                      onTap: () => setState(() => _isAnonymous = true),
-                    ),
-                    const SizedBox(height: 12),
-                    // CMD: Post-as-anonymous option disabled for now.
-                    // SwitchListTile(
-                    //   contentPadding: EdgeInsets.zero,
-                    //   title: Text(
-                    //     'Post anonymously',
-                    //     style: TextStyle(
-                    //       color: isDark ? Colors.white : brown,
-                    //       fontWeight: FontWeight.w600,
-                    //     ),
-                    //   ),
-                    //   value: _isAnonymous,
-                    //   activeThumbColor: Colors.white,
-                    //   activeTrackColor:
-                    //       isDark ? const Color(0xFFB8956A) : brown,
-                    //   inactiveThumbColor:
-                    //       isDark ? Colors.white54 : Colors.grey.shade400,
-                    //   inactiveTrackColor: isDark
-                    //       ? Colors.white.withOpacity(0.18)
-                    //       : Colors.grey.shade300,
-                    //   trackOutlineColor: WidgetStateProperty.resolveWith(
-                    //     (states) => states.contains(WidgetState.selected)
-                    //         ? Colors.transparent
-                    //         : (isDark
-                    //             ? Colors.white.withOpacity(0.35)
-                    //             : Colors.grey.shade400),
-                    //   ),
-                    //   onChanged: (v) => setState(() => _isAnonymous = v),
-                    // ),
-                    const SizedBox(height: 20),
-                    PrayerWallGuidelinesDialog.helpBanner(
-                      context,
-                      isDark: isDark,
-                    ),
-                    const SizedBox(height: 16),
-                    SizedBox(
+                    Container(
                       width: double.infinity,
-                      child: ElevatedButton(
-                        onPressed: (_submitting || _creatingAi)
-                            ? null
-                            : _onContinueToReview,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: brown,
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(vertical: 14),
-                        ),
-                        child: _creatingAi
-                            ? const SizedBox(
-                                height: 22,
-                                width: 22,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 4, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: brown,
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.12),
+                            blurRadius: 4,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                      child: Row(
+                        children: [
+                          IconButton(
+                            icon: Icon(
+                              _step == 1 ? Icons.arrow_back : Icons.close,
+                              color: Colors.white,
+                            ),
+                            onPressed: () {
+                              if (_step == 1) {
+                                setState(() => _step = 0);
+                              } else {
+                                _closePostAPrayer(context);
+                              }
+                            },
+                          ),
+                          Expanded(
+                            child: Center(
+                              child: Text(
+                                _step == 1
+                                    ? 'Review Your Prayer'
+                                    : 'Share Your Prayer',
+                                textAlign: TextAlign.center,
+                                style: const TextStyle(
+                                  fontFamily: 'Georgia',
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.w600,
                                   color: Colors.white,
                                 ),
-                              )
-                            : const Text('Continue'),
+                              ),
+                            ),
+                          ),
+                          // Balance the close button so the title stays centered.
+                          const SizedBox(width: 48),
+                        ],
                       ),
                     ),
-                    ],
+                    Expanded(
+                      child: _step == 1
+                          ? Column(
+                              children: [
+                                Expanded(
+                                  child: SingleChildScrollView(
+                                    keyboardDismissBehavior:
+                                        ScrollViewKeyboardDismissBehavior
+                                            .onDrag,
+                                    padding: const EdgeInsets.fromLTRB(
+                                        20, 16, 20, 12),
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.stretch,
+                                      children:
+                                          _reviewStepChildren(brown, isDark),
+                                    ),
+                                  ),
+                                ),
+                                Padding(
+                                  padding: EdgeInsets.fromLTRB(
+                                    20,
+                                    8,
+                                    20,
+                                    16 +
+                                        MediaQuery.of(context)
+                                            .viewInsets
+                                            .bottom,
+                                  ),
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.stretch,
+                                    children: [
+                                      Row(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Icon(
+                                            Icons.info_outline,
+                                            size: 18,
+                                            color: isDark
+                                                ? const Color(0xFFF6F1E9)
+                                                : brown.withOpacity(0.75),
+                                          ),
+                                          const SizedBox(width: 8),
+                                          Expanded(
+                                            child: Text(
+                                              'Both your original request and this enhanced version will be shared.',
+                                              style: TextStyle(
+                                                fontSize: 13,
+                                                height: 1.35,
+                                                color: isDark
+                                                    ? const Color(0xFFF6F1E9)
+                                                    : brown.withOpacity(0.75),
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      const SizedBox(height: 18),
+                                      SizedBox(
+                                        width: double.infinity,
+                                        child: ElevatedButton(
+                                          onPressed:
+                                              _submitting ? null : _submit,
+                                          style: ElevatedButton.styleFrom(
+                                            backgroundColor: brown,
+                                            foregroundColor: Colors.white,
+                                            disabledBackgroundColor: brown,
+                                            disabledForegroundColor:
+                                                Colors.white,
+                                            padding: const EdgeInsets.symmetric(
+                                                vertical: 16),
+                                            shape: RoundedRectangleBorder(
+                                              borderRadius:
+                                                  BorderRadius.circular(28),
+                                            ),
+                                          ),
+                                          child: _submitting
+                                              ? const SizedBox(
+                                                  height: 22,
+                                                  width: 22,
+                                                  child:
+                                                      CircularProgressIndicator(
+                                                    strokeWidth: 2,
+                                                    color: Colors.white,
+                                                  ),
+                                                )
+                                              : const Text(
+                                                  'Post Prayer Request',
+                                                  style: TextStyle(
+                                                    fontWeight: FontWeight.w700,
+                                                    fontSize: 16,
+                                                  ),
+                                                ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            )
+                          : SingleChildScrollView(
+                              keyboardDismissBehavior:
+                                  ScrollViewKeyboardDismissBehavior.onDrag,
+                              padding: EdgeInsets.fromLTRB(
+                                20,
+                                16,
+                                20,
+                                24 + MediaQuery.of(context).viewInsets.bottom,
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
+                                  if (_step == 0) ...[
+                                    Text(
+                                      'We would be honored to pray with you.',
+                                      textAlign: TextAlign.center,
+                                      style: TextStyle(
+                                        fontSize: 14,
+                                        color: isDark
+                                            ? Colors.white70
+                                            : const Color(0xFF6D6D6D),
+                                      ),
+                                    ),
+                                    const SizedBox(height: 20),
+                                    _label('Prayer Title', brown, isDark),
+                                    const SizedBox(height: 8),
+                                    TextField(
+                                      controller: _titleCtrl,
+                                      focusNode: _titleFocus,
+                                      maxLength: 120,
+                                      enabled: !_creatingAi && !_submitting,
+                                      textCapitalization:
+                                          TextCapitalization.sentences,
+                                      onTap: () =>
+                                          _keepOnlyTextFocus(_titleFocus),
+                                      style: TextStyle(
+                                          color: isDark ? Colors.white : brown),
+                                      decoration: _fieldDecoration(
+                                        'Give your prayer a short title',
+                                        isDark,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 16),
+                                    _label(
+                                        'Your Prayer Request', brown, isDark),
+                                    const SizedBox(height: 8),
+                                    TextField(
+                                      controller: _detailsCtrl,
+                                      focusNode: _requestFocus,
+                                      maxLines: 5,
+                                      maxLength: 500,
+                                      enabled: !_creatingAi && !_submitting,
+                                      textCapitalization:
+                                          TextCapitalization.sentences,
+                                      onTap: () =>
+                                          _keepOnlyTextFocus(_requestFocus),
+                                      style: TextStyle(
+                                          color: isDark ? Colors.white : brown),
+                                      decoration: _fieldDecoration(
+                                        'Share what is on your heart...',
+                                        isDark,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 16),
+                                    _label(
+                                        'Category (Optional)', brown, isDark),
+                                    const SizedBox(height: 8),
+                                    Wrap(
+                                      spacing: 8,
+                                      runSpacing: 8,
+                                      children: _categories.map((c) {
+                                        final sel = _category == c;
+                                        return ChoiceChip(
+                                          label: Text(c),
+                                          selected: sel,
+                                          onSelected: (_) =>
+                                              setState(() => _category = c),
+                                          selectedColor: brown,
+                                          checkmarkColor: Colors.white,
+                                          surfaceTintColor: Colors.transparent,
+                                          shadowColor: Colors.transparent,
+                                          selectedShadowColor:
+                                              Colors.transparent,
+                                          color:
+                                              WidgetStateProperty.resolveWith(
+                                                  (states) {
+                                            if (states.contains(
+                                                WidgetState.selected)) {
+                                              return brown;
+                                            }
+                                            return isDark
+                                                ? Colors.white.withOpacity(0.1)
+                                                : Colors.white;
+                                          }),
+                                          labelStyle: TextStyle(
+                                            color: sel
+                                                ? Colors.white
+                                                : (isDark
+                                                    ? Colors.white
+                                                    : brown),
+                                            fontWeight: FontWeight.w500,
+                                          ),
+                                          backgroundColor: isDark
+                                              ? Colors.white.withOpacity(0.1)
+                                              : Colors.white,
+                                          side: BorderSide(
+                                            color: sel
+                                                ? brown
+                                                : (isDark
+                                                    ? Colors.white
+                                                        .withOpacity(0.45)
+                                                    : Colors.grey.shade400),
+                                            width: sel ? 1.5 : 1,
+                                          ),
+                                        );
+                                      }).toList(),
+                                    ),
+                                    const SizedBox(height: 16),
+                                    _label('Prayer Duration', brown, isDark),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      'Select the duration for your prayer post',
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        color: isDark
+                                            ? Colors.white60
+                                            : Colors.grey.shade700,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 10),
+                                    Row(
+                                      children: [
+                                        _durationChip(
+                                            '7 Days', 7, brown, isDark),
+                                        const SizedBox(width: 8),
+                                        _durationChip(
+                                            '14 Days', 14, brown, isDark),
+                                        const SizedBox(width: 8),
+                                        _durationChip(
+                                            '30 Days', 30, brown, isDark),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 10),
+                                    Text(
+                                      'Active: ${dateFmt.format(_startDate)} to ${dateFmt.format(_endDate)}',
+                                      style: TextStyle(
+                                        fontSize: 13,
+                                        color: isDark
+                                            ? Colors.white70
+                                            : const Color(0xFF6D6D6D),
+                                      ),
+                                    ),
+                                    // const SizedBox(height: 16),
+                                    // _label('Credit Cost', brown, isDark),
+                                    // const SizedBox(height: 6),
+                                    // Text(
+                                    //   'Total Cost: $_totalCredits Credits',
+                                    //   style: TextStyle(
+                                    //     fontSize: 16,
+                                    //     fontWeight: FontWeight.w600,
+                                    //     color: isDark ? Colors.white : brown,
+                                    //   ),
+                                    // ),
+                                    const SizedBox(height: 12),
+                                    _label('Post as', brown, isDark),
+                                    const SizedBox(height: 8),
+                                    _postAsTile(
+                                      brown: brown,
+                                      isDark: isDark,
+                                      selected: !_isAnonymous,
+                                      title: 'My Profile',
+                                      subtitle:
+                                          'Show your name and profile to the community.',
+                                      onTap: () =>
+                                          setState(() => _isAnonymous = false),
+                                    ),
+                                    const SizedBox(height: 8),
+                                    _postAsTile(
+                                      brown: brown,
+                                      isDark: isDark,
+                                      selected: _isAnonymous,
+                                      title: 'Anonymous',
+                                      subtitle:
+                                          'Share without showing your name.',
+                                      onTap: () =>
+                                          setState(() => _isAnonymous = true),
+                                    ),
+                                    const SizedBox(height: 12),
+                                    // CMD: Post-as-anonymous option disabled for now.
+                                    // SwitchListTile(
+                                    //   contentPadding: EdgeInsets.zero,
+                                    //   title: Text(
+                                    //     'Post anonymously',
+                                    //     style: TextStyle(
+                                    //       color: isDark ? Colors.white : brown,
+                                    //       fontWeight: FontWeight.w600,
+                                    //     ),
+                                    //   ),
+                                    //   value: _isAnonymous,
+                                    //   activeThumbColor: Colors.white,
+                                    //   activeTrackColor:
+                                    //       isDark ? const Color(0xFFB8956A) : brown,
+                                    //   inactiveThumbColor:
+                                    //       isDark ? Colors.white54 : Colors.grey.shade400,
+                                    //   inactiveTrackColor: isDark
+                                    //       ? Colors.white.withOpacity(0.18)
+                                    //       : Colors.grey.shade300,
+                                    //   trackOutlineColor: WidgetStateProperty.resolveWith(
+                                    //     (states) => states.contains(WidgetState.selected)
+                                    //         ? Colors.transparent
+                                    //         : (isDark
+                                    //             ? Colors.white.withOpacity(0.35)
+                                    //             : Colors.grey.shade400),
+                                    //   ),
+                                    //   onChanged: (v) => setState(() => _isAnonymous = v),
+                                    // ),
+                                    const SizedBox(height: 20),
+                                    PrayerWallGuidelinesDialog.helpBanner(
+                                      context,
+                                      isDark: isDark,
+                                    ),
+                                    const SizedBox(height: 16),
+                                    SizedBox(
+                                      width: double.infinity,
+                                      child: ElevatedButton(
+                                        onPressed: (_submitting || _creatingAi)
+                                            ? null
+                                            : _onContinueToReview,
+                                        style: ElevatedButton.styleFrom(
+                                          backgroundColor: brown,
+                                          foregroundColor: Colors.white,
+                                          padding: const EdgeInsets.symmetric(
+                                              vertical: 14),
+                                        ),
+                                        child: _creatingAi
+                                            ? const SizedBox(
+                                                height: 22,
+                                                width: 22,
+                                                child:
+                                                    CircularProgressIndicator(
+                                                  strokeWidth: 2,
+                                                  color: Colors.white,
+                                                ),
+                                              )
+                                            : const Text('Continue'),
+                                      ),
+                                    ),
+                                  ],
+                                ],
+                              ),
+                            ),
+                    ),
                   ],
                 ),
               ),
             ),
-          ],
-        ),
-      ),
-    ),
-  ),
+          ),
         ),
       ),
     );
@@ -1059,7 +1094,8 @@ class _PostPrayerScreenState extends State<PostPrayerScreen> {
               maxLines: null,
               minLines: 3,
               onTap: () => _keepOnlyTextFocus(_englishReviewFocus),
-              onTapOutside: (_) => FocusManager.instance.primaryFocus?.unfocus(),
+              onTapOutside: (_) =>
+                  FocusManager.instance.primaryFocus?.unfocus(),
               style: TextStyle(
                 fontFamily: 'Georgia',
                 fontSize: 15.5,
@@ -1119,12 +1155,9 @@ class _PostPrayerScreenState extends State<PostPrayerScreen> {
           child: Row(
             children: [
               Icon(
-                selected
-                    ? Icons.radio_button_checked
-                    : Icons.radio_button_off,
-                color: selected
-                    ? brown
-                    : (isDark ? Colors.white54 : Colors.grey),
+                selected ? Icons.radio_button_checked : Icons.radio_button_off,
+                color:
+                    selected ? brown : (isDark ? Colors.white54 : Colors.grey),
               ),
               const SizedBox(width: 10),
               Expanded(
@@ -1143,9 +1176,8 @@ class _PostPrayerScreenState extends State<PostPrayerScreen> {
                       subtitle,
                       style: TextStyle(
                         fontSize: 12,
-                        color: isDark
-                            ? Colors.white70
-                            : const Color(0xFF6D6D6D),
+                        color:
+                            isDark ? Colors.white70 : const Color(0xFF6D6D6D),
                       ),
                     ),
                   ],
@@ -1211,14 +1243,12 @@ class _PostPrayerScreenState extends State<PostPrayerScreen> {
             label,
             style: TextStyle(
               fontWeight: FontWeight.w600,
-              color: sel
-                  ? Colors.white
-                  : (isDark ? Colors.white : brown),
+              color: sel ? Colors.white : (isDark ? Colors.white : brown),
             ),
           ),
         ),
       ),
-        );
+    );
   }
 }
 
@@ -1354,7 +1384,7 @@ class _PrayerDetailsComposeScreenState
       context,
       _PrayerDetailsComposeResult(
         originalWords: _originalWords,
-        englishPrayer: english, 
+        englishPrayer: english,
       ),
     );
   }
@@ -1382,60 +1412,60 @@ class _PrayerDetailsComposeScreenState
           behavior: HitTestBehavior.translucent,
           onTap: _dismissKeyboard,
           child: Stack(
-          fit: StackFit.expand,
-          children: [
-            Positioned.fill(
-              child: Image.asset(
-                bgAsset,
-                fit: isTablet ? BoxFit.fitWidth : BoxFit.cover,
-                alignment: Alignment.topCenter,
-                filterQuality: FilterQuality.medium,
-                excludeFromSemantics: true,
-              ),
-            ),
-            Positioned.fill(
-              child: Padding(
-                padding: EdgeInsets.only(
-                  top: media.padding.top,
-                  bottom: media.padding.bottom,
+            fit: StackFit.expand,
+            children: [
+              Positioned.fill(
+                child: Image.asset(
+                  bgAsset,
+                  fit: isTablet ? BoxFit.fitWidth : BoxFit.cover,
+                  alignment: Alignment.topCenter,
+                  filterQuality: FilterQuality.medium,
+                  excludeFromSemantics: true,
                 ),
-                child: Column(
-                  children: [
-                    SizedBox(
-                      height: 48,
-                      child: Stack(
-                        alignment: Alignment.center,
-                        children: [
-                          Align(
-                            alignment: Alignment.centerLeft,
-                            child: IconButton(
-                              icon:
-                                  const Icon(Icons.arrow_back, color: _brown),
-                              onPressed: () => _popComposeRoute(context),
+              ),
+              Positioned.fill(
+                child: Padding(
+                  padding: EdgeInsets.only(
+                    top: media.padding.top,
+                    bottom: media.padding.bottom,
+                  ),
+                  child: Column(
+                    children: [
+                      SizedBox(
+                        height: 48,
+                        child: Stack(
+                          alignment: Alignment.center,
+                          children: [
+                            Align(
+                              alignment: Alignment.centerLeft,
+                              child: IconButton(
+                                icon:
+                                    const Icon(Icons.arrow_back, color: _brown),
+                                onPressed: () => _popComposeRoute(context),
+                              ),
                             ),
-                          ),
-                          Text(
-                            topTitle,
-                            textAlign: TextAlign.center,
-                            style: const TextStyle(
-                              fontFamily: 'Georgia',
-                              fontWeight: FontWeight.w700,
-                              fontSize: 18,
-                              color: _brown,
+                            Text(
+                              topTitle,
+                              textAlign: TextAlign.center,
+                              style: const TextStyle(
+                                fontFamily: 'Georgia',
+                                fontWeight: FontWeight.w700,
+                                fontSize: 18,
+                                color: _brown,
+                              ),
                             ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
-                    ),
-                    Expanded(
-                      child: _reviewStep ? _buildReview() : _buildType(),
-                    ),
-                  ],
+                      Expanded(
+                        child: _reviewStep ? _buildReview() : _buildType(),
+                      ),
+                    ],
+                  ),
                 ),
               ),
-            ),
-          ],
-        ),
+            ],
+          ),
         ),
       ),
     );

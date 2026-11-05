@@ -123,7 +123,8 @@ class BooksScreen extends HookConsumerWidget {
                     IconButton(
                       tooltip: 'My Digital Library',
                       onPressed: () async {
-                        await Get.to(() => const MyDigitalLibraryScreen());
+                        await Get.to(() =>
+                            const MyDigitalLibraryScreen(openedFromProducts: true));
                         await loadOwnedStatus();
                       },
                       icon: Icon(Icons.layers_outlined, color: ink),

@@ -452,6 +452,145 @@ class PrayerDualDescription {
   }
 }
 
+/// Hybrid fair rotation computed on the client from the server queue.
+///
+/// Pure function of the server list (createdAt asc, `_id` asc) and the
+/// server's epoch-aligned slot number, so every user gets the same schedule.
+/// Per round each prayer is featured once (no repeats while others wait);
+/// never-featured prayers go first; 3 of every 10 slots prefer prayers
+/// posted within 48h; with no fresh prayers every slot is fair rotation.
+class PrayerHybridRotation {
+  static const freshWindow = Duration(hours: 48);
+  static const _freshSlotsOfTen = {2, 5, 8};
+  /// History replayed before "now" (~14 days of 7 min slots).
+  static const _maxHistorySlots = 2880;
+  /// Re-anchor step when history is capped (~1 day), avoids per-slot drift.
+  static const _anchorAlignSlots = 200;
+
+  static ({PrayerQueueCurrentResult current, PrayerQueueListResult list})?
+      apply(PrayerQueueCurrentResult current, PrayerQueueListResult list) {
+    final slotMs = list.slotSeconds * 1000;
+    final startedAt = current.slotStartedAt ?? list.slotStartedAt;
+    final prayers = [
+      for (final slot in [...list.items]
+        ..sort((a, b) => a.position.compareTo(b.position)))
+        slot.prayer,
+    ];
+    if (slotMs <= 0 || startedAt == null || prayers.length < 2) return null;
+
+    final nowSlot = startedAt.millisecondsSinceEpoch ~/ slotMs;
+    final n = prayers.length;
+    final createdMs = [
+      for (final p in prayers) p.createdAt?.millisecondsSinceEpoch,
+    ];
+    final eligibleFrom = [
+      for (final ms in createdMs) ms == null ? null : (ms + slotMs - 1) ~/ slotMs,
+    ];
+
+    int? oldest;
+    for (final s in eligibleFrom) {
+      if (s != null && (oldest == null || s < oldest)) oldest = s;
+    }
+    final cap =
+        ((nowSlot - _maxHistorySlots) ~/ _anchorAlignSlots) * _anchorAlignSlots;
+    var anchor = oldest ?? nowSlot;
+    if (anchor < cap) anchor = cap;
+    if (anchor > nowSlot) anchor = nowSlot;
+
+    final lastShown = List<int?>.filled(n, null);
+    final inRound = List<bool>.filled(n, false);
+    final freshMs = freshWindow.inMilliseconds;
+
+    int? pickAt(int t) {
+      final eligible = <int>[
+        for (var i = 0; i < n; i++)
+          if ((eligibleFrom[i] ?? anchor) <= t) i,
+      ];
+      if (eligible.isEmpty) return null;
+      var pool = eligible.where((i) => !inRound[i]).toList();
+      if (pool.isEmpty) {
+        for (final i in eligible) {
+          inRound[i] = false;
+        }
+        pool = eligible;
+      }
+      if (_freshSlotsOfTen.contains(t % 10)) {
+        final cut = t * slotMs - freshMs;
+        final fresh = pool.where((i) {
+          final ms = createdMs[i];
+          return ms != null && ms >= cut;
+        }).toList();
+        if (fresh.isNotEmpty) pool = fresh;
+      }
+      var best = pool.first;
+      for (final i in pool.skip(1)) {
+        final a = lastShown[i];
+        final b = lastShown[best];
+        if (b == null) continue;
+        if (a == null || a < b) best = i;
+      }
+      inRound[best] = true;
+      lastShown[best] = t;
+      return best;
+    }
+
+    for (var t = anchor; t < nowSlot; t++) {
+      pickAt(t);
+    }
+
+    final firstOffset = <int, int>{};
+    final horizon = n * 2 + 10;
+    for (var j = 0; j <= horizon && firstOffset.length < n; j++) {
+      final idx = pickAt(nowSlot + j);
+      if (idx != null) firstOffset.putIfAbsent(idx, () => j);
+    }
+    final currentIdx = firstOffset.entries
+        .firstWhere((e) => e.value == 0, orElse: () => firstOffset.entries.first)
+        .key;
+    final nextIdx = firstOffset.entries
+        .where((e) => e.value > 0)
+        .fold<MapEntry<int, int>?>(
+          null,
+          (best, e) => best == null || e.value < best.value ? e : best,
+        )
+        ?.key;
+
+    var tail = horizon + 2;
+    final items = <PrayerQueueSlotItem>[
+      for (var i = 0; i < n; i++)
+        PrayerQueueSlotItem(
+          position: (firstOffset[i] ?? tail++) + 1,
+          isCurrent: i == currentIdx,
+          prayer: prayers[i],
+        ),
+    ]..sort((a, b) => a.position.compareTo(b.position));
+
+    return (
+      current: PrayerQueueCurrentResult(
+        slotSeconds: current.slotSeconds,
+        queueCount: current.queueCount,
+        position: 1,
+        msRemaining: current.msRemaining,
+        loops: current.loops,
+        slotStartedAt: current.slotStartedAt,
+        slotEndsAt: current.slotEndsAt,
+        prayer: prayers[currentIdx],
+        nextPrayerId: nextIdx == null ? null : prayers[nextIdx].id,
+      ),
+      list: PrayerQueueListResult(
+        slotSeconds: list.slotSeconds,
+        queueCount: list.queueCount,
+        currentPosition: 1,
+        msRemaining: list.msRemaining,
+        loops: list.loops,
+        items: items,
+        slotStartedAt: list.slotStartedAt,
+        slotEndsAt: list.slotEndsAt,
+      ),
+    );
+  }
+}
+
 /// Queue times from the server are global (UTC).
 DateTime? _prayerQueueUtc(dynamic v) {
   if (v == null) return null;

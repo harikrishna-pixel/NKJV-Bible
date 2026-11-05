@@ -24,6 +24,8 @@ class IosStyleAppDrawer extends StatefulWidget {
     required this.onCalendarTap,
     required this.onReadingProgressTap,
     required this.onConnectionInsightsTap,
+    required this.onConnectionPathsTap,
+    required this.onMilestonesTap,
     required this.onWallpapersTap,
     required this.onQuotesTap,
     required this.onShareTap,
@@ -69,6 +71,8 @@ class IosStyleAppDrawer extends StatefulWidget {
   final VoidCallback onCalendarTap;
   final VoidCallback onReadingProgressTap;
   final VoidCallback onConnectionInsightsTap;
+  final VoidCallback onConnectionPathsTap;
+  final VoidCallback onMilestonesTap;
   final VoidCallback onWallpapersTap;
   final VoidCallback onQuotesTap;
   final VoidCallback onShareTap;
@@ -304,6 +308,16 @@ class _IosStyleAppDrawerState extends State<IosStyleAppDrawer>
         label: 'Connection Insights',
         icon: Icons.favorite_outline_rounded,
         onTap: widget.onConnectionInsightsTap,
+      ),
+      _DrawerSubItem(
+        label: 'Connection Paths',
+        icon: Icons.route_outlined,
+        onTap: widget.onConnectionPathsTap,
+      ),
+      _DrawerSubItem(
+        label: 'Milestones',
+        icon: Icons.emoji_events_outlined,
+        onTap: widget.onMilestonesTap,
       ),
     ];
 

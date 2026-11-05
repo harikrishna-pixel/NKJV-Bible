@@ -1316,6 +1316,10 @@ class _WalletScreenState extends State<WalletScreen>
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       _buildCreditsStatusCard(context, screenWidth, isDark),
+                      if (!_isPremium && !_unlimitedAi) ...[
+                        const SizedBox(height: 12),
+                        _buildGoPremiumCard(context, screenWidth, isDark),
+                      ],
                       const SizedBox(height: 24),
 
                       // Answer Length Selection Section
@@ -1613,27 +1617,114 @@ class _WalletScreenState extends State<WalletScreen>
       );
     }
 
+    return Text(
+      'Free Plan',
+      style: TextStyle(
+        fontSize: 12,
+        fontWeight: FontWeight.w700,
+        color: chipInk,
+      ),
+    );
+  }
+
+  Widget _buildGoPremiumCard(
+    BuildContext context,
+    double screenWidth,
+    bool isDark,
+  ) {
+    final ink = isDark ? Colors.white : const Color(0xFF3D2914);
+    final muted = isDark ? Colors.white70 : const Color(0xFF7A6455);
+    final border = isDark
+        ? Colors.white.withOpacity(0.22)
+        : const Color(0xFFE2CFA8);
+    final fill = isDark ? const Color(0xFF433024) : const Color(0xFFFBF4E6);
+
     return Material(
       color: Colors.transparent,
       child: InkWell(
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(18),
         onTap: () async {
           await WalletEntry.openPremium();
           await _loadPremiumStatus();
         },
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        child: Ink(
           decoration: BoxDecoration(
-            color: chipBg,
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: chipBorder),
+            color: fill,
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: border),
           ),
-          child: Text(
-            'Free Plan',
-            style: TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w700,
-              color: chipInk,
+          child: Padding(
+            padding: EdgeInsets.fromLTRB(
+              screenWidth > 450 ? 18 : 14,
+              screenWidth > 450 ? 16 : 13,
+              screenWidth > 450 ? 14 : 12,
+              screenWidth > 450 ? 16 : 13,
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: screenWidth > 450 ? 48 : 44,
+                  height: screenWidth > 450 ? 48 : 44,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: isDark
+                        ? Colors.white.withOpacity(0.1)
+                        : const Color(0xFFF0E0C0),
+                  ),
+                  child: Icon(
+                    Icons.workspace_premium_rounded,
+                    color: isDark
+                        ? const Color(0xFFE8C989)
+                        : const Color(0xFFA67C2D),
+                    size: screenWidth > 450 ? 26 : 22,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Go Premium',
+                        style: TextStyle(
+                          fontFamily: 'Georgia',
+                          color: ink,
+                          fontSize: screenWidth > 450 ? 17 : 15.5,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        'Unlimited AI. No credits needed.',
+                        style: TextStyle(
+                          color: muted,
+                          fontSize: screenWidth > 450 ? 13 : 12,
+                          height: 1.25,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 9),
+                  decoration: BoxDecoration(
+                    color: isDark
+                        ? const Color(0xFFCFA03A)
+                        : const Color(0xFF6D4C41),
+                    borderRadius: BorderRadius.circular(22),
+                  ),
+                  child: Text(
+                    'Get',
+                    style: TextStyle(
+                      color: isDark ? const Color(0xFF3A2923) : Colors.white,
+                      fontSize: 13.5,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
         ),
