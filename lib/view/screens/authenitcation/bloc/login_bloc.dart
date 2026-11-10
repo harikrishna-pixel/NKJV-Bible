@@ -42,14 +42,12 @@ class LoginBloc extends ChangeNotifier {
     isLoading = true;
     notifyListeners();
     try {
-      isLoading = false;
       // return await authNotifier.login(
       //     email: emailCon.text, password: passCon.text, context: context);
       return await loginUser(email: emailCon.text, password: passCon.text);
-    } catch (_) {
+    } finally {
       isLoading = false;
       notifyListeners();
-      rethrow;
     }
   }
 }

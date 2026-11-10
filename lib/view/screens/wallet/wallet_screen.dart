@@ -10,6 +10,8 @@ import 'package:biblebookapp/view/constants/images.dart';
 import 'package:biblebookapp/view/constants/share_preferences.dart';
 import 'package:biblebookapp/view/constants/theme_provider.dart';
 import 'package:biblebookapp/view/screens/books/books_screen.dart';
+import 'package:biblebookapp/view/screens/dashboard/home_screen.dart'
+    show showSubscriptionInfoBottomSheet;
 import 'package:intl/intl.dart' show NumberFormat;
 import 'package:biblebookapp/view/screens/dashboard/constants.dart';
 import 'package:biblebookapp/view/widget/wallet_entry.dart';
@@ -1558,7 +1560,7 @@ class _WalletScreenState extends State<WalletScreen>
     final chipInk = isDark ? const Color(0xFFE8C989) : const Color(0xFF6D4C41);
 
     if (_unlimitedAi) {
-      return Container(
+      return _subscriptionInfoTap(Container(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
         decoration: BoxDecoration(
           color: chipBg,
@@ -1595,11 +1597,11 @@ class _WalletScreenState extends State<WalletScreen>
             ),
           ],
         ),
-      );
+      ));
     }
 
     if (_isLifetime || _isPremium) {
-      return Container(
+      return _subscriptionInfoTap(Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         decoration: BoxDecoration(
           color: chipBg,
@@ -1614,7 +1616,7 @@ class _WalletScreenState extends State<WalletScreen>
             color: chipInk,
           ),
         ),
-      );
+      ));
     }
 
     return Text(
@@ -1624,6 +1626,20 @@ class _WalletScreenState extends State<WalletScreen>
         fontWeight: FontWeight.w700,
         color: chipInk,
       ),
+    );
+  }
+
+  Widget _subscriptionInfoTap(Widget badge) {
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: () async {
+        final prefs = await SharedPreferences.getInstance();
+        final expiry =
+            DateTime.tryParse(prefs.getString('isRewardAdViewTime') ?? '');
+        if (expiry == null || !mounted) return;
+        showSubscriptionInfoBottomSheet(context, expiry);
+      },
+      child: badge,
     );
   }
 
@@ -1644,6 +1660,11 @@ class _WalletScreenState extends State<WalletScreen>
       child: InkWell(
         borderRadius: BorderRadius.circular(18),
         onTap: () async {
+          if (!await InternetConnection().hasInternetAccess) {
+            Constants.showToast(
+                'Please check your internet connection and try again.', 3000);
+            return;
+          }
           await WalletEntry.openPremium();
           await _loadPremiumStatus();
         },

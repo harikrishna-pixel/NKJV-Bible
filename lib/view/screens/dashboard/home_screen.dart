@@ -188,6 +188,82 @@ Widget _buildSubscriptionInfoDetails({
   );
 }
 
+/// Subscription Info sheet (Home menu premium info icon and Wallet badge).
+void showSubscriptionInfoBottomSheet(BuildContext context, DateTime expiryDate) {
+  final screenWidth = MediaQuery.of(context).size.width;
+  showModalBottomSheet<void>(
+    context: context,
+    backgroundColor: Colors.white,
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(25)),
+    ),
+    clipBehavior: Clip.antiAliasWithSaveLayer,
+    builder: (BuildContext sheetContext) {
+      return Stack(
+        children: [
+          Container(
+            decoration: BoxDecoration(
+              border: Border.all(color: Colors.white),
+              borderRadius: const BorderRadius.only(
+                topLeft: Radius.circular(20),
+                topRight: Radius.circular(20),
+              ),
+            ),
+            height: MediaQuery.of(sheetContext).size.height * 0.30,
+            child: SingleChildScrollView(
+              physics: const ScrollPhysics(),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: <Widget>[
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Image.asset(
+                        "assets/feedbacklogo.png",
+                        height: 120,
+                        width: 120,
+                        color: CommanColor.lightDarkPrimary(sheetContext),
+                      ),
+                    ],
+                  ),
+                  Text(
+                    'Subscription Info',
+                    style: TextStyle(
+                      letterSpacing: BibleInfo.letterSpacing,
+                      fontSize: BibleInfo.fontSizeScale * 16,
+                      color: CommanColor.lightDarkPrimary(sheetContext),
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  const SizedBox(height: 15),
+                  _buildSubscriptionInfoDetails(
+                    context: sheetContext,
+                    expiryDate: expiryDate,
+                    screenWidth: screenWidth,
+                  ),
+                ],
+              ),
+            ),
+          ),
+          Positioned(
+            top: 10,
+            right: 15,
+            child: InkWell(
+              child: Icon(
+                Icons.close,
+                color: CommanColor.lightDarkPrimary(sheetContext),
+                size: 25,
+              ),
+              onTap: () => Navigator.pop(sheetContext),
+            ),
+          ),
+        ],
+      );
+    },
+  );
+}
+
 // ignore: must_be_immutable
 class HomeScreen extends StatefulWidget {
   var selectedBookForRead;
@@ -647,7 +723,35 @@ class _HomeScreenState extends State<HomeScreen>
         isDark ? const Color(0xFFCFA03A) : const Color(0xFFA9673C);
     final buttonFg = isDark ? const Color(0xFF3A2923) : Colors.white;
 
-    return Material(
+    // Close sits above the card's right corner so the text gets full width.
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.end,
+      children: [
+        GestureDetector(
+          onTap: () {
+            setState(() {
+              _showLifetimeAdCard = false;
+              _lifetimeAdCardDismissed = true;
+            });
+            unawaited(_persistLifetimeAdCardDismissed());
+          },
+          child: Container(
+            width: 26,
+            height: 26,
+            decoration: BoxDecoration(
+              color: cardBg,
+              shape: BoxShape.circle,
+              border: Border.all(color: borderColor),
+              boxShadow: const [
+                BoxShadow(color: Colors.black12, blurRadius: 4),
+              ],
+            ),
+            child: Icon(Icons.close, size: 15, color: subtitleColor),
+          ),
+        ),
+        const SizedBox(height: 6),
+        Material(
       color: cardBg,
       elevation: 6,
       shadowColor: Colors.black26,
@@ -657,7 +761,7 @@ class _HomeScreenState extends State<HomeScreen>
           borderRadius: BorderRadius.circular(16),
           border: Border.all(color: borderColor),
         ),
-        padding: const EdgeInsets.fromLTRB(12, 10, 4, 10),
+        padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
         child: Row(
           children: [
             Container(
@@ -677,8 +781,7 @@ class _HomeScreenState extends State<HomeScreen>
                 children: [
                   Text(
                     'Prefer ad-free reading?',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
+                    maxLines: 2,
                     style: TextStyle(
                       color: titleColor,
                       fontSize: 14,
@@ -689,8 +792,7 @@ class _HomeScreenState extends State<HomeScreen>
                   const SizedBox(height: 2),
                   Text(
                     'Lifetime · once · 5,000 credits',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
+                    maxLines: 2,
                     style: TextStyle(
                       color: subtitleColor,
                       fontSize: 11.5,
@@ -704,7 +806,7 @@ class _HomeScreenState extends State<HomeScreen>
             const SizedBox(width: 8),
             GestureDetector(
               onTap: () async {
-                await WalletEntry.openPremium();
+                await WalletEntry.openPremium(selectLifetime: true);
                 if (!mounted) return;
                 if (Get.find<DashBoardController>().adFree.value) {
                   setState(() => _showLifetimeAdCard = false);
@@ -727,22 +829,11 @@ class _HomeScreenState extends State<HomeScreen>
                 ),
               ),
             ),
-            IconButton(
-              visualDensity: VisualDensity.compact,
-              padding: EdgeInsets.zero,
-              constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-              icon: Icon(Icons.close, size: 18, color: subtitleColor),
-              onPressed: () {
-                setState(() {
-                  _showLifetimeAdCard = false;
-                  _lifetimeAdCardDismissed = true;
-                });
-                unawaited(_persistLifetimeAdCardDismissed());
-              },
-            ),
           ],
         ),
       ),
+        ),
+      ],
     );
   }
 
@@ -2347,6 +2438,9 @@ class _HomeScreenState extends State<HomeScreen>
     if (shouldShowAd) {
       try {
         await controller.interstitialAd?.show();
+        if (controller.interstitialAd != null) {
+          AdService.markInterstitialShown();
+        }
         DebugConsole.log(" interstitialAd 2 is running ");
         lastInterstitialAdPlayed.value = DateTime.now();
       } catch (e) {
@@ -2367,6 +2461,7 @@ class _HomeScreenState extends State<HomeScreen>
 
   // Check if 3 minutes have passed since last "Mark as Read" ad
   Future<bool> _canShowMarkAsReadAd() async {
+    if (!AdService.canShowInterstitialByGap) return false;
     final prefs = await SharedPreferences.getInstance();
     final lastAdTimeString = prefs.getString('last_mark_as_read_ad_time');
 
@@ -2424,6 +2519,7 @@ class _HomeScreenState extends State<HomeScreen>
         }
       },
       onAdShowedFullScreenContent: (ad) async {
+        AdService.markInterstitialShown();
         await SharPreferences.setString('OpenAd', '1');
         // Amen / Mark as Read / post-streak — same Lifetime card counter as swipe.
         if (mounted) _onReadingInterstitialShown();
@@ -4733,7 +4829,8 @@ class _HomeScreenState extends State<HomeScreen>
                           "now Chapter and count is $swipeCount $_swipeThreshold");
                       await Future.delayed(Duration(milliseconds: 500));
                       if (_adService.interstitialAd != null &&
-                          controller.adFree.value == false) {
+                          controller.adFree.value == false &&
+                          AdService.canShowInterstitialByGap) {
                         EasyLoading.showInfo('Please wait...');
                         await SharPreferences.setString('OpenAd', '1');
                         _adService.showInterstitialAd();
@@ -4767,7 +4864,8 @@ class _HomeScreenState extends State<HomeScreen>
                           "now Chapter and count is $swipeCount $_swipeThreshold");
                       await Future.delayed(Duration(milliseconds: 600));
                       if (_adService.interstitialAd != null &&
-                          controller.adFree.value == false) {
+                          controller.adFree.value == false &&
+                          AdService.canShowInterstitialByGap) {
                         EasyLoading.showInfo('Please wait...');
                         await SharPreferences.setString('OpenAd', '1');
                         _adService.showInterstitialAd();
@@ -6211,78 +6309,7 @@ class _HomeScreenState extends State<HomeScreen>
     void showSubscriptionInfoSheet() {
       final expiryRaw = '${controller.RewardAdExpireDate}';
       if (DateTime.tryParse(expiryRaw) == null) return;
-      final expiryDate = DateTime.parse(expiryRaw);
-      showModalBottomSheet<void>(
-        context: context,
-        backgroundColor: Colors.white,
-        shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(25)),
-        ),
-        clipBehavior: Clip.antiAliasWithSaveLayer,
-        builder: (BuildContext sheetContext) {
-          return Stack(
-            children: [
-              Container(
-                decoration: BoxDecoration(
-                  border: Border.all(color: Colors.white),
-                  borderRadius: const BorderRadius.only(
-                    topLeft: Radius.circular(20),
-                    topRight: Radius.circular(20),
-                  ),
-                ),
-                height: MediaQuery.of(sheetContext).size.height * 0.30,
-                child: SingleChildScrollView(
-                  physics: const ScrollPhysics(),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: <Widget>[
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Image.asset(
-                            "assets/feedbacklogo.png",
-                            height: 120,
-                            width: 120,
-                            color: CommanColor.lightDarkPrimary(sheetContext),
-                          ),
-                        ],
-                      ),
-                      Text(
-                        'Subscription Info',
-                        style: TextStyle(
-                          letterSpacing: BibleInfo.letterSpacing,
-                          fontSize: BibleInfo.fontSizeScale * 16,
-                          color: CommanColor.lightDarkPrimary(sheetContext),
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                      const SizedBox(height: 15),
-                      _buildSubscriptionInfoDetails(
-                        context: sheetContext,
-                        expiryDate: expiryDate,
-                        screenWidth: screenWidth,
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              Positioned(
-                top: 10,
-                right: 15,
-                child: InkWell(
-                  child: Icon(
-                    Icons.close,
-                    color: CommanColor.lightDarkPrimary(sheetContext),
-                    size: 25,
-                  ),
-                  onTap: () => Navigator.pop(sheetContext),
-                ),
-              ),
-            ],
-          );
-        },
-      );
+      showSubscriptionInfoBottomSheet(context, DateTime.parse(expiryRaw));
     }
 
     return Drawer(

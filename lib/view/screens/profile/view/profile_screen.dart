@@ -681,7 +681,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
           SizedBox(
             height: 48,
             child: ElevatedButton(
-              onPressed: () => Get.to(() => LoginScreen(hasSkip: false)),
+              onPressed: () =>
+                  Get.to(() => LoginScreen(hasSkip: false, popOnBack: true)),
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFF5C3317),
                 foregroundColor: Colors.white,
@@ -759,7 +760,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
             title: 'Get Free Credits',
             subtitle: 'Refer friends & earn credits!',
             background: const Color(0xFFE8C989).withOpacity(0.28),
-            onTap: () => Get.to(() => LoginScreen(hasSkip: false)),
+            onTap: () =>
+                Get.to(() => LoginScreen(hasSkip: false, popOnBack: true)),
           ),
           SizedBox(height: gap),
           _signedOutRow(

@@ -452,9 +452,9 @@ class _ReadingProgressScreenState extends State<ReadingProgressScreen> {
                         IconButton(
                           onPressed: _openBooks,
                           icon: const Icon(
-                            Icons.info_outline,
+                            Icons.menu_book_outlined,
                             color: _ink,
-                            size: 22,
+                            size: 24,
                           ),
                         ),
                       ],

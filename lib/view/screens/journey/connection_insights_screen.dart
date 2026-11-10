@@ -267,7 +267,8 @@ class _ConnectionInsightsScreenState extends State<ConnectionInsightsScreen> {
                       duration: const Duration(milliseconds: 300),
                     );
                   },
-                  icon: const Icon(Icons.info_outline, size: 22, color: _ink),
+                  icon: const Icon(Icons.calendar_month_outlined,
+                      size: 24, color: _ink),
                 ),
               ],
             ),

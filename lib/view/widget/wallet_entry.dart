@@ -83,7 +83,7 @@ class WalletEntry {
     await Get.to(() => const WalletScreen());
   }
 
-  static Future<void> openPremium() async {
+  static Future<void> openPremium({bool selectLifetime = false}) async {
     final six = await SharPreferences.getString('sixMonthPlan') ??
         BibleInfo.sixMonthPlanid;
     final year = await SharPreferences.getString('oneYearPlan') ??
@@ -95,6 +95,7 @@ class WalletEntry {
       oneYearPlan: year,
       lifeTimePlan: life,
       checkad: checkadId,
+      selectLifetime: selectLifetime,
     );
   }
 

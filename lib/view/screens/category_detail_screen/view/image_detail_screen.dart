@@ -54,6 +54,22 @@ class AdService {
   InterstitialAd? get _interstitialAd => _sharedInterstitialAd;
   bool get _isInterstitialAdLoaded => _sharedInterstitialLoaded;
 
+  /// Minimum gap between interstitials shown from any trigger.
+  static const interstitialGap = Duration(minutes: 2);
+  static DateTime? _lastInterstitialShownAt;
+
+  static void markInterstitialShown() =>
+      _lastInterstitialShownAt = DateTime.now();
+
+  /// True when no interstitial was shown in the last [interstitialGap].
+  /// A backwards clock change (negative diff) allows the ad.
+  static bool get canShowInterstitialByGap {
+    final last = _lastInterstitialShownAt;
+    if (last == null) return true;
+    final diff = DateTime.now().difference(last);
+    return diff.isNegative || diff >= interstitialGap;
+  }
+
   void loadRewardedInterstitialAds(VoidCallback onAdLoaded) async {
     if (!await SharPreferences.adsEnabledFromApiOrConstant()) return;
     String? adUnitId =
@@ -92,6 +108,7 @@ class AdService {
     if (_sharedInterstitialAd != null) {
       EasyLoading.dismiss();
       _sharedInterstitialAd!.show();
+      markInterstitialShown();
       DebugConsole.log(" interstitialAd 3 is running ");
       _sharedInterstitialAd = null; // Dispose after showing
       _sharedInterstitialLoaded = false;
@@ -119,6 +136,7 @@ class AdService {
 
     ad.fullScreenContentCallback = FullScreenContentCallback(
       onAdShowedFullScreenContent: (ad) async {
+        markInterstitialShown();
         await SharPreferences.setString('OpenAd', '1');
       },
       onAdDismissedFullScreenContent: (ad) async {
@@ -1106,7 +1124,8 @@ class ImageDetailScreenState extends ConsumerState<ImageDetailScreen> {
                         if (val > 0 &&
                             val % adcountview == 0 &&
                             shouldLoadAd &&
-                            _adService._interstitialAd != null) {
+                            _adService._interstitialAd != null &&
+                            AdService.canShowInterstitialByGap) {
                           if (_adService._isInterstitialAdLoaded) {
                             EasyLoading.showInfo('Please wait...');
                             await SharPreferences.setString('OpenAd', '1');

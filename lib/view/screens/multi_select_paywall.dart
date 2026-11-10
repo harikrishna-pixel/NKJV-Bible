@@ -48,6 +48,7 @@ class MultiSelectPaywall extends StatefulWidget {
     required this.oneYearPlan,
     required this.lifeTimePlan,
     required this.checkad,
+    this.selectLifetime = false,
   });
 
   final String sixMonthPlan;
@@ -57,6 +58,9 @@ class MultiSelectPaywall extends StatefulWidget {
   final String lifeTimePlan;
 
   final String checkad;
+
+  /// Open with the Lifetime card selected (e.g. reading Lifetime prompt).
+  final bool selectLifetime;
 
   @override
   State<MultiSelectPaywall> createState() => _MultiSelectPaywallState();
@@ -83,7 +87,7 @@ class _MultiSelectPaywallState extends State<MultiSelectPaywall> {
 
   static const Color _greenSoft = Color(0xFFDCEFE3);
 
-  _PwCard _sel = _PwCard.ai;
+  late _PwCard _sel = widget.selectLifetime ? _PwCard.lifetime : _PwCard.ai;
 
   _AiDur _dur = _AiDur.oneYear;
 

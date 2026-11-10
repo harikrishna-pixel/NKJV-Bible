@@ -413,8 +413,15 @@ class DashBoardController extends GetxController with WidgetsBindingObserver {
   }
 
   Future<void> _processSubscriptionData(GetAudioModel value) async {
-    bookAdsStatus.value = int.tryParse(value.data?.bookAdsStatus ?? '') ?? 0;
-    bookAdsAppId.value = int.tryParse(value.data?.bookAdsAppId ?? '') ?? 0;
+    // Constants/offline data has no book ads fields: keep the last values
+    // saved from the API so More → Digital Products still shows offline.
+    final prefs = await SharedPreferences.getInstance();
+    bookAdsStatus.value = int.tryParse(value.data?.bookAdsStatus ?? '') ??
+        prefs.getInt('bookAdsStatus') ??
+        0;
+    bookAdsAppId.value = int.tryParse(value.data?.bookAdsAppId ?? '') ??
+        prefs.getInt('bookAdsAppId') ??
+        0;
 
     isSubscriptionEnabled = value.data?.isSubscriptionEnabled == '1';
     sharedSecret = value.data?.subSharedsecret ?? "";

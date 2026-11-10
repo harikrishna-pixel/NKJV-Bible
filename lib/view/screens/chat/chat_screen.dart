@@ -38,6 +38,7 @@ import 'package:biblebookapp/controller/dashboard_controller.dart';
 import 'package:biblebookapp/view/screens/dashboard/home_screen.dart';
 import 'package:biblebookapp/view/widget/ai_gemini_privacy_banner.dart';
 import 'package:biblebookapp/view/widget/credits_sheets.dart';
+import 'package:biblebookapp/view/widget/unlimited_access_banner.dart';
 import 'package:biblebookapp/controller/dpProvider.dart';
 import 'package:biblebookapp/view/screens/category_detail_screen/view/image_detail_screen.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
@@ -121,10 +122,8 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
 
   // Low-credit hints: AI Premium skips credits; answer length sets the cost.
   bool _skipCredits = false;
-  /// AR Premium first-time banner; dismissed forever via prefs.
+  /// AR Premium first-time banner (see [UnlimitedAccessBanner]).
   bool _showUnlimitedAccessCard = false;
-  static const String _unlimitedAccessCardDismissedKey =
-      'chat_unlimited_access_card_dismissed';
   String _answerLength = 'small';
   static const Color _kCreditsAmber = Color(0xFFE08A1E);
 
@@ -274,92 +273,6 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
           ),
         ),
       ],
-    );
-  }
-
-  /// First-time AR Premium banner on empty Chat (dismiss forever).
-  Widget _buildUnlimitedAccessCard({
-    required double screenWidth,
-    required bool isDark,
-  }) {
-    final ink = isDark ? const Color(0xFFF5F0E6) : const Color(0xFF3D2914);
-    final muted = isDark
-        ? const Color(0xFFD4C4B0)
-        : const Color(0xFF7A6455);
-    final cardBg =
-        isDark ? const Color(0xFF3A2923) : const Color(0xFFFFFAF4);
-    final border =
-        isDark ? const Color(0xFF6B5348) : const Color(0xFFE9D7B8);
-
-    return Material(
-      color: cardBg,
-      elevation: 2,
-      shadowColor: Colors.black26,
-      borderRadius: BorderRadius.circular(16),
-      child: Container(
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: border),
-        ),
-        padding: EdgeInsets.fromLTRB(
-          screenWidth > 450 ? 14 : 12,
-          screenWidth > 450 ? 12 : 10,
-          4,
-          screenWidth > 450 ? 12 : 10,
-        ),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Padding(
-              padding: const EdgeInsets.only(top: 2),
-              child: Image.asset(
-                'assets/gold-premium-icons/theme_premium_crown.png',
-                width: screenWidth > 450 ? 36 : 32,
-                height: screenWidth > 450 ? 36 : 32,
-                errorBuilder: (_, __, ___) => Icon(
-                  Icons.workspace_premium,
-                  size: screenWidth > 450 ? 32 : 28,
-                  color: const Color(0xFFCFA03A),
-                ),
-              ),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'You have unlimited AI access',
-                    style: TextStyle(
-                      color: ink,
-                      fontSize: screenWidth > 450 ? 15 : 14,
-                      fontWeight: FontWeight.w700,
-                      height: 1.25,
-                    ),
-                  ),
-                  const SizedBox(height: 3),
-                  Text(
-                    'Enjoy unlimited AI chats. Credits won\'t be used.',
-                    style: TextStyle(
-                      color: muted,
-                      fontSize: screenWidth > 450 ? 13 : 12,
-                      fontWeight: FontWeight.w500,
-                      height: 1.3,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            IconButton(
-              visualDensity: VisualDensity.compact,
-              padding: EdgeInsets.zero,
-              constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-              icon: Icon(Icons.close, size: 18, color: muted),
-              onPressed: _dismissUnlimitedAccessCard,
-            ),
-          ],
-        ),
-      ),
     );
   }
 
@@ -1826,24 +1739,12 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
         }
         return;
       }
-      final prefs = await SharedPreferences.getInstance();
-      final dismissed =
-          prefs.getBool(_unlimitedAccessCardDismissedKey) ?? false;
-      final show = !dismissed;
-      if (mounted && show != _showUnlimitedAccessCard) {
-        setState(() => _showUnlimitedAccessCard = show);
+      // Only turns on; the banner hides itself and calls back when done.
+      final show = await UnlimitedAccessBanner.shouldShow();
+      if (mounted && show && !_showUnlimitedAccessCard) {
+        setState(() => _showUnlimitedAccessCard = true);
       }
     } catch (_) {}
-  }
-
-  Future<void> _dismissUnlimitedAccessCard() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setBool(_unlimitedAccessCardDismissedKey, true);
-    } catch (_) {}
-    if (mounted) {
-      setState(() => _showUnlimitedAccessCard = false);
-    }
   }
 
   Future<bool> _checkChatLimit() async {
@@ -3267,9 +3168,11 @@ Remember: You are assisting users with the ${BibleInfo.bible_shortName}, so prov
                                         screenWidth > 450 ? 20 : 16,
                                         screenWidth > 450 ? 14 : 12,
                                       ),
-                                      child: _buildUnlimitedAccessCard(
+                                      child: UnlimitedAccessBanner(
                                         screenWidth: screenWidth,
                                         isDark: isDark,
+                                        onDismissed: () => setState(() =>
+                                            _showUnlimitedAccessCard = false),
                                       ),
                                     ),
                                   // Show verse context if available

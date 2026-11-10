@@ -2822,6 +2822,35 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
       );
     }
 
+    final rows = <({int rank, Widget card})>[
+      ...items.map((item) {
+        final name = _cardDisplayName(item);
+        final title = item.title.isNotEmpty ? item.title : item.description;
+        final seed = (_blockTargetId(item) ?? item.id).trim();
+        return (
+          rank: _blockedRecencyRank(
+              {item.id, ..._relatedLocalBlockedIds(seed)}),
+          card: blockedCard(
+            name: name,
+            subtitle: title,
+            onUnblock: () => _unblockByPrayerId(item.id),
+          ),
+        );
+      }),
+      ...leftover.map((id) {
+        final name = _blockedListNameForId(id);
+        final shown = name.isNotEmpty ? name : 'Blocked user';
+        return (
+          rank: _blockedRecencyRank(_relatedLocalBlockedIds(id)),
+          card: blockedCard(
+            name: shown,
+            subtitle: 'This profile is hidden from your wall.',
+            onUnblock: () => _unblockByPrayerId(id),
+          ),
+        );
+      }),
+    ]..sort((a, b) => b.rank.compareTo(a.rank));
+
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 14, 16, 100),
       children: [
@@ -2884,27 +2913,21 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
           ),
         ),
         const SizedBox(height: 16),
-        ...items.map((item) {
-          final name = _cardDisplayName(item);
-          final title =
-              item.title.isNotEmpty ? item.title : item.description;
-          return blockedCard(
-            name: name,
-            subtitle: title,
-            onUnblock: () => _unblockByPrayerId(item.id),
-          );
-        }),
-        ...leftover.map((id) {
-          final name = _blockedListNameForId(id);
-          final shown = name.isNotEmpty ? name : 'Blocked user';
-          return blockedCard(
-            name: shown,
-            subtitle: 'This profile is hidden from your wall.',
-            onUnblock: () => _unblockByPrayerId(id),
-          );
-        }),
+        ...rows.map((r) => r.card),
       ],
     );
+  }
+
+  /// UI-only: position of the latest-blocked id in [_blockedUserIds]
+  /// (insertion order = block order). Higher means blocked more recently.
+  int _blockedRecencyRank(Iterable<String> ids) {
+    final order = _blockedUserIds.toList();
+    var best = -1;
+    for (final id in ids) {
+      final i = order.indexOf(id);
+      if (i > best) best = i;
+    }
+    return best;
   }
 
   /// Additive: follow counts for own Prayer Profile (existing Follow APIs).

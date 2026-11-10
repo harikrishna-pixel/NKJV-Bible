@@ -1652,16 +1652,13 @@ class FaithJourneyDialog {
                               final hasInternet =
                                   await InternetConnection().hasInternetAccess;
                               if (!hasInternet) {
-                                if (!await SubscriptionScreen
-                                    .isDashboardIapEnabled()) {
-                                  if (navContext != null &&
-                                      navContext.mounted) {
-                                    await StreakFlowNavigation
-                                        .navigateToStreakFlowOrHome(
-                                            navContext);
-                                  }
-                                  return;
+                                // Offline: store prices can't load (paywall
+                                // would show fallback USD), so skip it.
+                                if (navContext != null && navContext.mounted) {
+                                  await StreakFlowNavigation
+                                      .navigateToStreakFlowOrHome(navContext);
                                 }
+                                return;
                               } else {
                                 final shouldShowPaywall =
                                     await PaywallPreloadService

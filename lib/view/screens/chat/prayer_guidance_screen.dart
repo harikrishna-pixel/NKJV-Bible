@@ -8,6 +8,9 @@ import 'package:biblebookapp/services/smart_notification_helper.dart';
 import 'package:biblebookapp/core/notifiers/download.notifier.dart';
 import 'package:biblebookapp/services/milestone_lifetime_paywall_coordinator.dart';
 import 'package:biblebookapp/services/wallet_service.dart';
+import 'package:biblebookapp/services/study_plan_verse_service.dart';
+import 'package:biblebookapp/Model/verseBookContentModel.dart'
+    show normalizeVersePlainText;
 import 'package:biblebookapp/home_widget/bible_home_widget.dart';
 import 'package:biblebookapp/home_widget/widget_prompt_cards.dart';
 import 'package:biblebookapp/home_widget/widget_prompt_service.dart';
@@ -28,6 +31,7 @@ import 'package:biblebookapp/view/screens/prayer_wall/prayer_wall_service.dart';
 import 'package:biblebookapp/view/screens/wallet/wallet_screen.dart';
 import 'package:biblebookapp/view/widget/ai_gemini_privacy_banner.dart';
 import 'package:biblebookapp/view/widget/credits_sheets.dart';
+import 'package:biblebookapp/view/widget/unlimited_access_banner.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/gestures.dart';
 import 'package:url_launcher/url_launcher_string.dart';
@@ -41,6 +45,19 @@ import 'package:internet_connection_checker_plus/internet_connection_checker_plu
 import 'package:permission_handler/permission_handler.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+
+/// Pops with no reverse slide when a result is returned (Generate), so
+/// "Creating Your Prayer" appears directly instead of the Prayer Guidance
+/// screen sliding back in. Back / swipe-back keep the normal animation.
+class _InstantPopOnResultRoute<T> extends MaterialPageRoute<T> {
+  _InstantPopOnResultRoute({required super.builder});
+
+  @override
+  bool didPop(T? result) {
+    if (result != null) controller?.reverseDuration = Duration.zero;
+    return super.didPop(result);
+  }
+}
 
 class PrayerGuidanceScreen extends StatefulWidget {
   const PrayerGuidanceScreen({super.key});
@@ -91,6 +108,8 @@ class _PrayerGuidanceScreenState extends State<PrayerGuidanceScreen>
   int _currentCredits = 0;
   /// AR AI Premium: hide top-bar wallet (Menu / Settings only).
   bool _skipCredits = false;
+  /// AR Premium first-time banner (see [UnlimitedAccessBanner]).
+  bool _showUnlimitedAccessCard = false;
   Timer? _creditsTimer;
 
   // Intro answer length selection (shared with Chat intro behaviour)
@@ -638,7 +657,7 @@ class _PrayerGuidanceScreenState extends State<PrayerGuidanceScreen>
     final savedLength = await WalletService.getAnswerLength();
     if (!mounted) return;
     final result = await Navigator.of(context).push<PrayerRequestResult>(
-      MaterialPageRoute(
+      _InstantPopOnResultRoute(
         builder: (_) => PrayerRequestScreen(
           categoryTitle: _categories[categoryIndex].title,
           categorySubtitle:
@@ -653,7 +672,38 @@ class _PrayerGuidanceScreenState extends State<PrayerGuidanceScreen>
       ),
     );
     if (result == null || !mounted) return;
-    await _sendPrayerRequest(categoryIndex, request: result);
+    await _sendWithCreatingViewShown(
+      () => _sendPrayerRequest(categoryIndex, request: result),
+      title: _categories[categoryIndex].title,
+    );
+  }
+
+  /// Shows "Creating Your Prayer" as soon as the request screen pops, so
+  /// Prayer Guidance doesn't flash while the send checks (audio, internet,
+  /// credits) run. Reverts if the send stops early.
+  bool _pendingCreatingView = false;
+
+  Future<void> _sendWithCreatingViewShown(
+    Future<void> Function() send, {
+    String? title,
+  }) async {
+    final previousTitle = _responseHeaderTitle;
+    setState(() {
+      _pendingCreatingView = true;
+      if (title != null) _responseHeaderTitle = title;
+    });
+    try {
+      await send();
+    } finally {
+      if (mounted) {
+        setState(() {
+          _pendingCreatingView = false;
+          if (!_isLoading && _messages.isEmpty) {
+            _responseHeaderTitle = previousTitle;
+          }
+        });
+      }
+    }
   }
 
   /// Pray for Me → same Prayer Request flow as categories (no category card).
@@ -663,7 +713,7 @@ class _PrayerGuidanceScreenState extends State<PrayerGuidanceScreen>
     final savedLength = await WalletService.getAnswerLength();
     if (!mounted) return;
     final result = await Navigator.of(context).push<PrayerRequestResult>(
-      MaterialPageRoute(
+      _InstantPopOnResultRoute(
         builder: (_) => PrayerRequestScreen(
           categoryTitle: 'My Prayer',
           categorySubtitle: 'Get guidance based on your need.',
@@ -683,7 +733,9 @@ class _PrayerGuidanceScreenState extends State<PrayerGuidanceScreen>
       ),
     );
     if (result == null || !mounted) return;
-    await _sendCustomPrayerRequest(result.request, request: result);
+    await _sendWithCreatingViewShown(
+      () => _sendCustomPrayerRequest(result.request, request: result),
+    );
   }
 
   Future<void> _sendPrayerRequest(
@@ -1752,6 +1804,12 @@ ${personalInstruction}
           _skipCredits = skip;
         });
       }
+      if (skip && !_showUnlimitedAccessCard) {
+        final show = await UnlimitedAccessBanner.shouldShow();
+        if (mounted && show && !_showUnlimitedAccessCard) {
+          setState(() => _showUnlimitedAccessCard = true);
+        }
+      }
     } catch (e) {
       debugPrint('redits load error: $e');
     }
@@ -2637,7 +2695,8 @@ ${personalInstruction}
     );
   }
 
-  bool _prayerGuidanceIsMainScreen() => _messages.isEmpty;
+  bool _prayerGuidanceIsMainScreen() =>
+      _messages.isEmpty && !_pendingCreatingView;
 
   bool _prayerGuidanceHasAiResponse() =>
       _messages.any((message) => !message.isUser);
@@ -2661,7 +2720,7 @@ ${personalInstruction}
   static const String _kPrayerCreatingBg = 'assets/creating_prayer.png';
 
   bool _prayerGuidanceIsCreatingView() =>
-      _isLoading && !_prayerGuidanceHasAiResponse();
+      (_isLoading || _pendingCreatingView) && !_prayerGuidanceHasAiResponse();
 
   String? _categoryIconAsset(int categoryIndex) {
     switch (categoryIndex) {
@@ -3709,37 +3768,50 @@ ${personalInstruction}
     );
   }
 
-  ({String quote, String reference})? _prayerResponseInsightFromText(
-      String text) {
-    final versePattern = RegExp(
-      r'(\d?\s?[A-Za-z]+\s+\d+:\d+(?:-\d+)?)',
-      caseSensitive: false,
-    );
-    final matches = versePattern.allMatches(text).toList();
-    if (matches.isEmpty) return null;
+  /// Verse text (from the local Bible) for the first reference in the prayer
+  /// that resolves. Cached per prayer text so rebuilds don't re-query.
+  final Map<String, Future<({String quote, String reference})?>>
+      _prayerInsightVerseCache = {};
 
-    final match = matches.length >= 2 ? matches[1] : matches.first;
-    final reference = match.group(0)!;
-    final refStart = match.start;
-    final before = text.substring(0, refStart);
-    final sentenceStart = before.lastIndexOf('.');
-    final start = sentenceStart >= 0 ? sentenceStart + 1 : 0;
-    final afterRef = match.end;
-    final nextPeriod = text.indexOf('.', afterRef);
-    final end = nextPeriod >= 0 ? nextPeriod + 1 : text.length;
-    var quote = text.substring(start, end).trim();
-    quote = quote.replaceAll(reference, '').trim();
-    if (quote.length < 12) {
-      quote =
-          'Give thanks in all circumstances; for this is the will of God in Christ Jesus for you.';
-    }
-    return (quote: quote, reference: reference);
+  Future<({String quote, String reference})?> _prayerResponseInsightFromText(
+      String text) {
+    return _prayerInsightVerseCache.putIfAbsent(text, () async {
+      final versePattern = RegExp(
+        r'(\d?\s?[A-Za-z]+\s+\d+:\d+(?:-\d+)?)',
+        caseSensitive: false,
+      );
+      final refs = <String>{
+        for (final m in versePattern.allMatches(text)) m.group(0)!.trim(),
+      };
+      for (final reference in refs) {
+        try {
+          final verses =
+              await StudyPlanVerseService.fetchVerseContent(reference);
+          final quote = verses
+              .map((v) => normalizeVersePlainText(v.content?.toString()))
+              .where((t) => t.isNotEmpty)
+              .join(' ')
+              .trim();
+          if (quote.isNotEmpty) return (quote: quote, reference: reference);
+        } catch (_) {}
+      }
+      return null;
+    });
   }
 
   Widget _buildPrayerResponseInsightBox(String aiText, Size size) {
-    final insight = _prayerResponseInsightFromText(aiText);
-    if (insight == null) return const SizedBox.shrink();
+    return FutureBuilder<({String quote, String reference})?>(
+      future: _prayerResponseInsightFromText(aiText),
+      builder: (context, snapshot) {
+        final insight = snapshot.data;
+        if (insight == null) return const SizedBox.shrink();
+        return _prayerResponseInsightCard(insight, size);
+      },
+    );
+  }
 
+  Widget _prayerResponseInsightCard(
+      ({String quote, String reference}) insight, Size size) {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.fromLTRB(14, 14, 14, 12),
@@ -3952,7 +4024,7 @@ ${personalInstruction}
     }
     final headerColor = isDark ? Colors.white : _kPrayerGuidanceInk;
 
-    if (_isLoading && aiText == null) {
+    if ((_isLoading || _pendingCreatingView) && aiText == null) {
       return _buildPrayerCreatingView(context, size, isDark);
     }
 
@@ -4209,8 +4281,8 @@ ${personalInstruction}
                       Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          // AR AI Premium: wallet lives in Menu / Settings only.
-                          if (!_skipCredits) ...[
+                          // Free: credits. AR Premium: "Unlimited" (opens Wallet).
+                          ...[
                             Container(
                               padding: EdgeInsets.symmetric(
                                 horizontal: size.width > 450 ? 12 : 10,
@@ -4254,7 +4326,9 @@ ${personalInstruction}
                                     ),
                                     const SizedBox(width: 6),
                                     Text(
-                                      '$_currentCredits',
+                                      _skipCredits
+                                          ? 'Unlimited'
+                                          : '$_currentCredits',
                                       style: TextStyle(
                             color: _prayerGuidanceIsMainScreen()
                                 ? (isDark
@@ -4365,7 +4439,7 @@ ${personalInstruction}
                   SizedBox(height: isCompactPhone ? 8 : 10),
                 Expanded(
                   child: ClipRect(
-                  child: _messages.isEmpty
+                  child: _prayerGuidanceIsMainScreen()
                       ? Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
@@ -5016,6 +5090,18 @@ ${personalInstruction}
               right: 0,
               child: _buildPrayerGuidanceTopBar(context, size, isDark),
             ),
+            if (_showUnlimitedAccessCard && _prayerGuidanceIsMainScreen())
+              Positioned(
+                top: _prayerGuidanceTopBarReservedHeight(context) + 6,
+                left: size.width > 450 ? 20 : 16,
+                right: size.width > 450 ? 20 : 16,
+                child: UnlimitedAccessBanner(
+                  screenWidth: size.width,
+                  isDark: isDark,
+                  onDismissed: () =>
+                      setState(() => _showUnlimitedAccessCard = false),
+                ),
+              ),
         ],
         ),
       ),

@@ -28,6 +28,7 @@ class PaywallNavigation {
     required String lifeTimePlan,
     required String checkad,
     bool fromHomeExitOffer = false,
+    bool selectLifetime = false,
   }) {
     final six = _sixMonthIdForVisiblePaywall(sixMonthPlan);
     final year = _oneYearIdForVisiblePaywall(oneYearPlan);
@@ -45,6 +46,7 @@ class PaywallNavigation {
         oneYearPlan: year,
         lifeTimePlan: lifeTimePlan,
         checkad: checkad,
+        selectLifetime: selectLifetime,
       );
     }
     return SubscriptionScreen(
@@ -62,6 +64,7 @@ class PaywallNavigation {
     required String lifeTimePlan,
     required String checkad,
     bool fromHomeExitOffer = false,
+    bool selectLifetime = false,
   }) {
     return Get.to<T>(
       () => buildVisiblePaywall(
@@ -70,6 +73,7 @@ class PaywallNavigation {
         lifeTimePlan: lifeTimePlan,
         checkad: checkad,
         fromHomeExitOffer: fromHomeExitOffer,
+        selectLifetime: selectLifetime,
       ),
       transition: SubscriptionScreen.paywallRouteTransition,
       duration: SubscriptionScreen.paywallRouteDuration,

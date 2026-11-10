@@ -15,6 +15,25 @@ import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+class _HintArrowPainter extends CustomPainter {
+  _HintArrowPainter(this.color);
+
+  final Color color;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final path = Path()
+      ..moveTo(size.width / 2, 0)
+      ..lineTo(size.width, size.height)
+      ..lineTo(0, size.height)
+      ..close();
+    canvas.drawPath(path, Paint()..color = color);
+  }
+
+  @override
+  bool shouldRepaint(_HintArrowPainter old) => old.color != color;
+}
+
 class MyDigitalLibraryScreen extends StatefulWidget {
   const MyDigitalLibraryScreen({super.key, this.openedFromProducts = false});
 
@@ -28,11 +47,63 @@ class _MyDigitalLibraryScreenState extends State<MyDigitalLibraryScreen> {
   static const _brown = Color(0xFF6D4C41);
   List<OwnedDigitalProduct> _items = [];
   bool _loading = true;
+  bool _showHint = false;
+  static const _hintSeenKey = 'digital_library_hint_seen_v1';
 
   @override
   void initState() {
     super.initState();
     _reload();
+    _loadHint();
+  }
+
+  /// First visit only; marked seen as soon as it shows.
+  Future<void> _loadHint() async {
+    final prefs = await SharedPreferences.getInstance();
+    if (prefs.getBool(_hintSeenKey) ?? false) return;
+    await prefs.setBool(_hintSeenKey, true);
+    if (mounted) setState(() => _showHint = true);
+  }
+
+  void _hideHint() {
+    if (_showHint) setState(() => _showHint = false);
+  }
+
+  Widget _buildHintBubble(bool isDark) {
+    final bg = isDark ? const Color(0xFFF5EBDD) : const Color(0xFF4A342B);
+    final fg = isDark ? const Color(0xFF3A2923) : Colors.white;
+    return Material(
+      color: Colors.transparent,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          CustomPaint(
+            size: const Size(16, 8),
+            painter: _HintArrowPainter(bg),
+          ),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.fromLTRB(14, 10, 14, 10),
+            decoration: BoxDecoration(
+              color: bg,
+              borderRadius: BorderRadius.circular(12),
+              boxShadow: const [
+                BoxShadow(
+                  color: Colors.black26,
+                  blurRadius: 8,
+                  offset: Offset(0, 3),
+                ),
+              ],
+            ),
+            child: Text(
+              'Your unlocked products. Downloaded books are saved on this device.',
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 14, height: 1.35, color: fg),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   Future<void> _reload() async {
@@ -67,158 +138,178 @@ class _MyDigitalLibraryScreenState extends State<MyDigitalLibraryScreen> {
             : BoxDecoration(
                 color: isDark ? Colors.black : const Color(0xFFF7F1E8),
               ),
-        child: SafeArea(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+        child: Listener(
+          onPointerDown: (_) => _hideHint(),
+          child: Stack(
             children: [
-              Padding(
-                padding: const EdgeInsets.fromLTRB(8, 8, 16, 4),
-                child: Row(
+              SafeArea(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    IconButton(
-                      onPressed: () => Get.back(),
-                      icon:
-                          Icon(Icons.arrow_back_ios_new, size: 18, color: ink),
-                    ),
-                    Expanded(
-                      child: Text(
-                        'My Digital Library',
-                        textAlign: TextAlign.center,
-                        style: CommanStyle.appBarStyle(context),
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(8, 8, 16, 4),
+                      child: Row(
+                        children: [
+                          IconButton(
+                            onPressed: () => Get.back(),
+                            icon: Icon(Icons.arrow_back_ios_new,
+                                size: 18, color: ink),
+                          ),
+                          Expanded(
+                            child: Text(
+                              'My Digital Library',
+                              textAlign: TextAlign.center,
+                              style: CommanStyle.appBarStyle(context),
+                            ),
+                          ),
+                          const SizedBox(width: 40),
+                        ],
                       ),
                     ),
-                    const SizedBox(width: 40),
-                  ],
-                ),
-              ),
-              if (_loading || _items.isNotEmpty)
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 4, 20, 12),
-                  child: Text(
-                    'Your unlocked products. Downloaded books are saved on this device.',
-                    style: TextStyle(fontSize: 14, height: 1.35, color: muted),
-                  ),
-                ),
-              Expanded(
-                child: _loading
-                    ? const Center(child: CircularProgressIndicator.adaptive())
-                    : _items.isEmpty
-                        ? _buildEmptyState(context, isDark, ink, muted)
-                        : ListView.separated(
-                            padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
-                            itemCount: _items.length,
-                            separatorBuilder: (_, __) =>
-                                const SizedBox(height: 10),
-                            itemBuilder: (context, index) {
-                              final item = _items[index];
-                              final book = item.book;
-                              final date = DateFormat('d MMM yyyy')
-                                  .format(item.purchasedAt);
-                              return Material(
-                                color: card,
-                                borderRadius: BorderRadius.circular(14),
-                                child: InkWell(
-                                  borderRadius: BorderRadius.circular(14),
-                                  onTap: () async {
-                                    final file =
-                                        await DigitalProductsLibraryStore
-                                            .downloadedFile(book.bookId);
-                                    if (file != null) {
-                                      await Get.to(() =>
-                                          PdfViewScreen(filePath: file.path));
-                                      return;
-                                    }
-                                    await Get.to(() =>
-                                        DigitalProductDetailScreen(book: book));
-                                    _reload();
-                                  },
-                                  child: Container(
-                                    padding: const EdgeInsets.all(12),
-                                    decoration: BoxDecoration(
+                    const SizedBox(height: 8),
+                    Expanded(
+                      child: _loading
+                          ? const Center(
+                              child: CircularProgressIndicator.adaptive())
+                          : _items.isEmpty
+                              ? _buildEmptyState(context, isDark, ink, muted)
+                              : ListView.separated(
+                                  padding:
+                                      const EdgeInsets.fromLTRB(16, 0, 16, 24),
+                                  itemCount: _items.length,
+                                  separatorBuilder: (_, __) =>
+                                      const SizedBox(height: 10),
+                                  itemBuilder: (context, index) {
+                                    final item = _items[index];
+                                    final book = item.book;
+                                    final date = DateFormat('d MMM yyyy')
+                                        .format(item.purchasedAt);
+                                    return Material(
+                                      color: card,
                                       borderRadius: BorderRadius.circular(14),
-                                      border: Border.all(color: border),
-                                    ),
-                                    child: Row(
-                                      children: [
-                                        ClipRRect(
-                                          borderRadius:
-                                              BorderRadius.circular(8),
-                                          child: SizedBox(
-                                            width: 52,
-                                            height: 64,
-                                            child: book.bookThumbURL.isEmpty
-                                                ? ColoredBox(
-                                                    color: isDark
-                                                        ? Colors.white12
-                                                        : const Color(
-                                                            0xFFE8DCC8),
-                                                    child: Icon(Icons.menu_book,
-                                                        color: muted, size: 22),
-                                                  )
-                                                : CachedNetworkImage(
-                                                    imageUrl: book.bookThumbURL,
-                                                    fit: BoxFit.cover,
-                                                  ),
+                                      child: InkWell(
+                                        borderRadius: BorderRadius.circular(14),
+                                        onTap: () async {
+                                          final file =
+                                              await DigitalProductsLibraryStore
+                                                  .downloadedFile(book.bookId);
+                                          if (file != null) {
+                                            await Get.to(() => PdfViewScreen(
+                                                filePath: file.path));
+                                            return;
+                                          }
+                                          await Get.to(() =>
+                                              DigitalProductDetailScreen(
+                                                  book: book));
+                                          _reload();
+                                        },
+                                        child: Container(
+                                          padding: const EdgeInsets.all(12),
+                                          decoration: BoxDecoration(
+                                            borderRadius:
+                                                BorderRadius.circular(14),
+                                            border: Border.all(color: border),
                                           ),
-                                        ),
-                                        const SizedBox(width: 12),
-                                        Expanded(
-                                          child: Column(
-                                            crossAxisAlignment:
-                                                CrossAxisAlignment.start,
+                                          child: Row(
                                             children: [
-                                              Text(
-                                                book.bookName,
-                                                maxLines: 2,
-                                                overflow: TextOverflow.ellipsis,
-                                                style: TextStyle(
-                                                  fontWeight: FontWeight.w700,
-                                                  fontSize: 15,
-                                                  color: ink,
+                                              ClipRRect(
+                                                borderRadius:
+                                                    BorderRadius.circular(8),
+                                                child: SizedBox(
+                                                  width: 52,
+                                                  height: 64,
+                                                  child: book
+                                                          .bookThumbURL.isEmpty
+                                                      ? ColoredBox(
+                                                          color: isDark
+                                                              ? Colors.white12
+                                                              : const Color(
+                                                                  0xFFE8DCC8),
+                                                          child: Icon(
+                                                              Icons.menu_book,
+                                                              color: muted,
+                                                              size: 22),
+                                                        )
+                                                      : CachedNetworkImage(
+                                                          imageUrl:
+                                                              book.bookThumbURL,
+                                                          fit: BoxFit.cover,
+                                                        ),
                                                 ),
                                               ),
-                                              const SizedBox(height: 4),
-                                              Text(
-                                                'Saved on $date',
-                                                style: TextStyle(
-                                                  fontSize: 12.5,
-                                                  color: muted,
+                                              const SizedBox(width: 12),
+                                              Expanded(
+                                                child: Column(
+                                                  crossAxisAlignment:
+                                                      CrossAxisAlignment.start,
+                                                  children: [
+                                                    Text(
+                                                      book.bookName,
+                                                      maxLines: 2,
+                                                      overflow:
+                                                          TextOverflow.ellipsis,
+                                                      style: TextStyle(
+                                                        fontWeight:
+                                                            FontWeight.w700,
+                                                        fontSize: 15,
+                                                        color: ink,
+                                                      ),
+                                                    ),
+                                                    const SizedBox(height: 4),
+                                                    Text(
+                                                      'Saved on $date',
+                                                      style: TextStyle(
+                                                        fontSize: 12.5,
+                                                        color: muted,
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ),
+                                              ),
+                                              const SizedBox(width: 8),
+                                              Container(
+                                                padding:
+                                                    const EdgeInsets.symmetric(
+                                                        horizontal: 14,
+                                                        vertical: 8),
+                                                decoration: BoxDecoration(
+                                                  color: isDark
+                                                      ? Colors.white.withValues(
+                                                          alpha: 0.12)
+                                                      : const Color(0xFFF3E4C8),
+                                                  borderRadius:
+                                                      BorderRadius.circular(18),
+                                                ),
+                                                child: Text(
+                                                  'View',
+                                                  style: TextStyle(
+                                                    fontWeight: FontWeight.w700,
+                                                    fontSize: 13,
+                                                    color: isDark
+                                                        ? const Color(
+                                                            0xFFE8C989)
+                                                        : _brown,
+                                                  ),
                                                 ),
                                               ),
                                             ],
                                           ),
                                         ),
-                                        const SizedBox(width: 8),
-                                        Container(
-                                          padding: const EdgeInsets.symmetric(
-                                              horizontal: 14, vertical: 8),
-                                          decoration: BoxDecoration(
-                                            color: isDark
-                                                ? Colors.white
-                                                    .withValues(alpha: 0.12)
-                                                : const Color(0xFFF3E4C8),
-                                            borderRadius:
-                                                BorderRadius.circular(18),
-                                          ),
-                                          child: Text(
-                                            'View',
-                                            style: TextStyle(
-                                              fontWeight: FontWeight.w700,
-                                              fontSize: 13,
-                                              color: isDark
-                                                  ? const Color(0xFFE8C989)
-                                                  : _brown,
-                                            ),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
+                                      ),
+                                    );
+                                  },
                                 ),
-                              );
-                            },
-                          ),
+                    ),
+                  ],
+                ),
               ),
+              if (_showHint)
+                Positioned(
+                  top: MediaQuery.paddingOf(context).top + 58,
+                  left: 16,
+                  right: 16,
+                  child: _buildHintBubble(isDark),
+                ),
             ],
           ),
         ),

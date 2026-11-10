@@ -27,9 +27,13 @@ class LoginScreen extends HookConsumerWidget {
     this.popOnSuccess = false,
     this.replaceOnSuccess,
     this.onOpenSignUp,
+    this.popOnBack = false,
   });
   final bool hasSkip;
   final bool popOnSuccess;
+
+  /// Back icon returns to the previous screen (e.g. Account) instead of Home.
+  final bool popOnBack;
 
   /// UI-only: Prayer Wall + path — replace Login with Post a Prayer (no pop-then-push).
   final VoidCallback? replaceOnSuccess;
@@ -124,6 +128,9 @@ class LoginScreen extends HookConsumerWidget {
                       onPressed: () {
                         if (popOnSuccess || replaceOnSuccess != null) {
                           LoginScreen.popEmbedded(context, false);
+                        } else if (popOnBack &&
+                            Navigator.of(context).canPop()) {
+                          Navigator.of(context).pop();
                         } else {
                           Get.offAll(() => HomeScreen(
                               From: "splash",

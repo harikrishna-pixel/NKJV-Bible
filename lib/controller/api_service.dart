@@ -986,6 +986,10 @@ bool _referralWasAcceptedByApi(
   return false;
 }
 
+/// Sign In / Sign Up: total wait for temp token + auth request on slow
+/// networks before showing "No Internet Connection".
+const Duration _authRequestTimeout = Duration(seconds: 10);
+
 Future<String?> registerUser(
     {required String email,
     required String name,
@@ -993,10 +997,11 @@ Future<String?> registerUser(
     String? referredBy}) async {
   // final CacheNotifier cacheNotifier = CacheNotifier();
   try {
+    final deadline = DateTime.now().add(_authRequestTimeout);
     SharedPreferences prefs = await SharedPreferences.getInstance();
     List<String> selectedCategories =
         prefs.getStringList('selected_categories') ?? [];
-    final token = await getTempToken();
+    final token = await getTempToken().timeout(_authRequestTimeout);
     final inviteCode = referredBy?.trim() ?? '';
     final body = <String, String>{
       'name': name,
@@ -1016,7 +1021,7 @@ Future<String?> registerUser(
         await http.post(Uri.parse(Api.register), headers: <String, String>{
       'Content-Type': 'application/x-www-form-urlencoded',
       'Authorization': 'Bearer $token'
-    }, body: body);
+    }, body: body).timeout(deadline.difference(DateTime.now()));
     final data = jsonDecode(resp.body);
     debugPrint("sign up - $data ");
 
@@ -1135,7 +1140,8 @@ Future<UserModel> loginUser(
     required String password,
     String? referralCode}) async {
   try {
-    final token = await getTempToken();
+    final deadline = DateTime.now().add(_authRequestTimeout);
+    final token = await getTempToken().timeout(_authRequestTimeout);
     final body = <String, String>{
       'email': email,
       'password': password,
@@ -1150,7 +1156,7 @@ Future<UserModel> loginUser(
         await http.post(Uri.parse(Api.login), headers: <String, String>{
       'Content-Type': 'application/x-www-form-urlencoded',
       'Authorization': 'Bearer $token'
-    }, body: body);
+    }, body: body).timeout(deadline.difference(DateTime.now()));
     final data = jsonDecode(resp.body);
     debugPrint("user login - $data");
     if (data['status']) {

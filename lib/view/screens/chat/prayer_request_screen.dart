@@ -78,13 +78,10 @@ class _PrayerRequestScreenState extends State<PrayerRequestScreen> {
 
   static const _relationships = [
     'Friend',
-    'Parent',
-    'Child',
-    'Spouse',
-    'Sibling',
     'Relative',
     'Coworker',
     'Neighbor',
+    'Teacher / Mentor',
     'Church member',
     'Other',
   ];
@@ -115,7 +112,9 @@ class _PrayerRequestScreenState extends State<PrayerRequestScreen> {
   @override
   void initState() {
     super.initState();
-    _request = TextEditingController(text: _defaultFor(PrayerFor.myself));
+    // Pray for Me starts empty (placeholder only); "Use default" fills it.
+    _request = TextEditingController(
+        text: widget.isCustomFlow ? '' : _defaultFor(PrayerFor.myself));
     _request.addListener(_refresh);
     _detailsMyself.addListener(_refresh);
     _detailsFamily.addListener(_refresh);
@@ -168,9 +167,12 @@ class _PrayerRequestScreenState extends State<PrayerRequestScreen> {
     // Swap the text only if the user hasn't edited the current default.
     final untouched = _request.text.trim() == _defaultFor(_for).trim() ||
         _request.text.trim().isEmpty;
+    final wasEmpty = _request.text.trim().isEmpty;
     setState(() {
       _for = f;
-      if (untouched) _request.text = _defaultFor(f);
+      if (untouched && !(widget.isCustomFlow && wasEmpty)) {
+        _request.text = _defaultFor(f);
+      }
     });
   }
 
@@ -265,16 +267,19 @@ class _PrayerRequestScreenState extends State<PrayerRequestScreen> {
                         child: ListView(
                           padding: const EdgeInsets.fromLTRB(18, 0, 18, 20),
                           children: [
-                            _header(ink, muted, isTablet),
-                            const SizedBox(height: 16),
-                            if (!widget.isCustomFlow) ...[
+                            if (widget.isCustomFlow) ...[
+                              _header(ink, muted, isTablet),
+                              const SizedBox(height: 16),
+                            ] else ...[
+                              const SizedBox(height: 4),
                               _categoryCard(ink, muted, card, border),
                               const SizedBox(height: 18),
                             ],
                             _label('Who are you praying for?', ink),
                             const SizedBox(height: 10),
                             _whoChips(ink, card, border),
-                            if (_for == PrayerFor.someoneElse) ...[
+                            if (widget.isCustomFlow &&
+                                _for == PrayerFor.someoneElse) ...[
                               const SizedBox(height: 18),
                               _label('Tell us a little about them', ink),
                               const SizedBox(height: 10),
@@ -321,33 +326,64 @@ class _PrayerRequestScreenState extends State<PrayerRequestScreen> {
                             const SizedBox(height: 4),
                             _textField(
                               controller: _request,
-                              hint: 'Share what you would like to pray for...',
+                              hint: widget.isCustomFlow
+                                  ? 'Speak from your heart...'
+                                  : 'Share what you would like to pray for...',
                               maxLength: 500,
-                              maxLines: 5,
-                              minLines: 3,
+                              maxLines: widget.isCustomFlow ? 5 : 10,
+                              minLines: widget.isCustomFlow ? 3 : 7,
                               ink: ink,
                               muted: muted,
                               card: card,
                               border: border,
                             ),
-                            const SizedBox(height: 14),
-                            _label('Additional details (optional)', ink),
-                            const SizedBox(height: 8),
-                            KeyedSubtree(
-                              key: ValueKey(_for),
-                              child: _textField(
-                                controller: _details,
-                                hint:
-                                    "Share anything specific you'd like to include...\n(e.g. a situation, a person, or something on your heart)",
-                                maxLength: 500,
-                                maxLines: 4,
-                                minLines: 3,
-                                ink: ink,
-                                muted: muted,
-                                card: card,
-                                border: border,
+                            if (!widget.isCustomFlow &&
+                                _for == PrayerFor.someoneElse) ...[
+                              const SizedBox(height: 14),
+                              Text.rich(
+                                TextSpan(
+                                  text: 'Relationship',
+                                  style: TextStyle(
+                                    fontFamily: 'Georgia',
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w700,
+                                    color: ink,
+                                  ),
+                                  children: [
+                                    TextSpan(
+                                      text: ' (optional)',
+                                      style: TextStyle(
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w400,
+                                        color: muted,
+                                      ),
+                                    ),
+                                  ],
+                                ),
                               ),
-                            ),
+                              const SizedBox(height: 8),
+                              _relationshipField(ink, muted, card, border),
+                            ],
+                            if (widget.isCustomFlow) ...[
+                              const SizedBox(height: 14),
+                              _label('Additional details (optional)', ink),
+                              const SizedBox(height: 8),
+                              KeyedSubtree(
+                                key: ValueKey(_for),
+                                child: _textField(
+                                  controller: _details,
+                                  hint:
+                                      "Share anything specific you'd like to include...\n(e.g. a situation, a person, or something on your heart)",
+                                  maxLength: 500,
+                                  maxLines: 4,
+                                  minLines: 3,
+                                  ink: ink,
+                                  muted: muted,
+                                  card: card,
+                                  border: border,
+                                ),
+                              ),
+                            ],
                             if (_showInfoTip) ...[
                               const SizedBox(height: 14),
                               _infoCard(ink, muted, isDark),
@@ -489,9 +525,14 @@ class _PrayerRequestScreenState extends State<PrayerRequestScreen> {
       ),
       child: Row(
         children: [
-          SizedBox(
-            width: 48,
-            height: 48,
+          Container(
+            width: 56,
+            height: 56,
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: _gold.withValues(alpha: 0.18),
+            ),
             child: widget.categoryIconAsset != null
                 ? Image.asset(widget.categoryIconAsset!, fit: BoxFit.contain)
                 : const Icon(Icons.favorite, color: _brown),
@@ -501,9 +542,6 @@ class _PrayerRequestScreenState extends State<PrayerRequestScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Prayer Category',
-                    style: TextStyle(fontSize: 12, color: muted)),
-                const SizedBox(height: 2),
                 Text(
                   widget.categoryTitle,
                   style: TextStyle(
@@ -525,15 +563,24 @@ class _PrayerRequestScreenState extends State<PrayerRequestScreen> {
           OutlinedButton(
             onPressed: () => Navigator.of(context).pop(),
             style: OutlinedButton.styleFrom(
-              foregroundColor: ink,
-              side: BorderSide(color: border),
-              padding: const EdgeInsets.symmetric(horizontal: 12),
+              foregroundColor: _gold,
+              side: const BorderSide(color: _gold),
+              padding: const EdgeInsets.only(left: 12, right: 6),
               minimumSize: const Size(0, 34),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(18),
               ),
             ),
-            child: const Text('Change', style: TextStyle(fontSize: 13)),
+            child: const Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  'Change',
+                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                ),
+                Icon(Icons.chevron_right, size: 18),
+              ],
+            ),
           ),
         ],
       ),
@@ -590,7 +637,7 @@ class _PrayerRequestScreenState extends State<PrayerRequestScreen> {
                     child: Text(
                       label,
                       maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
+                      softWrap: false,
                       style: TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.w600,
@@ -606,15 +653,27 @@ class _PrayerRequestScreenState extends State<PrayerRequestScreen> {
       );
     }
 
-    return Row(
-      children: [
-        chip(PrayerFor.myself, Icons.person_outline, 'Myself'),
-        const SizedBox(width: 8),
-        chip(PrayerFor.family, Icons.groups_outlined, 'My family'),
-        const SizedBox(width: 8),
-        chip(PrayerFor.someoneElse, Icons.person_add_alt_outlined,
-            'Someone else'),
-      ],
+    // Equal-width chips that fill the row; on narrow screens (SE) the row
+    // scrolls horizontally instead of cutting the labels.
+    return LayoutBuilder(
+      builder: (context, constraints) => SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: ConstrainedBox(
+          constraints: BoxConstraints(minWidth: constraints.maxWidth),
+          child: IntrinsicWidth(
+            child: Row(
+              children: [
+                chip(PrayerFor.myself, Icons.person_outline, 'Myself'),
+                const SizedBox(width: 8),
+                chip(PrayerFor.family, Icons.groups_outlined, 'My family'),
+                const SizedBox(width: 8),
+                chip(PrayerFor.someoneElse, Icons.person_add_alt_outlined,
+                    'Someone else'),
+              ],
+            ),
+          ),
+        ),
+      ),
     );
   }
 

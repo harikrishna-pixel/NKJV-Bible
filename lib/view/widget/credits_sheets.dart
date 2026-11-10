@@ -500,24 +500,22 @@ class _KeepGoingSheetState extends State<_KeepGoingSheet>
                 ),
               ]),
             ),
-          if (_yearly) ...[
-            const SizedBox(height: 4),
-            const Text(
-              "You won't be charged anything today.",
-              style: TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
-                color: _ink,
-              ),
+          const SizedBox(height: 4),
+          const Text(
+            "You won't be charged anything today.",
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+              color: _ink,
             ),
-          ],
+          ),
           const SizedBox(height: 12),
           _GradientButton(
             gradient: _goldGradient,
             onTap: _startPlan,
             child: Center(
               child: Text(
-                _yearly ? 'Start My 3-Day Free Trial →' : 'Continue →',
+                'Start My 3-Day Free Trial →',
                 style: const TextStyle(
                   fontSize: 17,
                   fontWeight: FontWeight.w800,
@@ -531,7 +529,7 @@ class _KeepGoingSheetState extends State<_KeepGoingSheet>
             Text(
               _yearly
                   ? 'Then $price/year · Auto-renews · Cancel anytime.'
-                  : '$price/month · Auto-renews · Cancel anytime.',
+                  : 'Then $price/month · Auto-renews · Cancel anytime.',
               style: const TextStyle(fontSize: 12, color: _muted),
             ),
           ],

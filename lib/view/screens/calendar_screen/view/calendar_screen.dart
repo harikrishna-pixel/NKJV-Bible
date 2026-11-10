@@ -228,6 +228,7 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
               // the focused field is auto-scrolled into view.
               Padding(
               padding: EdgeInsets.only(
+                top: MediaQuery.of(context).padding.top,
                 bottom: MediaQuery.of(context).viewInsets.bottom,
               ),
               child: Column(
@@ -240,12 +241,7 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        const SafeArea(
-                          bottom: false,
-                          child: SizedBox(
-                            height: 4,
-                          ),
-                        ),
+                        const SizedBox(height: 4),
                         Padding(
                           padding: const EdgeInsets.symmetric(horizontal: 8),
                           child: Row(

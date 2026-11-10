@@ -119,6 +119,12 @@ class _SettingScreenState extends State<SettingScreen>
         chevron: isFree,
         onTap: isFree
             ? () async {
+                if (!await InternetConnection().hasInternetAccess) {
+                  Constants.showToast(
+                      'Please check your internet connection and try again.',
+                      3000);
+                  return;
+                }
                 await WalletEntry.openPremium();
                 await _loadWalletSummary();
               }
