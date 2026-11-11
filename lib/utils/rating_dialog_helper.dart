@@ -2,7 +2,7 @@ import 'package:biblebookapp/view/widget/thanks_for_love_rating_dialog_content.d
 import 'package:biblebookapp/view/constants/colors.dart';
 import 'package:biblebookapp/view/constants/constant.dart';
 import 'package:biblebookapp/view/constants/share_preferences.dart';
-import 'package:connectivity_plus/connectivity_plus.dart';
+import 'package:biblebookapp/view/screens/dashboard/constants.dart';
 import 'package:flutter/material.dart';
 import 'package:in_app_review/in_app_review.dart';
 
@@ -66,42 +66,9 @@ class RatingDialogHelper {
               onClose: () => Navigator.of(dialogContext).pop(),
               onRate: () async {
                 Navigator.pop(dialogContext);
-                // Check internet connection with retry mechanism for reliability
-                bool hasConnection = false;
-                for (int i = 0; i < 3; i++) {
-                  try {
-                    final connectivityResult =
-                        await Connectivity().checkConnectivity();
-                    // If result is empty (occasionally on first call), retry after delay
-                    if (connectivityResult.isEmpty) {
-                      if (i < 2) {
-                        await Future.delayed(const Duration(milliseconds: 300));
-                      }
-                      continue;
-                    }
-                    hasConnection =
-                        connectivityResult.contains(ConnectivityResult.mobile) ||
-                        connectivityResult.contains(ConnectivityResult.wifi) ||
-                        connectivityResult.contains(ConnectivityResult.ethernet);
-                    // Empty result (e.g. on some 5G/configs) — assume connected for rate us
-                    if (connectivityResult.isEmpty) hasConnection = true;
-                    if (hasConnection) {
-                      break; // Connection found, exit retry loop
-                    }
-                    // Wait a bit before retrying (only if not last attempt)
-                    if (i < 2) {
-                      await Future.delayed(const Duration(milliseconds: 300));
-                    }
-                  } catch (e) {
-                    debugPrint('Connectivity check error: $e');
-                    // Continue to next retry
-                  }
-                }
-
-                if (!hasConnection) {
-                  Constants.showToast("Check your Internet connection");
-                  return;
-                }
+                // Same as Settings Rate Us: do not block on Connectivity().
+                // That check often false-fails after Share and shows
+                // "Check your Internet connection" with no App Store action.
                 await SharPreferences.setString('OpenAd', '1');
                 await _requestReview();
               },
@@ -113,7 +80,8 @@ class RatingDialogHelper {
     );
   }
 
-  /// Requests in-app review
+  /// Requests in-app review; if unavailable, opens the App Store listing
+  /// (matches "Rate Us on the App Store" button).
   static Future<void> _requestReview() async {
     final InAppReview inAppReview = InAppReview.instance;
 
@@ -122,12 +90,16 @@ class RatingDialogHelper {
     if (isAvailable) {
       try {
         await inAppReview.requestReview();
+        return;
       } catch (e, st) {
-        Constants.showToast("review request failed");
         debugPrint('Error: $e,$st');
       }
-    } else {
-      Constants.showToast("review request not available, try again later");
+    }
+    try {
+      await inAppReview.openStoreListing(appStoreId: BibleInfo.apple_AppId);
+    } catch (e, st) {
+      Constants.showToast("Could not open the App Store. Please try again.");
+      debugPrint('openStoreListing error: $e,$st');
     }
   }
 }

@@ -308,16 +308,19 @@ class _PrayerRequestScreenState extends State<PrayerRequestScreen> {
                                 TextButton.icon(
                                   onPressed: () => setState(
                                       () => _request.text = _defaultFor(_for)),
-                                  icon: Icon(Icons.refresh,
-                                      size: 16, color: isDark ? _gold : _brown),
+                                  // Gold + light halo so it stays readable on
+                                  // the dark photo areas (same accent as Change).
+                                  icon: const Icon(Icons.refresh,
+                                      size: 16, color: _gold),
                                   label: Text(
                                     'Use default',
                                     style: TextStyle(
                                       fontSize: 13,
                                       fontWeight: FontWeight.w600,
-                                      color: isDark ? _gold : _brown,
+                                      color: _gold,
                                       decoration: TextDecoration.underline,
-                                      decorationColor: isDark ? _gold : _brown,
+                                      decorationColor: _gold,
+                                      shadows: _onPhotoShadow(_ink),
                                     ),
                                   ),
                                 ),

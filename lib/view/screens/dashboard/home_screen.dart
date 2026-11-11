@@ -2435,7 +2435,7 @@ class _HomeScreenState extends State<HomeScreen>
       }
     }
 
-    if (shouldShowAd) {
+    if (shouldShowAd && AdService.canShowInterstitialByGap) {
       try {
         await controller.interstitialAd?.show();
         if (controller.interstitialAd != null) {
@@ -2495,6 +2495,12 @@ class _HomeScreenState extends State<HomeScreen>
   // This ensures ad shows FIRST, then content shows AFTER ad is dismissed
   Future<void> _showInterstitialAdAndWait() async {
     final completer = Completer<void>();
+
+    // Shared 2-min gap (swipe / Mark as Read / Amen / streak).
+    if (!AdService.canShowInterstitialByGap) {
+      completer.complete();
+      return completer.future;
+    }
 
     // Check if ad is available
     final ad = _adService.interstitialAd;
@@ -6342,8 +6348,15 @@ class _HomeScreenState extends State<HomeScreen>
             }
           });
         },
-        onUpgradeTap: () {
-          openPaywallFromDrawer();
+        onUpgradeTap: () async {
+          if (!await InternetConnection().hasInternetAccess) {
+            Constants.showToast(
+              "You're offline. Please check your internet connection and try again.",
+              3000,
+            );
+            return;
+          }
+          await openPaywallFromDrawer();
         },
         onPremiumInfoTap: () async {
           try {

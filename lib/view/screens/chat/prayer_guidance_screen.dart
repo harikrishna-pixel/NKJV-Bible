@@ -1819,14 +1819,29 @@ ${personalInstruction}
       'prayer_choose_credit_amount_seen';
 
   /// First Prayer Guidance open: "Choose Credit Amount" once (not every generate).
-  /// Then fall back to the shared Chat-style intro if that was never seen.
+  /// Free users: Chat-style free intro. AR Monthly/Yearly: Premium Active intro
+  /// (same keys as Chat — `chat_premium_intro_seen` / `chat_intro_seen`).
   Future<void> _showPrayerIntroIfNeeded() async {
     final prefs = await SharedPreferences.getInstance();
     final skipCredits = await BibleInfo.shouldSkipChatPrayerCredits();
+
+    // After Monthly/Yearly: show Premium Active once (same as Chat).
+    if (skipCredits) {
+      final seenPremium = prefs.getBool('chat_premium_intro_seen') ?? false;
+      if (seenPremium || !mounted) return;
+      final length = await WalletService.getAnswerLength();
+      if (!mounted) return;
+      setState(() => _introAnswerLength = length);
+      await _showPrayerIntroDialog(isPremium: true);
+      return;
+    }
+
+    // Shared with Chat: if either screen already chose answer length, skip.
+    final seenIntro = prefs.getBool('chat_intro_seen') ?? false;
     final creditSeen =
         prefs.getBool(_kPrayerChooseCreditAmountSeen) ?? false;
 
-    if (!skipCredits && !creditSeen && mounted) {
+    if (!creditSeen && !seenIntro && mounted) {
       final length = await WalletService.getAnswerLength();
       if (!mounted) return;
       setState(() => _introAnswerLength = length);
@@ -1839,10 +1854,11 @@ ${personalInstruction}
         if (mounted) setState(() => _introAnswerLength = picked);
       }
       await prefs.setBool(_kPrayerChooseCreditAmountSeen, true);
+      // Same purpose as Chat intro — don't show Chat's sheet next.
+      await prefs.setBool('chat_intro_seen', true);
       return;
     }
 
-    final seenIntro = prefs.getBool('chat_intro_seen') ?? false;
     if (seenIntro || !mounted) return;
 
     final length = await WalletService.getAnswerLength();
@@ -1851,10 +1867,10 @@ ${personalInstruction}
       _introAnswerLength = length;
     });
     if (!mounted) return;
-    await _showPrayerIntroDialog();
+    await _showPrayerIntroDialog(isPremium: false);
   }
 
-  Future<void> _showPrayerIntroDialog() async {
+  Future<void> _showPrayerIntroDialog({required bool isPremium}) async {
     final themeProvider = Provider.of<ThemeProvider>(context, listen: false);
     final isDark = themeProvider.themeMode == ThemeMode.dark;
     final screenWidth = MediaQuery.of(context).size.width;
@@ -1947,44 +1963,113 @@ ${personalInstruction}
                                 textAlign: TextAlign.center,
                               ),
                               const SizedBox(height: 16),
-                              Container(
-                                padding: EdgeInsets.symmetric(
-                                  horizontal:
-                                      screenWidth > 450 ? 16 : 14,
-                                  vertical:
-                                      screenWidth > 450 ? 10 : 8,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: Colors.white.withOpacity(0.2),
-                                  borderRadius: BorderRadius.circular(12),
-                                  border: Border.all(
-                                    color: Colors.white.withOpacity(0.3),
-                                    width: 1,
+                              if (isPremium)
+                                Container(
+                                  padding: EdgeInsets.symmetric(
+                                    horizontal:
+                                        screenWidth > 450 ? 16 : 14,
+                                    vertical:
+                                        screenWidth > 450 ? 10 : 8,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFF5C3317)
+                                        .withOpacity(0.55),
+                                    borderRadius:
+                                        BorderRadius.circular(12),
+                                    border: Border.all(
+                                      color: const Color(0xFFE8C989),
+                                      width: 1.2,
+                                    ),
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(
+                                        Icons.workspace_premium,
+                                        color: const Color(0xFFE8C989),
+                                        size: screenWidth > 450
+                                            ? 22
+                                            : 20,
+                                      ),
+                                      const SizedBox(width: 10),
+                                      Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Text(
+                                            'Premium Active',
+                                            style: TextStyle(
+                                              color: Colors.white,
+                                              fontSize:
+                                                  screenWidth > 450
+                                                      ? 15
+                                                      : 14,
+                                              fontWeight:
+                                                  FontWeight.w700,
+                                            ),
+                                          ),
+                                          Text(
+                                            'Unlimited AI Chats',
+                                            style: TextStyle(
+                                              color: Colors.white
+                                                  .withOpacity(0.9),
+                                              fontSize:
+                                                  screenWidth > 450
+                                                      ? 13
+                                                      : 12,
+                                              fontWeight:
+                                                  FontWeight.w500,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ],
+                                  ),
+                                )
+                              else
+                                Container(
+                                  padding: EdgeInsets.symmetric(
+                                    horizontal:
+                                        screenWidth > 450 ? 16 : 14,
+                                    vertical:
+                                        screenWidth > 450 ? 10 : 8,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color:
+                                        Colors.white.withOpacity(0.2),
+                                    borderRadius:
+                                        BorderRadius.circular(12),
+                                    border: Border.all(
+                                      color: Colors.white
+                                          .withOpacity(0.3),
+                                      width: 1,
+                                    ),
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(
+                                        Icons.account_balance_wallet,
+                                        color: Colors.white,
+                                        size: screenWidth > 450
+                                            ? 20
+                                            : 18,
+                                      ),
+                                      const SizedBox(width: 8),
+                                      Text(
+                                        'You have $initialCredits credits',
+                                        style: TextStyle(
+                                          color: Colors.white,
+                                          fontSize: screenWidth > 450
+                                              ? 15
+                                              : 14,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                    ],
                                   ),
                                 ),
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Icon(
-                                      Icons.account_balance_wallet,
-                                      color: Colors.white,
-                                      size:
-                                          screenWidth > 450 ? 20 : 18,
-                                    ),
-                                    const SizedBox(width: 8),
-                                    Text(
-                                      'You have $initialCredits credits',
-                                      style: TextStyle(
-                                        color: Colors.white,
-                                        fontSize: screenWidth > 450
-                                            ? 15
-                                            : 14,
-                                        fontWeight: FontWeight.w600,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
                             ],
                           ),
                         ),
@@ -2049,7 +2134,9 @@ ${personalInstruction}
                                     const SizedBox(width: 12),
                                     Expanded(
                                       child: Text(
-                                        'Each response uses credits. You can change this anytime in your Wallet.',
+                                        isPremium
+                                            ? 'As a Premium member, you can ask unlimited questions with no credit deductions.'
+                                            : 'Each response uses credits. You can change this anytime in your Wallet.',
                                         style: TextStyle(
                                           color: CommanColor
                                                   .whiteBlack(context)
@@ -2084,7 +2171,7 @@ ${personalInstruction}
                                 length: 'small',
                                 title: 'Short Answer',
                                 description: 'Quick & concise response',
-                                cost: '20 Credits',
+                                cost: isPremium ? null : '20 Credits',
                                 setBottomSheetState: setBottomSheetState,
                               ),
                               const SizedBox(height: 12),
@@ -2095,7 +2182,7 @@ ${personalInstruction}
                                 length: 'medium',
                                 title: 'Medium Answer',
                                 description: 'Balanced explanation',
-                                cost: '50 Credits',
+                                cost: isPremium ? null : '50 Credits',
                                 setBottomSheetState: setBottomSheetState,
                               ),
                               const SizedBox(height: 12),
@@ -2106,7 +2193,7 @@ ${personalInstruction}
                                 length: 'large',
                                 title: 'Full Study',
                                 description: 'Detailed & comprehensive',
-                                cost: '100 Credits',
+                                cost: isPremium ? null : '100 Credits',
                                 setBottomSheetState: setBottomSheetState,
                               ),
                             ],
@@ -2156,8 +2243,14 @@ ${personalInstruction}
                                   onPressed: () async {
                                     final prefs =
                                     await SharedPreferences.getInstance();
+                                    if (isPremium) {
+                                      await prefs.setBool(
+                                          'chat_premium_intro_seen', true);
+                                    }
                                     await prefs.setBool(
                                         'chat_intro_seen', true);
+                                    await prefs.setBool(
+                                        _kPrayerChooseCreditAmountSeen, true);
                                     if (mounted) {
                                       Navigator.pop(context);
                                     }
@@ -2210,7 +2303,7 @@ ${personalInstruction}
     required String length,
     required String title,
     required String description,
-    required String cost,
+    required String? cost,
     required StateSetter setBottomSheetState,
   }) {
     final isSelected = _introAnswerLength == length;
@@ -2315,38 +2408,40 @@ ${personalInstruction}
                 ],
               ),
             ),
-            const SizedBox(width: 8),
-            Container(
-              padding: EdgeInsets.symmetric(
-                horizontal: screenWidth > 450 ? 12 : 10,
-                vertical: 6,
-              ),
-              decoration: BoxDecoration(
-                color: isSelected
-                    ? (isDark
-                        ? const Color(0xFFFFD54F)
-                        : CommanColor.lightDarkPrimary(context))
-                    : (isDark
-                        ? Colors.white.withOpacity(0.1)
-                        : CommanColor.lightDarkPrimary(context)
-                            .withOpacity(0.1)),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Text(
-                cost,
-                style: TextStyle(
+            if (cost != null) ...[
+              const SizedBox(width: 8),
+              Container(
+                padding: EdgeInsets.symmetric(
+                  horizontal: screenWidth > 450 ? 12 : 10,
+                  vertical: 6,
+                ),
+                decoration: BoxDecoration(
                   color: isSelected
                       ? (isDark
-                          ? const Color(0xFF3D2914)
-                          : Colors.white)
+                          ? const Color(0xFFFFD54F)
+                          : CommanColor.lightDarkPrimary(context))
                       : (isDark
-                          ? Colors.white.withOpacity(0.88)
-                          : CommanColor.lightDarkPrimary(context)),
-                  fontSize: screenWidth > 450 ? 14 : 13,
-                  fontWeight: FontWeight.bold,
+                          ? Colors.white.withOpacity(0.1)
+                          : CommanColor.lightDarkPrimary(context)
+                              .withOpacity(0.1)),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                  cost,
+                  style: TextStyle(
+                    color: isSelected
+                        ? (isDark
+                            ? const Color(0xFF3D2914)
+                            : Colors.white)
+                        : (isDark
+                            ? Colors.white.withOpacity(0.88)
+                            : CommanColor.lightDarkPrimary(context)),
+                    fontSize: screenWidth > 450 ? 14 : 13,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
               ),
-            ),
+            ],
           ],
         ),
       ),
@@ -2520,7 +2615,7 @@ ${personalInstruction}
         final canShowByTime = lastStr == null ||
             lastStr.isEmpty ||
             now.difference(DateTime.tryParse(lastStr) ?? now).inMinutes >= 3;
-        if (canShowByTime) {
+        if (canShowByTime && AdService.canShowInterstitialByGap) {
               await _showInterstitialAdAndWait();
               await SharPreferences.setString(
                   SharPreferences.lastBackInterstitialTime,
@@ -2569,6 +2664,7 @@ ${personalInstruction}
         }
       },
       onAdShowedFullScreenContent: (ad) async {
+        AdService.markInterstitialShown();
         await SharPreferences.setString('OpenAd', '1');
         debugPrint('✅ AD: Ad is now showing...');
       },

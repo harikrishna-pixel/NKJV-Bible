@@ -105,6 +105,11 @@ class AdService {
 
   void showInterstitialAd() async {
     await Future.delayed(Duration(milliseconds: 600));
+    // Shared 2-min gap for every interstitial trigger.
+    if (!canShowInterstitialByGap) {
+      EasyLoading.dismiss();
+      return;
+    }
     if (_sharedInterstitialAd != null) {
       EasyLoading.dismiss();
       _sharedInterstitialAd!.show();
@@ -124,6 +129,8 @@ class AdService {
   Future<void> showInterstitialAdAndWait({
     Duration timeout = const Duration(seconds: 30),
   }) async {
+    // Shared 2-min gap for every interstitial trigger.
+    if (!canShowInterstitialByGap) return;
     final ad = _sharedInterstitialAd;
     if (ad == null || !_sharedInterstitialLoaded) {
       loadInterstitialAd(() {});

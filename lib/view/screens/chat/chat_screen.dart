@@ -400,9 +400,12 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     final prefs = await SharedPreferences.getInstance();
     final isPremium = await BibleInfo.shouldSkipChatPrayerCredits();
     // Free intro once; Premium Active once after Monthly/Yearly purchase.
+    // Also skip free intro if Prayer already showed answer-length once.
+    final prayerCreditSeen =
+        prefs.getBool('prayer_choose_credit_amount_seen') ?? false;
     final seen = isPremium
         ? (prefs.getBool('chat_premium_intro_seen') ?? false)
-        : (prefs.getBool('chat_intro_seen') ?? false);
+        : ((prefs.getBool('chat_intro_seen') ?? false) || prayerCreditSeen);
     if (seen || !mounted) return;
 
     final length = await WalletService.getAnswerLength();
@@ -771,6 +774,10 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                                         'chat_premium_intro_seen', true);
                                   }
                                   await prefs.setBool('chat_intro_seen', true);
+                                  // Same purpose as Prayer credit sheet —
+                                  // don't show Prayer's answer-length next.
+                                  await prefs.setBool(
+                                      'prayer_choose_credit_amount_seen', true);
                                   if (mounted) {
                                     Navigator.pop(context);
                                   }
@@ -1420,12 +1427,20 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   /// Show interstitial and wait for dismiss (for back-button ad). One ad only for unsubscribed when leaving after activity.
   Future<void> _showChatBackInterstitialAndWait() async {
     final completer = Completer<void>();
+    // Shared 2-min gap with Reading / Image / Mark as Read interstitials.
+    if (!AdService.canShowInterstitialByGap) {
+      completer.complete();
+      return completer.future;
+    }
     final ad = _chatBackAdService.interstitialAd;
     if (ad == null) {
       completer.complete();
       return completer.future;
     }
     ad.fullScreenContentCallback = FullScreenContentCallback(
+      onAdShowedFullScreenContent: (a) {
+        AdService.markInterstitialShown();
+      },
       onAdDismissedFullScreenContent: (a) async {
         a.dispose();
         _chatBackAdService.loadInterstitialAd(() {});
