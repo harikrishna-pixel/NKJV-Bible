@@ -717,6 +717,8 @@ class _SubscriptionScreenState extends State<SubscriptionScreen>
     if (best == null) {
       EasyLoading.dismiss();
       Constants.showToast('No active subscription available');
+      // Same as offline/catch: close invisible restore host or taps stay blocked.
+      _popInvisiblePurchaseHost(false);
       return;
     }
     debugPrint(

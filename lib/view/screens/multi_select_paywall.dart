@@ -33,12 +33,9 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:url_launcher/url_launcher.dart';
 
-/// Multi-select paywall matching OldPaper Design B (PAYWALL v8 APPROVED).
-
+/// Multi-select paywall UI (Old Paper Irresistible HTML).
 /// Product IDs / prices come from the same sources as [SubscriptionScreen].
-
 /// Purchases run through the existing invisible [SubscriptionScreen] host —
-
 /// no changes to that purchase / restore logic.
 
 class MultiSelectPaywall extends StatefulWidget {
@@ -71,25 +68,26 @@ enum _PwCard { ai, lifetime }
 enum _AiDur { sixMonth, oneYear }
 
 class _MultiSelectPaywallState extends State<MultiSelectPaywall> {
-  // OldPaper v8 Design B palette (UI only).
-
-  static const Color _cream = Color(0xFFEFE6D8);
-
-  static const Color _paper = Color(0xFFFDFBF6);
-
-  static const Color _ink = Color(0xFF101B2B);
-
-  static const Color _line = Color(0xFFE2D6C0);
-
-  static const Color _purple = Color(0xFF5B3FBF);
-
-  static const Color _green = Color(0xFF1E7A45);
-
-  static const Color _greenSoft = Color(0xFFDCEFE3);
+  // Old Paper Irresistible paywall palette (UI only — from HTML).
+  static const Color _cream = Color(0xFFF4E9D2);
+  static const Color _paper = Color(0xFFFBF4E2);
+  static const Color _ink = Color(0xFF2B1F13);
+  static const Color _soft = Color(0xFF5A4A30);
+  static const Color _gold = Color(0xFFB08B3F);
+  static const Color _goldDeep = Color(0xFF96712E);
+  static const Color _line = Color(0xFFE2D2B2);
+  static const Color _selBorder = Color(0xFF9A5A2A);
+  static const Color _ctaTop = Color(0xFFC07A3C);
+  static const Color _ctaBot = Color(0xFF9A5323);
+  static const String _serif = 'Georgia';
 
   late _PwCard _sel = widget.selectLifetime ? _PwCard.lifetime : _PwCard.ai;
 
   _AiDur _dur = _AiDur.oneYear;
+
+  /// Exit / win-back sheet (UI only). First ✕ / Continue Free shows it once.
+  bool _exitOfferVisible = false;
+  bool _exitOfferShownOnce = false;
 
   ProductDetails? _sixMonth;
 
@@ -373,12 +371,52 @@ class _MultiSelectPaywallState extends State<MultiSelectPaywall> {
   }
 
   String get _ctaLabel => _sel == _PwCard.lifetime
-      ? 'Get Lifetime Access →'
-      : 'Start My 3-Day Free Trial →';
+      ? 'Unlock Lifetime Access'
+      : 'Start My 3-Day Free Trial';
 
-  String get _aboveCta => _sel == _PwCard.lifetime
-      ? 'One payment today. Yours from here on.'
-      : "You won't be charged anything today.";
+  String get _trustLine => _sel == _PwCard.lifetime
+      ? 'One-time payment · Secure checkout'
+      : 'No charge today · Cancel anytime';
+
+  String get _monthPrice {
+    final p = _sixMonth;
+    if (p != null && p.price.isNotEmpty) return p.price;
+    return '\$5.99';
+  }
+
+  String get _yearPrice {
+    final p = _oneYear;
+    if (p != null && p.price.isNotEmpty) return p.price;
+    return '\$39.99';
+  }
+
+  String get _yearAnchor {
+    final monthly = _sixMonth?.rawPrice ?? 0;
+    if (monthly > 0) {
+      final anchor = monthly * 12;
+      final symbol = (_sixMonth?.currencySymbol.isNotEmpty == true)
+          ? _sixMonth!.currencySymbol
+          : '\$';
+      return '$symbol${anchor.toStringAsFixed(2)}';
+    }
+    return '\$71.88';
+  }
+
+  String get _headline {
+    if (_sel == _PwCard.lifetime) return 'Pay Once. Read Ad-Free.';
+    if (_dur == _AiDur.oneYear) return 'A Year of Deeper Faith';
+    return 'Go Deeper. Every Day.';
+  }
+
+  String get _subhead {
+    if (_sel == _PwCard.lifetime) {
+      return 'Your reading & study tools, for life.';
+    }
+    if (_dur == _AiDur.oneYear) {
+      return 'Unlimited Bible AI + ad-free reading.';
+    }
+    return 'One plan. Unlimited Bible AI. No ads.';
+  }
 
   String get _belowCta {
     if (_sel == _PwCard.lifetime) {
@@ -406,11 +444,44 @@ class _MultiSelectPaywallState extends State<MultiSelectPaywall> {
   }
 
   Future<void> _continueLimited() async {
+    if (!_exitOfferShownOnce) {
+      if (!mounted) return;
+      setState(() {
+        _exitOfferShownOnce = true;
+        _exitOfferVisible = true;
+      });
+      return;
+    }
     await _navigateAwayFromPaywall();
   }
 
   Future<void> _onClose() async {
+    if (_exitOfferVisible) {
+      if (!mounted) return;
+      setState(() => _exitOfferVisible = false);
+      await _navigateAwayFromPaywall();
+      return;
+    }
+    if (!_exitOfferShownOnce) {
+      if (!mounted) return;
+      setState(() {
+        _exitOfferShownOnce = true;
+        _exitOfferVisible = true;
+      });
+      return;
+    }
     await _navigateAwayFromPaywall();
+  }
+
+  /// Exit sheet CTA — same yearly purchase path (no new product / pricing logic).
+  Future<void> _claimExitGift() async {
+    if (!mounted) return;
+    setState(() {
+      _exitOfferVisible = false;
+      _sel = _PwCard.ai;
+      _dur = _AiDur.oneYear;
+    });
+    await _onPrimaryCta();
   }
 
   String _formatPlanExpiry(DateTime date) {
@@ -922,909 +993,686 @@ class _MultiSelectPaywallState extends State<MultiSelectPaywall> {
     }
   }
 
+
   @override
   Widget build(BuildContext context) {
     final w = MediaQuery.sizeOf(context).width;
-
     final isTablet = w > 600;
-
-    // Tablet reference uses wider content (~8% inset); phone matches v8 16.
-
-    final hPad = isTablet ? (w * 0.08).clamp(36.0, 64.0) : 16.0;
+    final hPad = isTablet ? (w * 0.08).clamp(36.0, 64.0) : 22.0;
 
     return PopScope(
       canPop: false,
       onPopInvokedWithResult: (didPop, result) async {
         if (didPop) return;
-
-        await _navigateAwayFromPaywall();
+        await _onClose();
       },
       child: Scaffold(
-      backgroundColor: _cream,
-      body: Column(
-        children: [
-          Expanded(
-            child: SingleChildScrollView(
-              physics: const BouncingScrollPhysics(),
-              child: Column(
-                children: [
-                  _buildHero(isTablet),
-                  Padding(
-                      // UI only: a little space between benefits → AI Premium.
-
-                    padding: EdgeInsets.fromLTRB(
-                          hPad, isTablet ? 12 : 10, hPad, 0),
-
+        backgroundColor: _cream,
+        body: Stack(
+          children: [
+            // Paper texture feel (UI only).
+            Positioned.fill(
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  color: _cream,
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      _cream.withValues(alpha: 0.95),
+                      _cream,
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            Column(
+              children: [
+                Expanded(
+                  child: SingleChildScrollView(
+                    physics: const BouncingScrollPhysics(),
+                    padding: EdgeInsets.fromLTRB(hPad, 0, hPad, 8),
                     child: Column(
                       children: [
-                        _buildAiCard(isTablet),
-                          SizedBox(height: isTablet ? 12 : 9),
-                        _buildLifetimeCard(isTablet),
+                        SizedBox(height: MediaQuery.paddingOf(context).top + 8),
+                        Align(
+                          alignment: Alignment.centerRight,
+                          child: InkWell(
+                            onTap: _onClose,
+                            customBorder: const CircleBorder(),
+                            child: SizedBox(
+                              width: 28,
+                              height: 28,
+                              child: Icon(
+                                Icons.close,
+                                size: 20,
+                                color: const Color(0xFF6B5A44),
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        _buildAppIconHeader(isTablet),
+                        const SizedBox(height: 8),
+                        Text(
+                          _headline,
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontFamily: _serif,
+                            fontWeight: FontWeight.w700,
+                            fontSize: isTablet ? 28 : 24,
+                            height: 1.08,
+                            letterSpacing: -0.3,
+                            color: const Color(0xFF241A0F),
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          _subhead,
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontSize: isTablet ? 15 : 13.5,
+                            fontWeight: FontWeight.w600,
+                            color: _soft,
+                          ),
+                        ),
+                        const SizedBox(height: 11),
+                        _buildBenefits(isTablet),
+                        const SizedBox(height: 11),
+                        Container(
+                          height: 1,
+                          margin: const EdgeInsets.symmetric(horizontal: 2),
+                          decoration: const BoxDecoration(
+                            gradient: LinearGradient(
+                              colors: [
+                                Colors.transparent,
+                                Color(0xFFE2D2B2),
+                                Colors.transparent,
+                              ],
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 9),
+                        _buildConfidence(isTablet),
+                        const SizedBox(height: 14),
+                        _buildReassure(isTablet),
+                        const SizedBox(height: 16),
                       ],
                     ),
                   ),
-                    SizedBox(height: isTablet ? 6 : 4),
-                ],
-              ),
+                ),
+                _buildFooter(isTablet, w),
+              ],
             ),
-          ),
-          _buildFooter(isTablet, w),
-        ],
+            if (_exitOfferVisible) _buildExitOffer(isTablet),
+          ],
         ),
       ),
     );
   }
 
-  Widget _buildHero(bool isTablet) {
-    // Restored pre-v8 hero: full scenic img + text overlay positions (UI only).
+  Widget _buildAppIconHeader(bool isTablet) {
+    return Column(
+      children: [
+        Container(
+          width: isTablet ? 88 : 78,
+          height: isTablet ? 88 : 78,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(17),
+            boxShadow: [
+              BoxShadow(
+                color: const Color(0x8050320F),
+                blurRadius: 26,
+                offset: const Offset(0, 12),
+              ),
+            ],
+          ),
+          clipBehavior: Clip.antiAlias,
+          child: Image.asset(
+            'assets/Icon-1024.png',
+            fit: BoxFit.cover,
+            errorBuilder: (_, __, ___) => ColoredBox(
+              color: const Color(0xFFE8D5C4),
+              child: Icon(Icons.menu_book, size: 36, color: _goldDeep),
+            ),
+          ),
+        ),
+        const SizedBox(height: 2),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              width: 34,
+              height: 1,
+              decoration: const BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [Colors.transparent, Color(0xFFB6945A)],
+                ),
+              ),
+            ),
+            const SizedBox(width: 9),
+            Text(
+              'PREMIUM',
+              style: TextStyle(
+                fontFamily: _serif,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 3.5,
+                fontSize: isTablet ? 13.5 : 12.5,
+                color: const Color(0xFF9A7430),
+              ),
+            ),
+            const SizedBox(width: 9),
+            Container(
+              width: 34,
+              height: 1,
+              decoration: const BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [Color(0xFFB6945A), Colors.transparent],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
 
-    const paywallInk = Color(0xFF2D2D3A);
-
-    const paywallTitleGold = Color(0xFF9E7340);
-
-    const paywallCream = Color(0xFFFFFBF7);
-
-    const paywallSubtitle = Color(0xFF5C534C);
-
-    const heroShadows = <Shadow>[
-      Shadow(
-        color: Color(0x59FFFFFF),
-        blurRadius: 4,
-        offset: Offset(0, 1),
-      ),
+  List<(IconData, String)> get _benefitRows {
+    if (_sel == _PwCard.lifetime) {
+      return const [
+        (Icons.block, 'Remove ads permanently'),
+        (Icons.bookmark_border, 'Keep highlights, notes & bookmarks'),
+        (Icons.layers_outlined, 'Explore Connection Paths'),
+        (Icons.payments_outlined, '5,000 AI credits (~250 AI chats)'),
+      ];
+    }
+    return const [
+      (Icons.chat_bubble_outline, 'Ask unlimited Bible questions'),
+      (Icons.menu_book_outlined, 'Understand any verse or chapter'),
+      (Icons.favorite_border, 'Create personal prayers with AI'),
+      (Icons.layers_outlined, 'Read ad-free & follow Connection Paths'),
     ];
+  }
 
-    final size = MediaQuery.sizeOf(context);
-
-    final topPadding = MediaQuery.paddingOf(context).top;
-
-    final isCompactHeight = size.height < 750;
-
-    // Tablet: taller hero so scenic bg shows fully; phone unchanged.
-
-    final imageHeight = isTablet
-        ? (size.height * 0.46).clamp(380.0, 520.0)
-        : isCompactHeight
-            ? (size.height * 0.44).clamp(290.0, 340.0)
-            : (size.height * 0.42).clamp(280.0, 340.0);
-
-    // Compact benefits: pull box up toward subtitle (UI only).
-
-    final cardLayoutHeight = isTablet ? 104.0 : 86.0;
-
-    final cardOverlap = isTablet
-        ? 88.0
-        : isCompactHeight
-            ? 72.0
-            : 84.0;
-
-    final sectionHeight = imageHeight + (cardLayoutHeight - cardOverlap) + 4.0;
-
-    final heroSidePad = isTablet ? (size.width * 0.08).clamp(36.0, 64.0) : 16.0;
-
-    return SizedBox(
-      width: double.infinity,
-      height: sectionHeight,
-      child: Stack(
-        clipBehavior: Clip.none,
-        children: [
-          Positioned(
-            top: 0,
-            left: 0,
-            right: 0,
-            height: imageHeight,
-            child: Stack(
-              clipBehavior: Clip.none,
-              fit: StackFit.expand,
+  Widget _buildBenefits(bool isTablet) {
+    return Column(
+      children: [
+        for (final row in _benefitRows) ...[
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4.5),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-          Positioned.fill(
-                  child: ColoredBox(
-                    color: paywallCream,
-                    child: isTablet
-                        ? Image.asset(
-                            'assets/img.png',
-                            fit: BoxFit.fitWidth,
-                            alignment: Alignment.topCenter,
-                            width: double.infinity,
-                            filterQuality: FilterQuality.high,
-                            gaplessPlayback: true,
-                            errorBuilder: (_, __, ___) => Container(
-                              color: const Color(0xFFE8D5C4),
-                            ),
-                          )
-                        : ColorFiltered(
-                            colorFilter: ColorFilter.mode(
-                              Colors.white.withValues(alpha: 0.14),
-                              BlendMode.lighten,
-                            ),
-            child: Image.asset(
-                              'assets/img.png',
-              fit: BoxFit.cover,
-              alignment: Alignment.topCenter,
-                              filterQuality: FilterQuality.high,
-              gaplessPlayback: true,
-                              errorBuilder: (_, __, ___) => Container(
-                                color: const Color(0xFFE8D5C4),
-                              ),
-                            ),
-                          ),
-            ),
-          ),
-          Positioned.fill(
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                        colors: isTablet
-                            ? [
-                                paywallCream.withValues(alpha: 0.0),
-                                paywallCream.withValues(alpha: 0.04),
-                                paywallCream.withValues(alpha: 0.35),
-                                paywallCream,
-                              ]
-                            : [
-                                paywallCream.withValues(alpha: 0.06),
-                                paywallCream.withValues(alpha: 0.22),
-                                paywallCream.withValues(alpha: 0.72),
-                                paywallCream,
-                              ],
-                        stops: const [0.0, 0.30, 0.64, 1.0],
-                ),
-              ),
-            ),
-          ),
-          Positioned(
-                  top: topPadding + 40,
-            left: 0,
-            right: 0,
-                  child: Container(
-                    height: isTablet ? 100 : 180,
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                        begin: Alignment.centerLeft,
-                        end: Alignment.centerRight,
-                  colors: [
-                          paywallCream.withValues(
-                              alpha: isTablet ? 0.10 : 0.26),
-                          paywallCream.withValues(
-                              alpha: isTablet ? 0.04 : 0.14),
-                          paywallCream.withValues(alpha: 0.03),
-                          paywallCream.withValues(alpha: 0.0),
-                        ],
-                        stops: const [0.0, 0.35, 0.70, 1.0],
-                ),
-              ),
-            ),
-          ),
-          SafeArea(
-            bottom: false,
-                  child: Align(
-                    alignment: Alignment.topLeft,
-            child: Padding(
-                      padding: EdgeInsets.only(
-                          left: heroSidePad, top: isTablet ? 8 : 6),
-                      child: Row(
-                        children: [
-                          // iPad: PREMIUM sits with title (centered left).
-
-                          // Phone: badge stays top-left (unchanged).
-
-                          if (!isTablet)
-                            Image.asset(
-                              'assets/paywall_icons/premium.png',
-                              height: 52,
-                              fit: BoxFit.contain,
-                              errorBuilder: (_, __, ___) =>
-                                  const SizedBox.shrink(),
-                            ),
-
-                          const Spacer(),
-
-                          Padding(
-                            padding: EdgeInsets.only(right: isTablet ? 16 : 12),
-                            child: Material(
-                              // UI only: lightly visible close (readable, not heavy).
-
-                              color: Colors.white.withValues(alpha: 0.52),
-
-                              elevation: 0,
-
-                              shadowColor: Colors.transparent,
-
-                              shape: const CircleBorder(),
-
-                              child: InkWell(
-                                customBorder: const CircleBorder(),
-                                onTap: _onClose,
-                                child: SizedBox(
-                                  width: isTablet ? 30 : 26,
-                                  height: isTablet ? 30 : 26,
-                                  child: Center(
-                                    child: Icon(
-                                      Icons.close,
-                                      size: isTablet ? 15 : 14,
-                                      color: const Color(0xFF3A2B18)
-                                          .withValues(alpha: 0.62),
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-                if (isTablet)
-                  Positioned(
-                    left: heroSidePad,
-
-                    // Keep copy on the left side of the scenic hero.
-
-                    right: size.width * 0.40,
-
-                    top: topPadding + 20,
-
-                    bottom: (imageHeight * 0.22).clamp(80.0, 140.0),
-
-                    child: Align(
-                      // iPad UI only: vertically center on left side of hero.
-
-                      alignment: Alignment.centerLeft,
-
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisSize: MainAxisSize.min,
-                children: [
-                          Image.asset(
-                            'assets/paywall_icons/premium.png',
-                            height: 60,
-                            fit: BoxFit.contain,
-                            errorBuilder: (_, __, ___) =>
-                                const SizedBox.shrink(),
-                          ),
-                          const SizedBox(height: 12),
-                          RichText(
-                            textAlign: TextAlign.left,
-                            text: TextSpan(
-                              style: const TextStyle(
-                                fontFamily: 'Georgia',
-                                fontSize: 40,
-                                fontWeight: FontWeight.w800,
-                                color: paywallInk,
-                                height: 1.12,
-                                letterSpacing: -0.3,
-                                shadows: heroShadows,
-                              ),
-                              children: [
-                                const TextSpan(text: 'Grow Closer\n'),
-                                const TextSpan(text: 'to '),
-                                TextSpan(
-                                  text: 'God',
-                          style: TextStyle(
-                                    fontFamily: 'Georgia',
-                                    color: paywallTitleGold,
-                            fontWeight: FontWeight.w800,
-                                    shadows: heroShadows,
-                                  ),
-                                ),
-                                TextSpan(
-                                  text: ' Daily',
-                                style: TextStyle(
-                                    fontFamily: 'Georgia',
-                                    color: paywallTitleGold,
-                                    fontWeight: FontWeight.w800,
-                                    shadows: heroShadows,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(height: 10),
-                          const Text(
-                            'Guidance, prayer, and encouragement\n whenever you need it.',
-                            textAlign: TextAlign.left,
-                            style: TextStyle(
-                              fontSize: 16.5,
-                              height: 1.4,
-                              color: paywallSubtitle,
-                              fontWeight: FontWeight.w500,
-                              shadows: heroShadows,
-                        ),
-                      ),
-                    ],
-                  ),
-                    ),
-                  )
-                else
-                  Positioned(
-                    left: heroSidePad,
-                    right: heroSidePad,
-                    top: topPadding + 48,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        RichText(
-                          textAlign: TextAlign.left,
-                          text: TextSpan(
-                            style: TextStyle(
-                              fontSize: 34,
-                              fontWeight: FontWeight.w800,
-                              color: paywallInk,
-                              height: 1.12,
-                              letterSpacing: -0.3,
-                              shadows: heroShadows,
-                            ),
-                            children: [
-                              const TextSpan(text: 'Grow Closer\n'),
-                              const TextSpan(text: 'to '),
-                    TextSpan(
-                                text: 'God',
+                Icon(row.$1, size: isTablet ? 26 : 25, color: const Color(0xFF6B5A44)),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.only(top: 2),
+                    child: Text(
+                      row.$2,
                       style: TextStyle(
-                                  color: paywallTitleGold,
-                                  fontWeight: FontWeight.w800,
-                                  shadows: heroShadows,
-                                ),
-                              ),
-                        TextSpan(
-                                text: ' Daily',
-                                style: TextStyle(
-                                  color: paywallTitleGold,
-                                  fontWeight: FontWeight.w800,
-                                  shadows: heroShadows,
-                                ),
-                        ),
-                      ],
+                        fontSize: isTablet ? 15 : 14,
+                        fontWeight: FontWeight.w600,
+                        height: 1.2,
+                        color: const Color(0xFF2E2214),
+                      ),
                     ),
                   ),
-                        const SizedBox(height: 8),
-                  Text(
-                          'Guidance, prayer, and encouragement\n whenever you need it.',
-                          textAlign: TextAlign.left,
-                    style: TextStyle(
-                            fontSize: 14,
-                            height: 1.4,
-                            color: paywallSubtitle,
-                            fontWeight: FontWeight.w500,
-                            shadows: heroShadows,
-                    ),
-                  ),
-                ],
-              ),
-            ),
+                ),
               ],
             ),
           ),
-          Positioned(
-            left: 0,
-            right: 0,
-            top: imageHeight - cardOverlap,
-            child: _buildBenefits(isTablet),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildConfidence(bool isTablet) {
+    if (_sel == _PwCard.lifetime) {
+      return _confidenceLine(
+        icon: Icons.all_inclusive,
+        text: 'One payment, yours forever. No subscription, no recurring fees.',
+        isTablet: isTablet,
+      );
+    }
+    if (_dur == _AiDur.oneYear) {
+      final save = _yearSavePercent;
+      final saveText = save != null
+          ? 'That\'s $save% off paying monthly — our most popular plan'
+          : 'That\'s 44% off paying monthly — our most popular plan';
+      final monthly = _sixMonth?.rawPrice ?? 0;
+      final yearly = _oneYear?.rawPrice ?? 0;
+      String saveAmount = '\$31.89';
+      if (monthly > 0 && yearly > 0) {
+        final diff = (monthly * 12) - yearly;
+        if (diff > 0) {
+          final symbol = (_oneYear?.currencySymbol.isNotEmpty == true)
+              ? _oneYear!.currencySymbol
+              : '\$';
+          saveAmount = '$symbol${diff.toStringAsFixed(2)}';
+        }
+      }
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: _gold, width: 1.5),
+          gradient: const LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [Color(0xFFFBF1D8), Color(0xFFF6E9C9)],
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: _goldDeep.withValues(alpha: 0.2),
+              blurRadius: 18,
+              offset: const Offset(0, 8),
+            ),
+          ],
+        ),
+        child: Column(
+          children: [
+            Text(
+              'You save $saveAmount a year',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontFamily: _serif,
+                fontWeight: FontWeight.w700,
+                fontSize: isTablet ? 17 : 15.5,
+                color: const Color(0xFF7A5A1E),
+              ),
+            ),
+            const SizedBox(height: 1),
+            Text(
+              saveText,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: isTablet ? 12.5 : 11.5,
+                fontWeight: FontWeight.w700,
+                color: const Color(0xFF5A4A2E),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+    return _confidenceLine(
+      icon: Icons.spa_outlined,
+      text: 'All AI features included. Flexible — month to month.',
+      isTablet: isTablet,
+    );
+  }
+
+  Widget _confidenceLine({
+    required IconData icon,
+    required String text,
+    required bool isTablet,
+  }) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        Icon(icon, size: 16, color: const Color(0xFF7A9B6A)),
+        const SizedBox(width: 8),
+        Flexible(
+          child: Text(
+            text,
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: isTablet ? 13.5 : 12.5,
+              fontWeight: FontWeight.w600,
+              height: 1.3,
+              color: _soft,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildReassure(bool isTablet) {
+    final lifetime = _sel == _PwCard.lifetime;
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+      decoration: BoxDecoration(
+        color: _paper,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: _line),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            lifetime ? Icons.all_inclusive : Icons.notifications_none_rounded,
+            size: 16,
+            color: _goldDeep,
+          ),
+          const SizedBox(width: 8),
+          Flexible(
+            child: Text(
+              lifetime
+                  ? 'Instant lifetime access — pay once, keep it forever.'
+                  : "We'll remind you before your free trial ends.",
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: isTablet ? 13 : 12,
+                fontWeight: FontWeight.w700,
+                height: 1.25,
+                color: const Color(0xFF4F4026),
+              ),
+            ),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildBenefits([bool isTablet = false]) {
-    Widget cell({
-      required IconData icon,
-      required Color bg,
-      required Color iconColor,
-      required String title,
-    }) {
-      return Expanded(
-        child: Padding(
-          padding: EdgeInsets.symmetric(horizontal: isTablet ? 10 : 8),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Container(
-                width: isTablet ? 40 : 36,
-                height: isTablet ? 40 : 36,
-                alignment: Alignment.center,
-                decoration: BoxDecoration(color: bg, shape: BoxShape.circle),
-                child: Icon(icon, size: isTablet ? 22 : 20, color: iconColor),
-              ),
-              SizedBox(height: isTablet ? 8 : 6),
-              Text(
-                title,
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontWeight: FontWeight.w700,
-                  fontSize: isTablet ? 13 : 11.5,
-                  color: const Color(0xFF17202E),
-                  height: 1.28,
-                  letterSpacing: -0.15,
-                ),
-              ),
-            ],
+  Widget _buildPlanCard({
+    required bool selected,
+    required bool recommended,
+    required String name,
+    required String price,
+    String? anchor,
+    String? badge,
+    required VoidCallback onTap,
+    required bool isTablet,
+  }) {
+    // Fixed equal size for all three cards (match 1 Year footprint).
+    final cardH = isTablet ? 130.0 : 120.0;
+
+    Widget badgeChip(String label) {
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(9),
+          gradient: LinearGradient(
+            colors: label.contains('BEST')
+                ? const [Color(0xFFEAC877), Color(0xFFA9792B)]
+                : const [Color(0xFF9676CF), Color(0xFF6C50A6)],
+          ),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.32)),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.2),
+              blurRadius: 8,
+              offset: const Offset(0, 3),
+            ),
+          ],
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontSize: isTablet ? 10 : 9,
+            fontWeight: FontWeight.w800,
+            letterSpacing: 0.4,
+            color: Colors.white,
           ),
         ),
       );
     }
 
-    final side = isTablet
-        ? (MediaQuery.sizeOf(context).width * 0.06).clamp(28.0, 48.0)
-        : 16.0;
-
-    return Container(
-      margin: EdgeInsets.symmetric(horizontal: side),
-      padding: EdgeInsets.symmetric(
-          vertical: isTablet ? 14 : 12, horizontal: isTablet ? 6 : 4),
-        decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(isTablet ? 18 : 16),
-          boxShadow: [
-            BoxShadow(
-            color: const Color(0xFF5A3C14).withValues(alpha: 0.08),
-            blurRadius: 16,
-            offset: const Offset(0, 4),
-            ),
-          ],
-        ),
-        child: IntrinsicHeight(
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
+    return Expanded(
+      child: GestureDetector(
+        onTap: onTap,
+        child: SizedBox(
+          height: cardH,
+          width: double.infinity,
+          child: Stack(
+            clipBehavior: Clip.none,
+            alignment: Alignment.topCenter,
             children: [
-              cell(
-              icon: Icons.volunteer_activism_rounded,
-              bg: const Color(0xFFFBF0DA),
-              iconColor: const Color(0xFFB07A1E),
-                title: 'Pray With\nConfidence',
-              ),
-            const VerticalDivider(
-                width: 1, thickness: 1, color: Color(0xFFEFE7DA)),
-              cell(
-              icon: Icons.menu_book_rounded,
-              bg: const Color(0xFFEDF4E2),
-              iconColor: const Color(0xFF5C8A2B),
-              title: 'Understand\nScripture Better',
-            ),
-            const VerticalDivider(
-                width: 1, thickness: 1, color: Color(0xFFEFE7DA)),
-              cell(
-              icon: Icons.favorite_rounded,
-              bg: const Color(0xFFFCE9EA),
-              iconColor: const Color(0xFFD9636B),
-                title: 'Find Peace\nEvery Day',
-              ),
-            ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildAiCard(bool isTablet) {
-    final selected = _sel == _PwCard.ai;
-
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onTap: () {
-        if (_sel == _PwCard.ai) return;
-
-        setState(() => _sel = _PwCard.ai);
-      },
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(17),
-        child: Stack(
-          children: [
-            AnimatedContainer(
-        duration: const Duration(milliseconds: 160),
-        curve: Curves.easeOutCubic,
-        padding: EdgeInsets.fromLTRB(
-          isTablet ? 18 : 15,
-          isTablet ? 16 : 14,
-          isTablet ? 18 : 15,
-          isTablet ? 16 : 15,
-        ),
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(17),
-          border: Border.all(
-            color: selected ? _purple : _line,
-            width: selected ? 2.5 : 1.5,
-          ),
-          color: selected ? const Color(0xFFF6F1FE) : _paper,
-          boxShadow: selected
-              ? [
-                  BoxShadow(
-                    color: const Color(0xFF5B3FBF).withValues(alpha: 0.15),
-                    blurRadius: 22,
-                    offset: const Offset(0, 8),
-                  ),
-                ]
-              : const [],
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Icon(
-                  Icons.auto_awesome_rounded,
-                  size: isTablet ? 20 : 19,
-                  color: _purple,
-                ),
-                SizedBox(width: isTablet ? 8 : 6),
-                Expanded(
-                  child: Text(
-                    'AI Premium',
-                    style: TextStyle(
-                      fontWeight: FontWeight.w700,
-                      fontSize: isTablet ? 21 : 19,
-                      letterSpacing: -0.2,
-                      color: _ink,
-                    ),
-                  ),
-                ),
-                if (_sel == _PwCard.ai &&
-                    _dur == _AiDur.oneYear &&
-                    _yearSavePercent != null)
-                  _SaveFiftyBadge(
-                    isTablet: isTablet,
-                    percent: _yearSavePercent!,
-                  ),
-              ],
-            ),
-            SizedBox(height: isTablet ? 18 : 16),
-            if (_loading)
-              const Padding(
-                padding: EdgeInsets.only(bottom: 10),
-                child: Center(
-                  child: SizedBox(
-                    width: 18,
-                    height: 18,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  ),
-                ),
-              ),
-            _buildDurationRow(isTablet),
-            SizedBox(height: isTablet ? 12 : 10),
-            _inclRow(
-              rich: true,
-              bold: 'Unlimited AI',
-              rest: ' — chat, prayer & answers',
-              isTablet: isTablet,
-            ),
-            SizedBox(height: isTablet ? 8 : 7),
-            _inclRow(
-              rich: true,
-              bold: 'Ad-free',
-              rest: ' · all premium features',
-              isTablet: isTablet,
-            ),
-          ],
-        ),
-            ),
-            if (selected)
-              const Positioned.fill(
-                child: IgnorePointer(
-                  child: _BestValueCardShine(),
-                ),
-              ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  String _planPrice(ProductDetails? product, String fallback) {
-    if (product != null && product.price.isNotEmpty) return product.price;
-    return fallback;
-  }
-
-  String _yearPerMonthCaption() {
-    final product = _oneYear;
-    if (product != null && product.rawPrice > 0) {
-      final sym =
-          product.currencySymbol.isNotEmpty ? product.currencySymbol : '\$';
-      final perMonth = product.rawPrice / 12;
-      // Whole number only (e.g. ₹208 per month, not ₹208.25).
-      return '$sym${perMonth.round()} per month';
-    }
-    return 'per month';
-  }
-
-  Widget _buildDurationRow(bool isTablet) {
-    final items = <(_AiDur, String, String, String, Color)>[
-      if (_sixMonth != null || _loading)
-        (
-          _AiDur.sixMonth,
-          '1 Month',
-          _planPrice(_sixMonth, '\$34.99'),
-          'per month',
-          const Color(0xFF8A8498),
-        ),
-      if (_oneYear != null || _loading)
-        (
-          _AiDur.oneYear,
-          '1 Year',
-          _planPrice(_oneYear, '\$59.99'),
-          _yearPerMonthCaption(),
-          const Color(0xFF8B5E3C),
-        ),
-    ];
-
-    if (items.isEmpty) {
-      items.addAll([
-        (
-          _AiDur.sixMonth,
-          '1 Month',
-          _planPrice(_sixMonth, '\$34.99'),
-          'per month',
-          const Color(0xFF8A8498),
-        ),
-        (
-          _AiDur.oneYear,
-          '1 Year',
-          _planPrice(_oneYear, '\$59.99'),
-          _yearPerMonthCaption(),
-          const Color(0xFF8B5E3C),
-        ),
-      ]);
-    }
-
-    return Row(
-      children: [
-        for (var i = 0; i < items.length; i++) ...[
-          if (i > 0) SizedBox(width: isTablet ? 16 : 14),
-          Expanded(
-            child: _DurChip(
-              selected: _dur == items[i].$1 && _sel == _PwCard.ai,
-              label: items[i].$2,
-              price: items[i].$3,
-              caption: items[i].$4,
-              captionColor: items[i].$5,
-              onTap: () => setState(() {
-                _sel = _PwCard.ai;
-
-                _dur = items[i].$1;
-              }),
-            ),
-          ),
-        ],
-      ],
-    );
-  }
-
-  Widget _buildLifetimeCard(bool isTablet) {
-    final selected = _sel == _PwCard.lifetime;
-
-    final priceMuted = !selected;
-
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onTap: () {
-        if (_sel == _PwCard.lifetime) return;
-
-        setState(() => _sel = _PwCard.lifetime);
-      },
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(17),
-        child: Stack(
-          children: [
-            AnimatedContainer(
-        duration: const Duration(milliseconds: 160),
-        curve: Curves.easeOutCubic,
-        padding: EdgeInsets.fromLTRB(
-          isTablet ? 18 : 15,
-          isTablet ? 16 : 14,
-          isTablet ? 18 : 15,
-          isTablet ? 16 : 15,
-        ),
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(17),
-          border: Border.all(
-            color: selected ? _green : _line,
-            width: selected ? 2.5 : 1.5,
-          ),
-          color: selected ? const Color(0xFFF0F8F3) : _paper,
-          boxShadow: selected
-              ? [
-                  BoxShadow(
-                    color: const Color(0xFF1E7A45).withValues(alpha: 0.15),
-                    blurRadius: 22,
-                    offset: const Offset(0, 8),
-                  ),
-                ]
-              : const [],
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                _RadioDot(selected: selected, color: _green),
-                SizedBox(width: isTablet ? 10 : 8),
-                Icon(
-                  Icons.diamond_rounded,
-                  size: isTablet ? 20 : 19,
-                  color: _green,
-                ),
-                SizedBox(width: isTablet ? 8 : 6),
-                Expanded(
-                  child: Text(
-                    'Lifetime',
-                    style: TextStyle(
-                      fontWeight: FontWeight.w700,
-                      fontSize: isTablet ? 21 : 19,
-                      letterSpacing: -0.2,
-                      color: _ink,
-                    ),
-                  ),
-                ),
-                Container(
-                  padding: EdgeInsets.symmetric(
-                    horizontal: isTablet ? 16 : 14,
-                    vertical: isTablet ? 8 : 7,
-                  ),
+              Positioned.fill(
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 150),
+                  padding: const EdgeInsets.fromLTRB(4, 14, 4, 8),
                   decoration: BoxDecoration(
-                    color: selected
-                        ? _green
-                        : const Color(0xFFBDBDBD),
-                    borderRadius: BorderRadius.circular(24),
-                  ),
-                  child: Text(
-                    'Best Value',
-                    style: TextStyle(
-                      fontSize: isTablet ? 14 : 13,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.white,
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(
+                      color: selected
+                          ? _selBorder
+                          : (recommended ? const Color(0xFFD9B56A) : _line),
+                      width: 1.7,
                     ),
+                    gradient: recommended
+                        ? LinearGradient(
+                            begin: Alignment.topCenter,
+                            end: Alignment.bottomCenter,
+                            colors: selected
+                                ? const [Color(0xFFFFFDF6), Color(0xFFFBF2DC)]
+                                : const [Color(0xFFFCF4DD), Color(0xFFF7EBCB)],
+                          )
+                        : null,
+                    color: recommended
+                        ? null
+                        : (selected ? Colors.white : _paper),
+                    boxShadow: selected
+                        ? [
+                            BoxShadow(
+                              color: _selBorder.withValues(alpha: 0.35),
+                              blurRadius: 22,
+                              offset: const Offset(0, 10),
+                            ),
+                          ]
+                        : null,
                   ),
-                ),
-              ],
-            ),
-            SizedBox(height: isTablet ? 14 : 11),
-            Opacity(
-              opacity: priceMuted ? 0.45 : 1,
-              child: Row(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                Text(
-                  _lifetimePrice,
-                  style: TextStyle(
-                    fontWeight: FontWeight.w800,
-                      fontSize: isTablet ? 34 : 30,
-                      letterSpacing: -0.6,
-                      height: 1.1,
-                    color: _ink,
-                  ),
-                ),
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 4, left: 4),
-                  child: Text(
-                      'once',
-                    style: TextStyle(
-                        fontSize: isTablet ? 16 : 15,
-                      fontWeight: FontWeight.w600,
-                        color: const Color(0xFF5C5240),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            ),
-            SizedBox(height: isTablet ? 12 : 11),
-            _inclRow(
-              rich: true,
-              bold: 'Ad-free forever',
-              rest: ' + all reading & study features',
-              isTablet: isTablet,
-              accentGreen: true,
-            ),
-            SizedBox(height: isTablet ? 8 : 7),
-            _inclRow(
-              rich: true,
-              prefix: 'Use AI anytime with credits — ',
-              bold: 'earn free or buy',
-              isTablet: isTablet,
-              accentGreen: true,
-            ),
-            SizedBox(height: isTablet ? 8 : 7),
-            _inclRow(
-              rich: true,
-              bold: '5,000',
-              rest: ' welcome credits to start',
-              isTablet: isTablet,
-              accentGreen: true,
-            ),
-          ],
-        ),
-            ),
-            if (selected)
-              const Positioned.fill(
-                child: IgnorePointer(
-                  child: _BestValueCardShine(),
-                ),
-              ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _inclRow({
-    String? text,
-    bool rich = false,
-    String bold = '',
-    String rest = '',
-    String prefix = '',
-    bool isTablet = false,
-    bool accentGreen = false,
-  }) {
-    final fontSize = isTablet ? 13.5 : 12.5;
-
-    final checkColor =
-        accentGreen ? const Color(0xFF1E7A45) : const Color(0xFF5B3FBF);
-
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-            '✓',
-            style: TextStyle(
-            fontSize: isTablet ? 13 : 12,
-              fontWeight: FontWeight.w800,
-            color: checkColor,
-            height: 1.35,
-            ),
-          ),
-        SizedBox(width: isTablet ? 8 : 8),
-        Expanded(
-          child: rich
-              ? Text.rich(
-                  TextSpan(
-                    style: TextStyle(
-                      fontSize: fontSize,
-                      color: const Color(0xFF2E2718),
-                      height: 1.35,
-                    ),
+                  child: Column(
                     children: [
-                      if (prefix.isNotEmpty) TextSpan(text: prefix),
-                      TextSpan(
-                        text: bold,
-                        style: const TextStyle(
+                      Text(
+                        name,
+                        textAlign: TextAlign.center,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontFamily: _serif,
                           fontWeight: FontWeight.w700,
-                          color: Color(0xFF2E2718),
+                          fontSize: isTablet ? 18 : 17,
+                          color: _ink,
                         ),
                       ),
-                      TextSpan(text: rest),
+                      const SizedBox(height: 4),
+                      SizedBox(
+                        height: 15,
+                        child: anchor == null
+                            ? const SizedBox.shrink()
+                            : Text(
+                                anchor,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  fontSize: 11,
+                                  height: 1.1,
+                                  fontWeight: FontWeight.w600,
+                                  color: Color(0xFFA9966F),
+                                  decoration: TextDecoration.lineThrough,
+                                ),
+                              ),
+                      ),
+                      Text(
+                        price,
+                        textAlign: TextAlign.center,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: isTablet ? 13.5 : 12.5,
+                          fontWeight: FontWeight.w700,
+                          color: const Color(0xFF6B5A44),
+                        ),
+                      ),
+                      const Spacer(),
+                      Container(
+                        width: 18,
+                        height: 18,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: selected
+                                ? _selBorder
+                                : const Color(0xFFC4B084),
+                            width: 2,
+                          ),
+                        ),
+                        child: selected
+                            ? Center(
+                                child: Container(
+                                  width: 10,
+                                  height: 10,
+                                  decoration: const BoxDecoration(
+                                    color: Color(0xFF9A5A2A),
+                                    shape: BoxShape.circle,
+                                  ),
+                                ),
+                              )
+                            : null,
+                      ),
                     ],
                   ),
-                )
-              : Text(
-                  text ?? '',
-                  style: TextStyle(
-                    fontSize: fontSize,
-                    color: const Color(0xFF2E2718),
+                ),
+              ),
+              if (badge != null)
+                Positioned(
+                  top: -10,
+                  child: badgeChip(badge),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFooter(bool isTablet, double w) {
+    final hPad = isTablet ? (w * 0.08).clamp(36.0, 64.0) : 22.0;
+    final save = _yearSavePercent;
+    final saveBadge = save != null ? 'SAVE $save%' : 'SAVE 44%';
+
+    return SafeArea(
+      top: false,
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(hPad, 0, hPad, 10),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Padding(
+              padding: const EdgeInsets.only(top: 12),
+              child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _buildPlanCard(
+                  selected: _sel == _PwCard.ai && _dur == _AiDur.sixMonth,
+                  recommended: false,
+                  name: '1 Month',
+                  price: '$_monthPrice / mo',
+                  onTap: () => setState(() {
+                    _sel = _PwCard.ai;
+                    _dur = _AiDur.sixMonth;
+                  }),
+                  isTablet: isTablet,
+                ),
+                const SizedBox(width: 9),
+                _buildPlanCard(
+                  selected: _sel == _PwCard.ai && _dur == _AiDur.oneYear,
+                  recommended: true,
+                  name: '1 Year',
+                  price: '$_yearPrice / yr',
+                  anchor: _yearAnchor,
+                  badge: saveBadge,
+                  onTap: () => setState(() {
+                    _sel = _PwCard.ai;
+                    _dur = _AiDur.oneYear;
+                  }),
+                  isTablet: isTablet,
+                ),
+                const SizedBox(width: 9),
+                _buildPlanCard(
+                  selected: _sel == _PwCard.lifetime,
+                  recommended: false,
+                  name: 'Lifetime',
+                  price: '$_lifetimePrice once',
+                  badge: 'BEST VALUE',
+                  onTap: () => setState(() => _sel = _PwCard.lifetime),
+                  isTablet: isTablet,
+                ),
+              ],
+            ),
+            ),
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [_ctaTop, _ctaBot],
+                  ),
+                  borderRadius: BorderRadius.circular(16),
+                  boxShadow: [
+                    BoxShadow(
+                      color: _ctaBot.withValues(alpha: 0.45),
+                      blurRadius: 26,
+                      offset: const Offset(0, 14),
+                    ),
+                  ],
+                ),
+                child: ElevatedButton(
+                  onPressed: _loading ? null : _onPrimaryCta,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.transparent,
+                    shadowColor: Colors.transparent,
+                    elevation: 0,
+                    padding: EdgeInsets.symmetric(vertical: isTablet ? 17 : 15),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                  ),
+                  child: Text(
+                    _ctaLabel,
+                    style: TextStyle(
+                      fontFamily: _serif,
+                      fontSize: isTablet ? 19 : 18,
+                      fontWeight: FontWeight.w700,
+                      color: const Color(0xFFFFF6EA),
+                    ),
                   ),
                 ),
+              ),
+            ),
+            const SizedBox(height: 11),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(Icons.lock_outline, size: 15, color: Color(0xFF6B5A44)),
+                const SizedBox(width: 7),
+                Text(
+                  _trustLine,
+                  style: TextStyle(
+                    fontSize: isTablet ? 12.5 : 11.5,
+                    fontWeight: FontWeight.w700,
+                    color: _soft,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 9),
+            GestureDetector(
+              onTap: _continueLimited,
+              child: Text(
+                'Continue Free Version',
+                style: TextStyle(
+                  fontSize: isTablet ? 14 : 13,
+                  fontWeight: FontWeight.w700,
+                  color: const Color(0xFF2E2214),
+                  decoration: TextDecoration.underline,
+                  decorationColor: const Color(0xFF2E2214),
+                ),
+              ),
+            ),
+            const SizedBox(height: 8),
+            _buildLegalRow(isTablet: isTablet),
+          ],
         ),
-      ],
+      ),
     );
   }
 
@@ -1836,154 +1684,369 @@ class _MultiSelectPaywallState extends State<MultiSelectPaywall> {
         child: Padding(
           padding: EdgeInsets.symmetric(
             horizontal: isTablet ? 6 : 4,
-            vertical: isTablet ? 10 : 8,
+            vertical: isTablet ? 8 : 6,
           ),
           child: Text(
             label,
             style: TextStyle(
               fontSize: isTablet ? 12 : 11,
-              color: const Color(0xFF9A9080),
+              fontWeight: FontWeight.w600,
+              color: const Color(0xFF6B5A44),
               decoration: TextDecoration.underline,
-              decorationColor: const Color(0xFF9A9080),
+              decorationColor: const Color(0xFF6B5A44),
             ),
           ),
         ),
       );
     }
 
-    return Padding(
-      padding: EdgeInsets.symmetric(horizontal: isTablet ? 12 : 18),
-      child: Wrap(
-        alignment: WrapAlignment.center,
-        crossAxisAlignment: WrapCrossAlignment.center,
-        children: [
-          link(
-            'Terms of Use',
-            () => _openLegal('https://bibleoffice.com/terms_conditions.html'),
-          ),
-          Text(' · ',
-              style: TextStyle(
-                  fontSize: isTablet ? 12 : 11,
-                  color: const Color(0xFF9A9080))),
-          link(
-            'Privacy Policy',
-            () => _openLegal('https://bibleoffice.com/privacy_policy.html'),
-          ),
-          Text(' · ',
-              style: TextStyle(
-                  fontSize: isTablet ? 12 : 11,
-                  color: const Color(0xFF9A9080))),
-          link('Restore Purchases', _restorePurchases),
-        ],
-      ),
+    return Wrap(
+      alignment: WrapAlignment.center,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      children: [
+        link('Restore Purchases', _restorePurchases),
+        Text(' · ',
+            style: TextStyle(
+                fontSize: isTablet ? 12 : 11, color: const Color(0xFF6B5A44))),
+        link(
+          'Terms',
+          () => _openLegal('https://bibleoffice.com/terms_conditions.html'),
+        ),
+        Text(' · ',
+            style: TextStyle(
+                fontSize: isTablet ? 12 : 11, color: const Color(0xFF6B5A44))),
+        link(
+          'Privacy',
+          () => _openLegal('https://bibleoffice.com/privacy_policy.html'),
+        ),
+      ],
     );
   }
 
-  Widget _buildFooter(bool isTablet, double w) {
-    final hPad = isTablet ? (w * 0.08).clamp(36.0, 64.0) : 16.0;
-
-    final lifetimeCta = _sel == _PwCard.lifetime;
-
-    return SafeArea(
-      top: false,
-      child: Padding(
-        // UI only: tighter bottom CTA block spacing.
-
-        padding: EdgeInsets.fromLTRB(hPad, isTablet ? 4 : 2, hPad, 4),
-
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              _aboveCta,
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: isTablet ? 14 : 13,
-                fontWeight: FontWeight.w600,
-                height: 1.4,
-                color: const Color(0xFF4A3B22),
-              ),
-            ),
-            SizedBox(height: isTablet ? 7 : 6),
-            SizedBox(
-              width: double.infinity,
-              height: isTablet ? 56 : 50,
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: lifetimeCta
-                        ? const [Color(0xFF2E9457), Color(0xFF166438)]
-                        : const [Color(0xFFC08D22), Color(0xFF8E5F10)],
+  Widget _buildExitOffer(bool isTablet) {
+    return Positioned.fill(
+      child: Material(
+        color: _cream.withValues(alpha: 0.98),
+        child: SafeArea(
+          child: Column(
+            children: [
+              Align(
+                alignment: Alignment.topRight,
+                child: Padding(
+                  padding: const EdgeInsets.only(right: 16, top: 8),
+                  child: InkWell(
+                    onTap: () async {
+                      setState(() => _exitOfferVisible = false);
+                      await _navigateAwayFromPaywall();
+                    },
+                    customBorder: const CircleBorder(),
+                    child: Container(
+                      width: 30,
+                      height: 30,
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        shape: BoxShape.circle,
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.14),
+                            blurRadius: 8,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                      child: const Icon(Icons.close, size: 18, color: Color(0xFF3A2B18)),
+                    ),
                   ),
-                  borderRadius: BorderRadius.circular(13),
-                  boxShadow: [
-                    BoxShadow(
-                      color: (lifetimeCta
-                              ? const Color(0xFF166438)
-                              : const Color(0xFF8E5F10))
-                          .withValues(alpha: 0.28),
-                      blurRadius: 20,
-                      offset: const Offset(0, 8),
+                ),
+              ),
+              Expanded(
+                child: SingleChildScrollView(
+                  padding: EdgeInsets.symmetric(horizontal: isTablet ? 40 : 24),
+                  child: Column(
+                    children: [
+                      const SizedBox(height: 8),
+                      Container(
+                        width: 88,
+                        height: 88,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          gradient: const RadialGradient(
+                            center: Alignment(0, -0.3),
+                            colors: [Color(0xFFFBEFCF), Color(0xFFEEDBA6)],
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: _goldDeep.withValues(alpha: 0.35),
+                              blurRadius: 30,
+                              offset: const Offset(0, 14),
+                            ),
+                          ],
+                        ),
+                        child: Padding(
+                          padding: const EdgeInsets.all(18),
+                          child: Image.asset(
+                            'assets/dove.png',
+                            fit: BoxFit.contain,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      Text(
+                        '✦ ONE-TIME OFFER',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: 1.2,
+                          color: _goldDeep,
+                        ),
+                      ),
+                      const SizedBox(height: 7),
+                      Text.rich(
+                        TextSpan(
+                          style: TextStyle(
+                            fontFamily: _serif,
+                            fontWeight: FontWeight.w700,
+                            fontSize: isTablet ? 32 : 28,
+                            height: 1.1,
+                            color: const Color(0xFF241A0F),
+                          ),
+                          children: const [
+                            TextSpan(text: 'Wait — a '),
+                            TextSpan(
+                              text: 'gift',
+                              style: TextStyle(color: Color(0xFF9A5323)),
+                            ),
+                            TextSpan(text: '\nbefore you go'),
+                          ],
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 9),
+                      Text(
+                        "We'd love for you to keep growing in the Word. Here's a gift to begin.",
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: isTablet ? 15 : 14,
+                          fontWeight: FontWeight.w600,
+                          color: _soft,
+                        ),
+                      ),
+                      const SizedBox(height: 18),
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.fromLTRB(18, 22, 18, 16),
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(color: _gold, width: 2),
+                          gradient: const LinearGradient(
+                            begin: Alignment.topCenter,
+                            end: Alignment.bottomCenter,
+                            colors: [Color(0xFFFFFBF2), Color(0xFFF8EFD6)],
+                          ),
+                        ),
+                        child: Column(
+                          children: [
+                            Transform.translate(
+                              offset: const Offset(0, -30),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 15, vertical: 6),
+                                decoration: BoxDecoration(
+                                  borderRadius: BorderRadius.circular(20),
+                                  gradient: const LinearGradient(
+                                    colors: [Color(0xFFB5712E), Color(0xFFC9A35A)],
+                                  ),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Image.asset(
+                                      'assets/offer/gift.png',
+                                      width: 16,
+                                      height: 16,
+                                      fit: BoxFit.contain,
+                                      errorBuilder: (_, __, ___) =>
+                                          const Icon(
+                                        Icons.card_giftcard,
+                                        size: 16,
+                                        color: Colors.white,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 6),
+                                    const Text(
+                                      'A GIFT TO BEGIN',
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w800,
+                                        color: Colors.white,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                            Text(
+                              '1 Year Premium · Unlimited AI',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                fontFamily: _serif,
+                                fontWeight: FontWeight.w700,
+                                fontSize: isTablet ? 19 : 18,
+                                color: const Color(0xFF241A0F),
+                              ),
+                            ),
+                            const SizedBox(height: 6),
+                            // Real yearly StoreKit price only (no $29 promo product).
+                            Text.rich(
+                              TextSpan(
+                                children: [
+                                  TextSpan(
+                                    text: '$_yearPrice',
+                                    style: TextStyle(
+                                      fontFamily: _serif,
+                                      fontSize: 30,
+                                      fontWeight: FontWeight.w700,
+                                      color: const Color(0xFF9A5323),
+                                    ),
+                                  ),
+                                  const TextSpan(
+                                    text: ' / year',
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w700,
+                                      color: Color(0xFF6B5A44),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              '$_yearPrice/year · auto-renews · cancel anytime',
+                              textAlign: TextAlign.center,
+                              style: const TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                color: Color(0xFF6B5A44),
+                              ),
+                            ),
+                            const SizedBox(height: 13),
+                            Wrap(
+                              alignment: WrapAlignment.center,
+                              spacing: 8,
+                              runSpacing: 6,
+                              children: const [
+                                _ExitChip('✓ Unlimited AI'),
+                                _ExitChip('✓ Ad-free'),
+                                _ExitChip('✓ All features'),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              Padding(
+                padding: EdgeInsets.fromLTRB(isTablet ? 40 : 24, 0, isTablet ? 40 : 24, 16),
+                child: Column(
+                  children: [
+                    SizedBox(
+                      width: double.infinity,
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          gradient: const LinearGradient(
+                            begin: Alignment.topCenter,
+                            end: Alignment.bottomCenter,
+                            colors: [_ctaTop, _ctaBot],
+                          ),
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        child: ElevatedButton(
+                          onPressed: _claimExitGift,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.transparent,
+                            shadowColor: Colors.transparent,
+                            elevation: 0,
+                            padding: const EdgeInsets.symmetric(vertical: 15),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                          ),
+                          child: Text(
+                            'Claim My Gift ›',
+                            style: TextStyle(
+                              fontFamily: _serif,
+                              fontSize: 18,
+                              fontWeight: FontWeight.w700,
+                              color: const Color(0xFFFFF6EA),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 9),
+                    Text(
+                      '$_yearPrice/year · auto-renews · cancel anytime',
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        fontSize: 10.5,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFF7A6A4E),
+                      ),
+                    ),
+                    const SizedBox(height: 11),
+                    GestureDetector(
+                      onTap: () async {
+                        setState(() => _exitOfferVisible = false);
+                        await _navigateAwayFromPaywall();
+                      },
+                      child: const Text(
+                        'No thanks, continue with limited access',
+                        style: TextStyle(
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w700,
+                          color: Color(0xFF6B5A44),
+                          decoration: TextDecoration.underline,
+                        ),
+                      ),
                     ),
                   ],
                 ),
-                child: ElevatedButton(
-                  onPressed: _onPrimaryCta,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.transparent,
-                    shadowColor: Colors.transparent,
-                    elevation: 0,
-                    padding: EdgeInsets.zero,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(13),
-                    ),
-                  ),
-                  child: Text(
-                    _ctaLabel,
-                    style: TextStyle(
-                      fontSize: isTablet ? 19 : 17.5,
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: -0.15,
-                      color: Colors.white,
-                    ),
-                  ),
-                ),
               ),
-            ),
-            SizedBox(height: isTablet ? 6 : 5),
-            Text(
-              _belowCta,
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: isTablet ? 12 : 11,
-                fontWeight: FontWeight.w600,
-                height: 1.5,
-                letterSpacing: -0.1,
-                color: const Color(0xFF3E3527),
-              ),
-            ),
-            SizedBox(height: isTablet ? 8 : 6),
-            GestureDetector(
-              onTap: _continueLimited,
-              child: Text(
-                'Continue with Limited Access',
-                style: TextStyle(
-                  fontSize: isTablet ? 13.5 : 12.5,
-                  color: const Color(0xFF8A7A5E),
-                  decoration: TextDecoration.none,
-                ),
-              ),
-            ),
-            SizedBox(height: isTablet ? 6 : 5),
-            _buildLegalRow(isTablet: isTablet),
-          ],
+            ],
+          ),
         ),
       ),
     );
   }
 }
+
+class _ExitChip extends StatelessWidget {
+  const _ExitChip(this.label);
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 5),
+      decoration: BoxDecoration(
+        color: const Color(0xFFE8F1E3),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Text(
+        label,
+        style: const TextStyle(
+          fontSize: 11.5,
+          fontWeight: FontWeight.w700,
+          color: Color(0xFF4F6A45),
+        ),
+      ),
+    );
+  }
+}
+
 
 class _RadioDot extends StatelessWidget {
   const _RadioDot({required this.selected, required this.color});

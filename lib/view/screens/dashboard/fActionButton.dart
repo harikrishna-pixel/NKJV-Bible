@@ -25,6 +25,7 @@ import '../../widget/country.dart';
 import '../../widget/delayed_barrier_dismiss.dart';
 import '../../widget/laguage.dart';
 import 'package:audioplayers/audioplayers.dart';
+import 'package:biblebookapp/services/reader_audio_player.dart';
 import 'package:get/get.dart';
 import '../../../controller/dashboard_controller.dart';
 import '../../../controller/dpProvider.dart';
@@ -38,7 +39,7 @@ class floatingButton extends StatefulWidget {
   GetAudioModel? audioData;
   List<ConnectivityResult>? internetConnection;
   bool textToSpeechLoad;
-  late AudioPlayer audioPlayer;
+  late ReaderAudioPlayer audioPlayer;
   /// Display-only: Home repaints after audio/TTS chapter sync.
   final VoidCallback? onReadingChapterSynced;
 
@@ -84,7 +85,7 @@ class floatingButtonState extends State<floatingButton>
   int currentBookChapterCount =
       1; // Track current book's chapter count for accurate completion checks
   bool isPrevTTSEnabled = false;
-  late AudioPlayer audioPlayer;
+  late ReaderAudioPlayer audioPlayer;
 
   // Track if audio was playing when closed, to auto-resume on chapter change
   bool _wasAudioPlayingBeforeClose = false;
@@ -104,6 +105,8 @@ class floatingButtonState extends State<floatingButton>
   // continues after the player sheet is dismissed.
   StreamSubscription<void>? _completeSubscription;
   StreamSubscription<Duration>? _positionSubscription;
+  /// Native playlist moved to the queued next chapter (minimize / screen-off).
+  StreamSubscription<QueuedChapter>? _autoAdvanceSubscription;
   bool _handlingMp3Complete = false;
   /// Fires next chapter slightly before EOF so iOS keeps the audio session
   /// alive (onPlayerComplete alone often never starts the next track in BG).
@@ -233,6 +236,12 @@ class floatingButtonState extends State<floatingButton>
     _restoreSharedSleep();
     checknetwork();
     audioPlayer = widget.audioPlayer;
+    ReaderAudioPlayer.albumTitle = BibleInfo.bible_shortName;
+    audioPlayer.titleBuilder = () {
+      final name = (_storedBookName ?? widget.bookName).trim();
+      final ch = audioChapterNum > 0 ? audioChapterNum : selectedChapter;
+      return name.isEmpty ? 'Bible Audio' : '$name $ch';
+    };
     setupAudioPlayer().then((_) {
       if (!mounted) return;
       selectedChapter = int.tryParse(widget.chapterNum) ?? 1;
@@ -257,6 +266,8 @@ class floatingButtonState extends State<floatingButton>
       if (state == PlayerState.playing) {
         _pausedForPhoneCall = false;
         unawaited(_prefetchNextChapterAudio());
+        // Keep a native next item queued so OS can advance while minimized.
+        unawaited(_queueNativeNextChapter());
       } else if (state == PlayerState.paused && wasPlaying) {
         // Chapter auto-next briefly pauses while swapping sources — not a call.
         if (!_handlingMp3Complete && !isNext) {
@@ -296,6 +307,7 @@ class floatingButtonState extends State<floatingButton>
 
     // Additive: keep auto-next alive while FAB State is alive (sheet dismiss safe).
     _ensureMp3CompletionListener();
+    _ensureNativeAutoAdvanceListener();
 
     // Store initial book name
     _storedBookName = widget.bookName;
@@ -387,8 +399,148 @@ class floatingButtonState extends State<floatingButton>
   void _ensureMp3CompletionListener() {
     if (_completeSubscription != null) return;
     _completeSubscription = audioPlayer.onPlayerComplete.listen((_) async {
+      // Native queue already owns the next track — wait for onAutoAdvance.
+      if (audioPlayer.hasQueuedNext) return;
       await _handleMp3PlayerComplete();
     });
+  }
+
+  void _ensureNativeAutoAdvanceListener() {
+    if (_autoAdvanceSubscription != null) return;
+    _autoAdvanceSubscription = audioPlayer.onAutoAdvance.listen((q) {
+      unawaited(_onNativeAutoAdvance(q));
+    });
+  }
+
+  /// Sync reader UI after the OS player moved to the queued next chapter.
+  Future<void> _onNativeAutoAdvance(QueuedChapter q) async {
+    if (!mounted) return;
+    _nearEndAdvanceStarted = false;
+    _pausedForPhoneCall = false;
+    isNext = true;
+    try {
+      audioBookNum = q.audioBookNum;
+      audioChapterNum = q.chapter;
+      selectedChapter = q.chapter;
+      final base = _recordedAudioBase();
+      if (base != null && base.isNotEmpty) {
+        audioBaseUrl = '$base/${q.audioBookNum}/${q.chapter}.mp3';
+      }
+      if (mounted) {
+        _mp3UiSetState(() {
+          isAudioPlaying = true;
+          position = Duration.zero;
+          _audioResumePosition = Duration.zero;
+        });
+      }
+      if (q.isNewBook &&
+          q.bookIndex != null &&
+          (q.bookName ?? '').isNotEmpty &&
+          q.bookChapterCount != null) {
+        currentBookChapterCount = q.bookChapterCount!;
+        _storedBookName = q.bookName;
+        await updateReadingScreenForNextBook(
+          q.bookIndex!,
+          q.chapter,
+          q.bookName!,
+          q.bookChapterCount!,
+        );
+      } else if (mounted) {
+        await updateReadingScreenChapter(q.chapter);
+      }
+      unawaited(_prefetchNextChapterAudio());
+      unawaited(_queueNativeNextChapter());
+    } catch (e) {
+      debugPrint('Native auto-advance sync error: $e');
+    } finally {
+      Future.delayed(const Duration(milliseconds: 2000), () {
+        if (mounted) {
+          isNext = false;
+          _mp3UiSetState(() {});
+        }
+      });
+    }
+  }
+
+  /// Resolve the next chapter target for prefetch / native queue.
+  Future<({int book, int chapter, QueuedChapter queued})?>
+      _nextChapterTarget() async {
+    if (audioChapterNum < _lastChapterForAdvance()) {
+      final book = audioBookNum;
+      final chapter = audioChapterNum + 1;
+      return (
+        book: book,
+        chapter: chapter,
+        queued: QueuedChapter(
+          audioBookNum: book,
+          chapter: chapter,
+        ),
+      );
+    }
+    final current = int.tryParse(widget.bookNum.toString());
+    if (current == null) return null;
+    final next = await getNextBook(current);
+    if (next?.bookNum == null || next?.chapterCount == null) return null;
+    final bookIndex = next!.bookNum!.toInt();
+    final book = bookIndex + 1;
+    const chapter = 1;
+    return (
+      book: book,
+      chapter: chapter,
+      queued: QueuedChapter(
+        audioBookNum: book,
+        chapter: chapter,
+        bookIndex: bookIndex,
+        bookName: next.title ?? '',
+        bookChapterCount: next.chapterCount!.toInt(),
+      ),
+    );
+  }
+
+  /// Queue next MP3 on the native playlist (BG / screen-off safe).
+  Future<void> _queueNativeNextChapter() async {
+    if (_readerUseTts || repeat || _sleepEndOfChapter) {
+      try {
+        await audioPlayer.clearQueuedNext();
+      } catch (_) {}
+      return;
+    }
+    if (audioPlayer.state != PlayerState.playing && !isAudioPlaying) return;
+    final target = await _nextChapterTarget();
+    if (target == null) {
+      try {
+        await audioPlayer.clearQueuedNext();
+      } catch (_) {}
+      return;
+    }
+    final key = '${target.book}/${target.chapter}';
+    String? path;
+    if (_prefetchedKey == key &&
+        _prefetchedPath != null &&
+        File(_prefetchedPath!).existsSync()) {
+      path = _prefetchedPath;
+    }
+    final base = _recordedAudioBase();
+    final urlOrPath = path ??
+        ((base != null && base.isNotEmpty)
+            ? '$base/${target.book}/${target.chapter}.mp3'
+            : null);
+    if (urlOrPath == null || urlOrPath.isEmpty) return;
+    final name = (_storedBookName ?? widget.bookName).trim();
+    final title = name.isEmpty
+        ? 'Bible Audio'
+        : (target.queued.isNewBook
+            ? '${target.queued.bookName ?? name} ${target.chapter}'
+            : '$name ${target.chapter}');
+    try {
+      await audioPlayer.queueNext(
+        target.queued,
+        urlOrPath,
+        title: title,
+      );
+    } catch (e) {
+      debugPrint('Native queueNext failed: $e');
+    }
   }
 
   // Background auto-next: the next chapter MP3 is downloaded while the current
@@ -423,24 +575,17 @@ class floatingButtonState extends State<floatingButton>
     if (base == null || base.isEmpty) return;
     _prefetching = true;
     try {
-      int book;
-      int chapter;
-      if (audioChapterNum < _lastChapterForAdvance()) {
-        book = audioBookNum;
-        chapter = audioChapterNum + 1;
-      } else {
-        final current = int.tryParse(widget.bookNum.toString());
-        if (current == null) return;
-        final next = await getNextBook(current);
-        if (next?.bookNum == null) return;
-        book = next!.bookNum!.toInt() + 1;
-        chapter = 1;
-      }
+      final target = await _nextChapterTarget();
+      if (target == null) return;
+      final book = target.book;
+      final chapter = target.chapter;
       final key = '$book/$chapter';
       final existing = _prefetchedPath;
       if (_prefetchedKey == key &&
           existing != null &&
           File(existing).existsSync()) {
+        // Refresh native queue to prefer the local file when already queued.
+        unawaited(_queueNativeNextChapter());
         return;
       }
       final res = await http
@@ -459,6 +604,8 @@ class floatingButtonState extends State<floatingButton>
           File(old).deleteSync();
         } catch (_) {}
       }
+      // Prefer local file in the native playlist for BG handoff.
+      unawaited(_queueNativeNextChapter());
     } catch (e) {
       debugPrint('Next chapter audio prefetch failed: $e');
     } finally {
@@ -526,6 +673,8 @@ class floatingButtonState extends State<floatingButton>
   /// audio session never goes idle (fixes minimize / screen-off auto-next).
   void _maybeStartNextChapterBeforeEof(Duration p) {
     if (_readerUseTts || repeat || _sleepEndOfChapter) return;
+    // Native playlist already has next — do not double-start in Dart.
+    if (audioPlayer.hasQueuedNext) return;
     if (_handlingMp3Complete || isNext || _nearEndAdvanceStarted) return;
     if (audioPlayer.state != PlayerState.playing && !isAudioPlaying) return;
     final totalMs = duration.inMilliseconds;
@@ -622,6 +771,7 @@ class floatingButtonState extends State<floatingButton>
           _nearEndAdvanceStarted = false;
           debugPrint('Audio auto-next: next chapter started '
               '(app state: ${WidgetsBinding.instance.lifecycleState})');
+          unawaited(_queueNativeNextChapter());
           return true;
         }
         useLocal = false;
@@ -661,6 +811,9 @@ class floatingButtonState extends State<floatingButton>
       _sleepChoiceMinutes = null;
       _sleepTimer?.cancel();
       _clearSharedSleep();
+      try {
+        await audioPlayer.clearQueuedNext();
+      } catch (_) {}
       Constants.showToast('Sleep timer: end of chapter. Pausing audio.');
       try {
         await audioPlayer.pause();
@@ -672,6 +825,9 @@ class floatingButtonState extends State<floatingButton>
       }
       return;
     }
+
+    // Native queue will advance — Dart complete is a fallback only.
+    if (audioPlayer.hasQueuedNext) return;
 
     // Repeat mode - restart current chapter (unchanged behavior).
     if (repeat) {
@@ -944,21 +1100,7 @@ class floatingButtonState extends State<floatingButton>
   }
 
   Future<void> setupAudioPlayer() async {
-    await AudioPlayer.global.setAudioContext(
-      AudioContext(
-        android: const AudioContextAndroid(
-          isSpeakerphoneOn: false,
-          stayAwake: true,
-          contentType: AndroidContentType.music,
-          usageType: AndroidUsageType.media,
-          audioFocus: AndroidAudioFocus.gain,
-        ),
-        iOS: AudioContextIOS(
-          category: AVAudioSessionCategory.playback,
-          // No defaultToSpeaker here for music
-        ),
-      ),
-    );
+    // ReaderAudioPlayer configures the music audio session on first play.
   }
 
   initMusic() {
@@ -2431,6 +2573,7 @@ class floatingButtonState extends State<floatingButton>
     _durationSubscription?.cancel();
     _positionSubscription?.cancel();
     _completeSubscription?.cancel();
+    _autoAdvanceSubscription?.cancel();
     _sleepTimer?.cancel();
     // Local timer only — the shared end time lets the next reader resume it.
     _sleepTimer?.cancel();
@@ -2438,6 +2581,7 @@ class floatingButtonState extends State<floatingButton>
     _durationSubscription = null;
     _positionSubscription = null;
     _completeSubscription = null;
+    _autoAdvanceSubscription = null;
     _readerWordTimer?.cancel();
     _readerWordTimer = null;
     _closeAudioSheetUi();
@@ -2990,6 +3134,11 @@ class floatingButtonState extends State<floatingButton>
                           setState(() => repeat = !repeat);
                           audioPlayer.setReleaseMode(
                               repeat ? ReleaseMode.loop : ReleaseMode.release);
+                          if (repeat) {
+                            unawaited(audioPlayer.clearQueuedNext());
+                          } else {
+                            unawaited(_queueNativeNextChapter());
+                          }
                         },
                         child: Stack(children: [
                           Image.asset(
@@ -5436,6 +5585,7 @@ class floatingButtonState extends State<floatingButton>
       _sleepEndOfChapter = true;
       _sharedSleepEndOfChapter = true;
       _sharedSleepChoice = minutes;
+      unawaited(audioPlayer.clearQueuedNext());
     } else if (minutes != null && minutes > 0) {
       _sharedSleepEndsAt = DateTime.now().add(Duration(minutes: minutes));
       _sharedSleepChoice = minutes;

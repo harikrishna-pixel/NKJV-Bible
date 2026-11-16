@@ -5,6 +5,7 @@ import 'dart:ui';
 import 'dart:ui' as ui;
 import 'package:app_tracking_transparency/app_tracking_transparency.dart';
 import 'package:audioplayers/audioplayers.dart';
+import 'package:biblebookapp/services/reader_audio_player.dart';
 import 'package:biblebookapp/Model/dailyVerseList.dart';
 import 'package:biblebookapp/constant/size_config.dart';
 import 'package:biblebookapp/controller/dashboard_controller.dart';
@@ -1419,7 +1420,8 @@ class _HomeScreenState extends State<HomeScreen>
   final Connectivity _connectivity = Connectivity();
   final InAppReview inAppReview = InAppReview.instance;
   final AdService _adService = AdService();
-  final AudioPlayer audioPlayer = AudioPlayer();
+  // Shared just_audio player: native next-chapter queue works minimized / screen off.
+  final ReaderAudioPlayer audioPlayer = ReaderAudioPlayer();
   final GlobalKey<floatingButtonState> _readerAudioFabKey =
       GlobalKey<floatingButtonState>();
 

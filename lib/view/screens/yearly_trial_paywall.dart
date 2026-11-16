@@ -208,11 +208,14 @@ class _YearlyTrialPaywallState extends State<YearlyTrialPaywall> {
       await NotificationsServices().cancelTrialEndReminder();
       return;
     }
-    final day = _lastTrialDay;
+    // Day 2 of the 3-day trial: remind that it expires tomorrow (same local notif path).
+    final day = _lastTrialDay.subtract(const Duration(days: 1));
+    final cancelLabel = _cancelByLabel(_lastTrialDay);
     await NotificationsServices().scheduleTrialEndReminder(
       when: DateTime(day.year, day.month, day.day, 9),
-      title: 'Your free trial ends today',
-      body: 'Cancel today and pay nothing. Your yearly plan begins tomorrow.',
+      title: 'Your free trial expires tomorrow',
+      body:
+          'Cancel by $cancelLabel and pay nothing. Your yearly plan begins the next day.',
     );
   }
 

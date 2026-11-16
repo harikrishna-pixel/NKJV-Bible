@@ -30,6 +30,7 @@ import 'package:get/get.dart';
 import 'package:get_storage/get_storage.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart' as hooks;
+import 'package:just_audio_background/just_audio_background.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'view/constants/theme_provider.dart';
@@ -71,6 +72,17 @@ bool _isBenignHardwareKeyboardKeyUp(FlutterErrorDetails details) {
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Bible reader MP3: native next-chapter queue while minimized / screen off.
+  try {
+    await JustAudioBackground.init(
+      androidNotificationChannelId: 'bible.reader.audio',
+      androidNotificationChannelName: 'Bible Audio',
+      androidNotificationOngoing: true,
+    );
+  } catch (e) {
+    debugPrint('main: JustAudioBackground init failed: $e');
+  }
 
   final FlutterExceptionHandler? previousFlutterOnError = FlutterError.onError;
   FlutterError.onError = (FlutterErrorDetails details) {

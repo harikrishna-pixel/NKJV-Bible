@@ -16,6 +16,8 @@ dependencies:
   audio_video_progress_bar: ^2.0.3
   audioplayers: ^6.1.2
   audio_service: ^0.18.7
+  just_audio: ^0.10.6
+  just_audio_background: ^0.0.1-beta.17
   flutter_pdfview: ^1.4.1+1
   auto_size_text: ^3.0.0
   cached_network_image: ^3.3.1
