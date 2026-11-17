@@ -14,6 +14,8 @@ import 'package:biblebookapp/core/notifiers/auth/auth.notifier.dart';
 import 'package:biblebookapp/core/notifiers/cache.notifier.dart';
 import 'package:biblebookapp/core/notifiers/download.notifier.dart';
 import 'package:biblebookapp/services/premium_entitlement_label_sync.dart';
+import 'package:biblebookapp/services/trial_reminder_ux.dart';
+import 'package:biblebookapp/view/screens/trial_started_alert.dart';
 import 'package:biblebookapp/main.dart';
 import 'package:biblebookapp/utils/debugprint.dart';
 import 'package:biblebookapp/utils/emoji_text_style.dart';
@@ -7797,6 +7799,12 @@ class PremiumWelcomeAlert {
   static const Duration _kClearUpgradeDeferDelay = Duration(milliseconds: 300);
 
   static Future<void> show(BuildContext context) async {
+    // Trial subscriptions → Day 0 confirmation UX (no paywall/IAP changes).
+    if (await TrialReminderUx.shouldShowTrialStartedFlow()) {
+      await TrialStartedAlert.show(context);
+      return;
+    }
+
     final size = MediaQuery.of(context).size;
     final isTablet = size.width > 600;
     final prefs = await SharedPreferences.getInstance();
