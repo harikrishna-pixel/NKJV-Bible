@@ -1048,27 +1048,19 @@ class PreferenceSelectionScreenState extends State<PreferenceSelectionScreen> {
                     height: screenWidth > 600 ? 65 : 40,
                     decoration: BoxDecoration(
                         gradient: _selectedCategories.length >= 3
-                            ? (Provider.of<ThemeProvider>(context,
-                            listen: false)
-                            .themeMode ==
-                            ThemeMode.dark
-                            ? null
-                            : const LinearGradient(
-                          colors: [
-                            Color(0xFF763201),
-                            Color(0xFFD5821F),
-                            Color(0xFF763201),
-                          ],
-                        ))
+                            ? const LinearGradient(
+                                colors: [
+                                  Color(0xFF763201),
+                                  Color(0xFFD5821F),
+                                  Color(0xFF763201),
+                                ],
+                              )
                             : null,
                         color: _selectedCategories.length >= 3
-                            ? (Provider.of<ThemeProvider>(context,
-                            listen: false)
-                            .themeMode ==
-                            ThemeMode.dark
-                            ? CommanColor.backgrondcolor
-                            : null)
-                            : Color(0XFFC9B7A5),
+                            ? null
+                            : (isDark
+                                ? const Color(0xFF5A4638)
+                                : const Color(0xFFC9B7A5)),
                         borderRadius: BorderRadius.circular(9) // Brown color
                     ),
                     // onPressed: _selectedCategories.length == 4
@@ -1095,14 +1087,12 @@ class PreferenceSelectionScreenState extends State<PreferenceSelectionScreen> {
                               : "Continue",
                           style: TextStyle(
                               fontSize: screenWidth > 600 ? 20 : 17,
+                              fontWeight: FontWeight.w600,
                               color: _selectedCategories.length >= 3
-                                  ? Provider.of<ThemeProvider>(context,
-                                  listen: false)
-                                  .themeMode ==
-                                  ThemeMode.dark
-                                  ? CommanColor.darkPrimaryColor
-                                  : CommanColor.white
-                                  : null)),
+                                  ? CommanColor.white
+                                  : (isDark
+                                      ? const Color(0xFFE8DCC8)
+                                      : const Color(0xFF5A4638)))),
                     ),
                   ),
                 ),
@@ -1116,7 +1106,9 @@ class PreferenceSelectionScreenState extends State<PreferenceSelectionScreen> {
                       textAlign: TextAlign.center,
                       style: TextStyle(
                         fontSize: screenWidth > 600 ? 17 : 15,
-                        color: const Color(0xFF7B5536),
+                        color: isDark
+                            ? Colors.white70
+                            : const Color(0xFF7B5536),
                         fontStyle: FontStyle.normal,
                       ),
                     )

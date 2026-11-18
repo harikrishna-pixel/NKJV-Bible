@@ -5775,29 +5775,18 @@ class floatingButtonState extends State<floatingButton>
                     icon: Icon(Icons.keyboard_arrow_down, color: ink, size: 28),
                   ),
                   Expanded(
-                    child: Column(
-                      children: [
-                        Text(
-                          '$book - $chapter',
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            color: ink,
-                            fontSize: 17,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                        if (ttsUi) ...[
-                          const SizedBox(height: 2),
-                          Text(
-                            'Read Aloud',
-                            style: TextStyle(
-                              color: ink.withValues(alpha: 0.55),
-                              fontSize: 13,
-                            ),
-                          ),
-                        ],
-                      ],
+                    child: Text(
+                      ttsUi
+                          ? 'Read Aloud'
+                          : BibleInfo.englishBibleAudioName,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: ink,
+                        fontSize: 17,
+                        fontWeight: FontWeight.w700,
+                      ),
                     ),
                   ),
                   IconButton(
@@ -5852,7 +5841,7 @@ class floatingButtonState extends State<floatingButton>
                             ),
                             const SizedBox(height: 6),
                             Text(
-                              'Chapter $chapter',
+                              '— Chapter $chapter —',
                               style: const TextStyle(
                                 color: Colors.white,
                                 fontFamily: 'Georgia',

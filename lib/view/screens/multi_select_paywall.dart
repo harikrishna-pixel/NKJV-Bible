@@ -7,6 +7,7 @@ import 'package:biblebookapp/controller/dashboard_controller.dart';
 import 'package:biblebookapp/core/notifiers/download.notifier.dart';
 
 import 'package:biblebookapp/services/paywall_preload_service.dart';
+import 'package:biblebookapp/services/paywall_price_cache.dart';
 import 'package:biblebookapp/services/premium_entitlement_label_sync.dart';
 
 import 'package:biblebookapp/streak_flow/streak_flow_screens.dart';
@@ -26,6 +27,8 @@ import 'package:flutter_easyloading/flutter_easyloading.dart';
 import 'package:get/get.dart';
 
 import 'package:in_app_purchase/in_app_purchase.dart';
+
+import 'package:internet_connection_checker_plus/internet_connection_checker_plus.dart';
 
 import 'package:provider/provider.dart';
 
@@ -67,6 +70,9 @@ enum _PwCard { ai, lifetime }
 
 enum _AiDur { sixMonth, oneYear }
 
+/// Display-only price load UI (does not change buy / restore).
+enum _PriceUiState { loading, retrying, ready, noInternet, unavailable }
+
 class _MultiSelectPaywallState extends State<MultiSelectPaywall> {
   // Old Paper Irresistible paywall palette (UI only — from HTML).
   static const Color _cream = Color(0xFFF4E9D2);
@@ -86,8 +92,29 @@ class _MultiSelectPaywallState extends State<MultiSelectPaywall> {
   _AiDur _dur = _AiDur.oneYear;
 
   /// Exit / win-back sheet (UI only). First ✕ / Continue Free shows it once.
+  /// Only during onboarding (`checkad == 'onboard'`), not Paywall Options.
+  static const String _exitOfferConsumedPref = 'ms_exit_offer_consumed';
+
   bool _exitOfferVisible = false;
   bool _exitOfferShownOnce = false;
+
+  bool get _exitOfferEnabled => widget.checkad == 'onboard';
+
+  Future<bool> _shouldShowExitOffer() async {
+    if (!_exitOfferEnabled || _exitOfferShownOnce) return false;
+    final consumed =
+        await SharPreferences.getBoolean(_exitOfferConsumedPref);
+    return consumed != true;
+  }
+
+  Future<void> _presentExitOffer() async {
+    await SharPreferences.setBoolean(_exitOfferConsumedPref, true);
+    if (!mounted) return;
+    setState(() {
+      _exitOfferShownOnce = true;
+      _exitOfferVisible = true;
+    });
+  }
 
   ProductDetails? _sixMonth;
 
@@ -96,6 +123,12 @@ class _MultiSelectPaywallState extends State<MultiSelectPaywall> {
   ProductDetails? _lifetime;
 
   bool _loading = true;
+
+  _PriceUiState _priceUi = _PriceUiState.loading;
+
+  String? _cachedMonthPrice;
+  String? _cachedYearPrice;
+  String? _cachedLifetimePrice;
 
   String get _resolvedSixMonth => BibleInfo.isAutoRenewablePaywallMode
       ? BibleInfo.arOneMonthPlanid
@@ -239,29 +272,81 @@ class _MultiSelectPaywallState extends State<MultiSelectPaywall> {
     );
   }
 
-  Future<void> _loadProducts() async {
-    // Same data path as SubscriptionScreen / PaywallPreloadService.
+  Future<void> _readPriceCaches() async {
+    _cachedMonthPrice = await PaywallPriceCache.read(_resolvedSixMonth);
+    _cachedYearPrice = await PaywallPriceCache.read(_resolvedOneYear);
+    _cachedLifetimePrice = await PaywallPriceCache.read(_resolvedLifetime);
+  }
 
-    var products = PaywallPreloadService.getPreloadedProducts();
+  Future<void> _persistLivePrices() async {
+    final six = _sixMonth;
+    if (six != null && six.price.isNotEmpty) {
+      await PaywallPriceCache.save(six.id, six.price);
+      _cachedMonthPrice = six.price;
+    }
+    final year = _oneYear;
+    if (year != null && year.price.isNotEmpty) {
+      await PaywallPriceCache.save(year.id, year.price);
+      _cachedYearPrice = year.price;
+    }
+    final life = _lifetime;
+    if (life != null && life.price.isNotEmpty) {
+      await PaywallPriceCache.save(life.id, life.price);
+      _cachedLifetimePrice = life.price;
+    }
+  }
 
-    if (products.isEmpty) {
-      await PaywallPreloadService.preloadPaywallData();
+  bool get _hasCachedDisplayPrices =>
+      (_cachedMonthPrice?.isNotEmpty == true) ||
+      (_cachedYearPrice?.isNotEmpty == true) ||
+      (_cachedLifetimePrice?.isNotEmpty == true);
 
-      products = PaywallPreloadService.getPreloadedProducts();
+  bool get _hasLiveOrCachedPrices {
+    final monthOk = (_sixMonth?.price.isNotEmpty == true) ||
+        (_cachedMonthPrice?.isNotEmpty == true);
+    final yearOk = (_oneYear?.price.isNotEmpty == true) ||
+        (_cachedYearPrice?.isNotEmpty == true);
+    final lifeOk = (_lifetime?.price.isNotEmpty == true) ||
+        (_cachedLifetimePrice?.isNotEmpty == true);
+    return monthOk || yearOk || lifeOk;
+  }
+
+  Future<void> _loadProducts({bool isRetry = false}) async {
+    if (!mounted) return;
+    setState(() {
+      _loading = true;
+      _priceUi =
+          isRetry ? _PriceUiState.retrying : _PriceUiState.loading;
+    });
+
+    await _readPriceCaches();
+
+    final online = await InternetConnection().hasInternetAccess;
+    if (!mounted) return;
+    if (!online) {
+      if (_hasCachedDisplayPrices) {
+        setState(() {
+          _loading = false;
+          _priceUi = _PriceUiState.ready;
+        });
+      } else {
+        setState(() {
+          _loading = false;
+          _priceUi = _PriceUiState.noInternet;
+        });
+      }
+      return;
     }
 
+    // Same data path as SubscriptionScreen / PaywallPreloadService.
     ProductDetails? six;
-
     ProductDetails? year;
-
     ProductDetails? life;
 
     void assignFrom(Iterable<ProductDetails> list) {
       for (final p in list) {
-      final id = p.id.toLowerCase();
-
+        final id = p.id.toLowerCase();
         // Paywall shows AR 1-month in the short slot (not AR 6-month).
-
         if (six == null &&
             (p.id == _resolvedSixMonth ||
                 BibleInfo.isArOneMonthProductId(p.id))) {
@@ -278,14 +363,18 @@ class _MultiSelectPaywallState extends State<MultiSelectPaywall> {
       }
     }
 
-    assignFrom(products);
+    try {
+      var products = PaywallPreloadService.getPreloadedProducts();
+      if (products.isEmpty) {
+        await PaywallPreloadService.preloadPaywallData()
+            .timeout(const Duration(seconds: 10));
+        products = PaywallPreloadService.getPreloadedProducts();
+      }
+      assignFrom(products);
 
-    // Display-only: if a slot is still empty, requery StoreKit using the
-
-    // same constant / resolved product IDs (buy / restore path unchanged).
-
-    if (six == null || year == null || life == null) {
-      try {
+      // Display-only: if a slot is still empty, requery StoreKit using the
+      // same constant / resolved product IDs (buy / restore path unchanged).
+      if (six == null || year == null || life == null) {
         if (await InAppPurchase.instance.isAvailable()) {
           final ids = <String>{
             ...AppApiConstant.subscriptionProductIdQueryVariants(
@@ -295,31 +384,34 @@ class _MultiSelectPaywallState extends State<MultiSelectPaywall> {
             ...AppApiConstant.subscriptionProductIdQueryVariants(
                 _resolvedLifetime),
           };
-
-          final response =
-              await InAppPurchase.instance.queryProductDetails(ids);
-
+          final response = await InAppPurchase.instance
+              .queryProductDetails(ids)
+              .timeout(const Duration(seconds: 10));
           assignFrom(response.productDetails);
         }
-      } catch (e) {
-        debugPrint('MultiSelectPaywall: store requery failed: $e');
       }
+    } catch (e) {
+      debugPrint('MultiSelectPaywall: store price load failed: $e');
     }
 
     if (!mounted) return;
 
     setState(() {
       _sixMonth = six;
-
       _oneYear = year;
-
       _lifetime = life;
-
-      _loading = false;
-
       if (_oneYear == null && _sixMonth != null) {
         _dur = _AiDur.sixMonth;
       }
+    });
+
+    await _persistLivePrices();
+    if (!mounted) return;
+
+    final ready = _hasLiveOrCachedPrices;
+    setState(() {
+      _loading = false;
+      _priceUi = ready ? _PriceUiState.ready : _PriceUiState.unavailable;
     });
   }
 
@@ -352,22 +444,25 @@ class _MultiSelectPaywallState extends State<MultiSelectPaywall> {
 
   String get _aiPrice {
     final p = _selectedAiProduct;
-
     if (p != null && p.price.isNotEmpty) return p.price;
-
-    // Existing fallback when StoreKit product is not bound yet.
-
-    return _dur == _AiDur.oneYear ? '\$59.99' : '\$34.99';
+    if (_dur == _AiDur.oneYear) {
+      return _cachedYearPrice ?? '';
+    }
+    return _cachedMonthPrice ?? '';
   }
 
   String get _lifetimePrice {
     final p = _lifetime;
-
     if (p != null && p.price.isNotEmpty) return p.price;
+    return _cachedLifetimePrice ?? '';
+  }
 
-    // Existing fallback when StoreKit product is not bound yet.
-
-    return '\$79.99';
+  bool get _canTapPurchase {
+    if (_loading || _priceUi != _PriceUiState.ready) return false;
+    if (_sel == _PwCard.lifetime) return _lifetimePrice.isNotEmpty;
+    return _dur == _AiDur.oneYear
+        ? _yearPrice.isNotEmpty
+        : _monthPrice.isNotEmpty;
   }
 
   String get _ctaLabel => _sel == _PwCard.lifetime
@@ -381,13 +476,13 @@ class _MultiSelectPaywallState extends State<MultiSelectPaywall> {
   String get _monthPrice {
     final p = _sixMonth;
     if (p != null && p.price.isNotEmpty) return p.price;
-    return '\$5.99';
+    return _cachedMonthPrice ?? '';
   }
 
   String get _yearPrice {
     final p = _oneYear;
     if (p != null && p.price.isNotEmpty) return p.price;
-    return '\$39.99';
+    return _cachedYearPrice ?? '';
   }
 
   String get _yearAnchor {
@@ -444,30 +539,22 @@ class _MultiSelectPaywallState extends State<MultiSelectPaywall> {
   }
 
   Future<void> _continueLimited() async {
-    if (!_exitOfferShownOnce) {
-      if (!mounted) return;
-      setState(() {
-        _exitOfferShownOnce = true;
-        _exitOfferVisible = true;
-      });
+    if (await _shouldShowExitOffer()) {
+      await _presentExitOffer();
       return;
     }
     await _navigateAwayFromPaywall();
   }
 
   Future<void> _onClose() async {
+    // Close exit offer → back to main paywall (leave only on next close).
     if (_exitOfferVisible) {
       if (!mounted) return;
       setState(() => _exitOfferVisible = false);
-      await _navigateAwayFromPaywall();
       return;
     }
-    if (!_exitOfferShownOnce) {
-      if (!mounted) return;
-      setState(() {
-        _exitOfferShownOnce = true;
-        _exitOfferVisible = true;
-      });
+    if (await _shouldShowExitOffer()) {
+      await _presentExitOffer();
       return;
     }
     await _navigateAwayFromPaywall();
@@ -1105,7 +1192,166 @@ class _MultiSelectPaywallState extends State<MultiSelectPaywall> {
               ],
             ),
             if (_exitOfferVisible) _buildExitOffer(isTablet),
+            if (_priceUi != _PriceUiState.ready) _buildPriceStatusOverlay(isTablet),
           ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPriceStatusOverlay(bool isTablet) {
+    final loading = _priceUi == _PriceUiState.loading ||
+        _priceUi == _PriceUiState.retrying;
+    final noNet = _priceUi == _PriceUiState.noInternet;
+    final title = loading
+        ? (_priceUi == _PriceUiState.retrying
+            ? 'Retrying...'
+            : 'Getting your price...')
+        : (noNet ? 'No Internet Connection' : 'Price unavailable');
+    final body = loading
+        ? (_priceUi == _PriceUiState.retrying
+            ? 'Getting your price again...'
+            : 'Please wait a moment')
+        : (noNet
+            ? 'Please check your internet connection and try again.'
+            : "We couldn't load the purchase price. This may be a temporary issue. Please try again.");
+
+    return Positioned.fill(
+      child: ColoredBox(
+        color: _cream.withValues(alpha: 0.97),
+        child: SafeArea(
+          child: Padding(
+            padding: EdgeInsets.symmetric(horizontal: isTablet ? 48 : 28),
+            child: Column(
+              children: [
+                Align(
+                  alignment: Alignment.topRight,
+                  child: IconButton(
+                    onPressed: _onClose,
+                    icon: const Icon(Icons.close, color: Color(0xFF6B5A44)),
+                  ),
+                ),
+                const Spacer(),
+                Container(
+                  width: isTablet ? 72 : 64,
+                  height: isTablet ? 72 : 64,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: loading
+                        ? const Color(0xFFEFE3C8)
+                        : const Color(0xFFF6E6DF),
+                  ),
+                  child: loading
+                      ? const Padding(
+                          padding: EdgeInsets.all(16),
+                          child: CircularProgressIndicator(
+                            strokeWidth: 3,
+                            color: Color(0xFF9A5323),
+                          ),
+                        )
+                      : Icon(
+                          noNet ? Icons.wifi_off_rounded : Icons.error_outline,
+                          size: 32,
+                          color: const Color(0xFFA8502F),
+                        ),
+                ),
+                const SizedBox(height: 18),
+                Text(
+                  title,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontFamily: _serif,
+                    fontWeight: FontWeight.w700,
+                    fontSize: isTablet ? 24 : 22,
+                    color: const Color(0xFF241A0F),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  body,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: isTablet ? 15 : 14,
+                    fontWeight: FontWeight.w600,
+                    fontStyle: loading ? FontStyle.italic : FontStyle.normal,
+                    color: _soft,
+                    height: 1.35,
+                  ),
+                ),
+                const SizedBox(height: 28),
+                if (loading)
+                  SizedBox(
+                    width: double.infinity,
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFD9C7A8),
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 15),
+                        child: Text(
+                          'Loading price...',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontFamily: _serif,
+                            fontWeight: FontWeight.w700,
+                            fontSize: 16,
+                            color: const Color(0xFF6B5A44),
+                          ),
+                        ),
+                      ),
+                    ),
+                  )
+                else
+                  SizedBox(
+                    width: double.infinity,
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                          colors: [_ctaTop, _ctaBot],
+                        ),
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      child: ElevatedButton.icon(
+                        onPressed: () => _loadProducts(isRetry: true),
+                        icon: const Icon(Icons.refresh_rounded,
+                            color: Color(0xFFFFF6EA)),
+                        label: Text(
+                          'Try Again',
+                          style: TextStyle(
+                            fontFamily: _serif,
+                            fontWeight: FontWeight.w700,
+                            fontSize: 16,
+                            color: const Color(0xFFFFF6EA),
+                          ),
+                        ),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.transparent,
+                          shadowColor: Colors.transparent,
+                          elevation: 0,
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                const Spacer(flex: 2),
+                Text(
+                  'Terms  ·  Restore  ·  Privacy',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: _soft.withValues(alpha: 0.75),
+                  ),
+                ),
+                const SizedBox(height: 18),
+              ],
+            ),
+          ),
         ),
       ),
     );
@@ -1616,7 +1862,7 @@ class _MultiSelectPaywallState extends State<MultiSelectPaywall> {
                   ],
                 ),
                 child: ElevatedButton(
-                  onPressed: _loading ? null : _onPrimaryCta,
+                  onPressed: _canTapPurchase ? _onPrimaryCta : null,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.transparent,
                     shadowColor: Colors.transparent,
@@ -1735,9 +1981,8 @@ class _MultiSelectPaywallState extends State<MultiSelectPaywall> {
                 child: Padding(
                   padding: const EdgeInsets.only(right: 16, top: 8),
                   child: InkWell(
-                    onTap: () async {
+                    onTap: () {
                       setState(() => _exitOfferVisible = false);
-                      await _navigateAwayFromPaywall();
                     },
                     customBorder: const CircleBorder(),
                     child: Container(
@@ -1896,7 +2141,17 @@ class _MultiSelectPaywallState extends State<MultiSelectPaywall> {
                               ),
                             ),
                             const SizedBox(height: 6),
-                            // Real yearly StoreKit price only (no $29 promo product).
+                            // Original (anchor) struck + real yearly StoreKit price.
+                            Text(
+                              _yearAnchor,
+                              style: const TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600,
+                                color: Color(0xFFA9966F),
+                                decoration: TextDecoration.lineThrough,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
                             Text.rich(
                               TextSpan(
                                 children: [
@@ -1998,9 +2253,8 @@ class _MultiSelectPaywallState extends State<MultiSelectPaywall> {
                     ),
                     const SizedBox(height: 11),
                     GestureDetector(
-                      onTap: () async {
+                      onTap: () {
                         setState(() => _exitOfferVisible = false);
-                        await _navigateAwayFromPaywall();
                       },
                       child: const Text(
                         'No thanks, continue with limited access',

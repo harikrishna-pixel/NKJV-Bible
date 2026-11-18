@@ -3904,17 +3904,8 @@ Your 3 questions (exactly 3 lines):''';
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: [
-          Text(
-            'Suggestions :',
-            style: TextStyle(
-              color: isDark
-                  ? Colors.white.withOpacity(0.75)
-                  : const Color(0xFF8D6E63).withOpacity(0.65),
-              fontSize: screenWidth > 450 ? 16 : 14.5,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          const SizedBox(height: 10),
+          _buildAskAiPartRule(context, 'Continue'),
+          const SizedBox(height: 4),
           SizedBox(
             height: screenWidth > 450 ? 160 : 138,
             child: SingleChildScrollView(
@@ -4860,47 +4851,17 @@ Your 3 questions (exactly 3 lines):''';
 
   Widget _buildLoadingIndicator() {
     final screenWidth = MediaQuery.of(context).size.width;
-    final isDark =
-        Provider.of<ThemeProvider>(context).themeMode == ThemeMode.dark;
 
     return Padding(
       padding: EdgeInsets.only(
-        bottom: 12,
-        left: 0,
-        right: screenWidth * 0.15,
+        bottom: 26,
+        right: screenWidth > 450 ? 28 : 8,
       ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.start,
+      child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          CircleAvatar(
-            radius: screenWidth > 450 ? 18 : 16,
-            backgroundColor: CommanColor.lightDarkPrimary(context),
-            child: Image.asset("assets/Mask group.png"),
-          ),
-          const SizedBox(width: 8),
-          Container(
-            padding: EdgeInsets.all(screenWidth > 450 ? 16 : 12),
-            decoration: BoxDecoration(
-              color: isDark
-                  ? CommanColor.darkPrimaryColor.withOpacity(0.3)
-                  : CommanColor.backgrondcolor,
-              border: Border.all(
-                color: CommanColor.lightDarkPrimary(context).withOpacity(0.3),
-                width: 1,
-              ),
-              borderRadius: const BorderRadius.only(
-                topLeft: Radius.circular(20),
-                topRight: Radius.circular(20),
-                bottomLeft: Radius.circular(4),
-                bottomRight: Radius.circular(20),
-              ),
-            ),
-            child: _WaveLoader(
-              color:
-                  isDark ? Colors.white : CommanColor.lightDarkPrimary(context),
-            ),
-          ),
+          _buildAskAiLabel(context),
+          _WaveLoader(color: _askAiAccent(context)),
         ],
       ),
     );
@@ -4939,14 +4900,376 @@ Your 3 questions (exactly 3 lines):''';
     return null;
   }
 
+  Color _askAiAccent(BuildContext context) {
+    final isDark =
+        Provider.of<ThemeProvider>(context, listen: false).themeMode ==
+            ThemeMode.dark;
+    return isDark ? const Color(0xFF45B8C2) : const Color(0xFF0E7C86);
+  }
+
+  Color _askAiInk(BuildContext context) {
+    final isDark =
+        Provider.of<ThemeProvider>(context, listen: false).themeMode ==
+            ThemeMode.dark;
+    return isDark ? const Color(0xFFF2F5F8) : CommanColor.whiteBlack(context);
+  }
+
+  Color _askAiMuted(BuildContext context) {
+    return _askAiInk(context).withValues(alpha: 0.72);
+  }
+
+  Widget _buildAskAiLabel(BuildContext context) {
+    final accent = _askAiAccent(context);
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 14),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 6,
+            height: 6,
+            decoration: BoxDecoration(color: accent, shape: BoxShape.circle),
+          ),
+          const SizedBox(width: 7),
+          Text(
+            'ASK AI',
+            style: TextStyle(
+              color: accent,
+              fontSize: 10.5,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 1.4,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Display-only split so Ask AI replies match HTML hierarchy (lead + body/points).
+  ({String lead, String rest}) _splitAskAiLeadBody(String raw) {
+    final text = raw.trim();
+    if (text.isEmpty) return (lead: '', rest: '');
+    final blank = text.indexOf(RegExp(r'\n\s*\n'));
+    if (blank > 0) {
+      return (
+        lead: text.substring(0, blank).trim(),
+        rest: text.substring(blank).trim(),
+      );
+    }
+    final sentence = RegExp(r'^(.+?[.!?])(\s+|$)').firstMatch(text);
+    if (sentence != null) {
+      final lead = sentence.group(1)!.trim();
+      if (lead.length >= 24 && lead.length <= (text.length * 0.65).round()) {
+        return (lead: lead, rest: text.substring(sentence.end).trim());
+      }
+    }
+    return (lead: text, rest: '');
+  }
+
+  List<String> _askAiBulletLines(String block) {
+    final out = <String>[];
+    for (final line in block.split('\n')) {
+      final t = line.trim();
+      final m = RegExp(r'^(?:[-•*]|\d+[.)])\s+(.*)$').firstMatch(t);
+      if (m != null) {
+        final body = (m.group(1) ?? '').trim();
+        if (body.isNotEmpty) out.add(body);
+      }
+    }
+    return out;
+  }
+
+  Widget _buildAskAiRichParagraph({
+    required String text,
+    required double screenWidth,
+    required BuildContext context,
+    required Color color,
+    required double fontSize,
+    required FontWeight weight,
+    required double height,
+  }) {
+    return RichText(
+      text: TextSpan(
+        style: TextStyle(
+          color: color,
+          fontSize: fontSize,
+          fontWeight: weight,
+          height: height,
+          letterSpacing: -0.1,
+        ),
+        children: _parseTextWithVerseHighlights(
+          text,
+          false,
+          screenWidth,
+          context,
+          color: color,
+          fontSize: fontSize,
+          height: height,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAskAiPartRule(BuildContext context, String label) {
+    final accent = _askAiAccent(context);
+    final hair = Provider.of<ThemeProvider>(context, listen: false)
+                .themeMode ==
+            ThemeMode.dark
+        ? const Color(0xFF232A34)
+        : const Color(0xFFE8ECF2);
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 11),
+      child: Row(
+        children: [
+          Text(
+            label.toUpperCase(),
+            style: TextStyle(
+              color: accent,
+              fontSize: 10.5,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 1.4,
+            ),
+          ),
+          const SizedBox(width: 11),
+          Expanded(
+            child: Container(height: 1, color: hair),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// HTML `.quote` — passage text + uppercase citation.
+  Widget _buildAskAiPassageQuote({
+    required BuildContext context,
+    required double screenWidth,
+    required String quote,
+    required String cite,
+  }) {
+    final ink = _askAiInk(context);
+    final citeColor = ink.withValues(alpha: 0.45);
+    final accent = _askAiAccent(context);
+    final quoteSize = screenWidth > 450 ? 18.0 : 17.0;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 24),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.only(left: 15),
+        decoration: BoxDecoration(
+          border: Border(
+            left: BorderSide(color: accent, width: 2.5),
+          ),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              quote,
+              style: TextStyle(
+                fontFamily: 'Georgia',
+                fontSize: quoteSize,
+                height: 1.6,
+                color: ink,
+                fontWeight: FontWeight.w400,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              cite.toUpperCase(),
+              style: TextStyle(
+                color: citeColor,
+                fontSize: 10.5,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 1.2,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Prefer verse-context passage; else first verse ref + nearby quoted text in the reply.
+  ({String? cite, String? quote}) _resolveAskAiPassage(String responseText) {
+    final ctx = widget.verseContext;
+    if (ctx != null) {
+      final book = (ctx['book'] ?? '').toString().trim();
+      final chapter = (ctx['chapter'] ?? '').toString().trim();
+      final verse = (ctx['verse'] ?? '').toString().trim();
+      final verseText = (ctx['verseText'] ?? '').toString().trim();
+      if (book.isNotEmpty &&
+          chapter.isNotEmpty &&
+          verse.isNotEmpty &&
+          verseText.isNotEmpty) {
+        return (cite: '$book $chapter:$verse', quote: verseText);
+      }
+    }
+
+    final refMatch = RegExp(
+      r'\b(?:[1-3]\s+)?[A-Za-z][A-Za-z]+(?:\s+[A-Za-z]+)?\s+\d{1,3}:\d{1,3}(?:-\d{1,3})?\b',
+    ).firstMatch(responseText);
+    final cite = refMatch?.group(0)?.trim();
+
+    String? quote;
+    final curly = RegExp(r'[“"]([^”"]{20,})[”"]').firstMatch(responseText);
+    if (curly != null) {
+      quote = curly.group(1)?.trim();
+    }
+    if ((quote == null || quote.isEmpty) && cite != null) {
+      // Line after a "Passage:" / "Scripture:" style label in the model reply.
+      final labeled = RegExp(
+        r'(?:Passage|Scripture|Verse)\s*[:\-–]\s*(.+)',
+        caseSensitive: false,
+      ).firstMatch(responseText);
+      if (labeled != null) {
+        quote = labeled.group(1)?.trim();
+      }
+    }
+
+    if (cite == null || cite.isEmpty || quote == null || quote.isEmpty) {
+      return (cite: null, quote: null);
+    }
+    return (cite: cite, quote: quote);
+  }
+
+  Widget _buildAskAiFormattedBody(
+    String text,
+    double screenWidth,
+    BuildContext context,
+  ) {
+    final ink = _askAiInk(context);
+    final muted = _askAiMuted(context);
+    final accent = _askAiAccent(context);
+    final leadSize = screenWidth > 450 ? 18.0 : 17.0;
+    final bodySize = screenWidth > 450 ? 15.5 : 14.8;
+    final parts = _splitAskAiLeadBody(text);
+    final restBlocks = parts.rest.isEmpty
+        ? const <String>[]
+        : parts.rest
+            .split(RegExp(r'\n\s*\n'))
+            .map((e) => e.trim())
+            .where((e) => e.isNotEmpty)
+            .toList();
+    final passage = _resolveAskAiPassage(text);
+
+    final children = <Widget>[
+      if (parts.lead.isNotEmpty)
+        _buildAskAiRichParagraph(
+          text: parts.lead,
+          screenWidth: screenWidth,
+          context: context,
+          color: ink,
+          fontSize: leadSize,
+          weight: FontWeight.w600,
+          height: 1.48,
+        ),
+    ];
+
+    // HTML order: lead → The passage (quote) → Why it matters → points.
+    if (passage.cite != null && passage.quote != null) {
+      children.add(const SizedBox(height: 24));
+      children.add(_buildAskAiPartRule(context, 'The passage'));
+      children.add(
+        _buildAskAiPassageQuote(
+          context: context,
+          screenWidth: screenWidth,
+          quote: passage.quote!,
+          cite: passage.cite!,
+        ),
+      );
+    }
+
+    if (restBlocks.isNotEmpty) {
+      if (passage.cite == null) {
+        children.add(const SizedBox(height: 24));
+      }
+      children.add(_buildAskAiPartRule(context, 'Why it matters'));
+    }
+
+    for (var b = 0; b < restBlocks.length; b++) {
+      final block = restBlocks[b];
+      final bullets = _askAiBulletLines(block);
+      final looksLikeList = bullets.length >= 2 &&
+          bullets.length >=
+              block
+                  .split('\n')
+                  .where((l) => l.trim().isNotEmpty)
+                  .length;
+      if (b > 0) children.add(const SizedBox(height: 18));
+      if (looksLikeList) {
+        children.add(
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              for (var i = 0; i < bullets.length; i++) ...[
+                if (i > 0) const SizedBox(height: 10),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.only(top: 8),
+                      child: Container(
+                        width: 5,
+                        height: 5,
+                        decoration: BoxDecoration(
+                          color: accent.withValues(alpha: 0.55),
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 11),
+                    Expanded(
+                      child: _buildAskAiRichParagraph(
+                        text: bullets[i],
+                        screenWidth: screenWidth,
+                        context: context,
+                        color: muted,
+                        fontSize: bodySize,
+                        weight: FontWeight.w400,
+                        height: 1.6,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ],
+          ),
+        );
+      } else {
+        children.add(
+          _buildAskAiRichParagraph(
+            text: block,
+            screenWidth: screenWidth,
+            context: context,
+            color: muted,
+            fontSize: bodySize,
+            weight: FontWeight.w400,
+            height: 1.7,
+          ),
+        );
+      }
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: children,
+    );
+  }
+
   // Function to parse text and highlight verse references with clickable links
   List<TextSpan> _parseTextWithVerseHighlights(
-      String text, bool isUser, double screenWidth, BuildContext context) {
+      String text, bool isUser, double screenWidth, BuildContext context,
+      {Color? color, double? fontSize, double? height}) {
     final themeProvider = Provider.of<ThemeProvider>(context);
     final isDark = themeProvider.themeMode == ThemeMode.dark;
-    final baseColor = isUser
-        ? const Color(0xFFF6F1E9)
-        : (isDark ? Colors.white.withOpacity(0.9) : const Color(0xFF8D6E63));
+    final baseColor = color ??
+        (isUser
+            ? const Color(0xFFF6F1E9)
+            : (isDark
+                ? Colors.white.withOpacity(0.9)
+                : const Color(0xFF8D6E63)));
+    final resolvedSize = fontSize ?? (screenWidth > 450 ? 18.0 : 16.0);
+    final resolvedHeight = height ?? 1.4;
     // Keep verse references clickable (for AI messages) but don't visually underline/highlight them.
     final highlightColor = baseColor;
 
@@ -4968,8 +5291,8 @@ Your 3 questions (exactly 3 lines):''';
           text: text.substring(lastIndex, match.start),
           style: TextStyle(
             color: baseColor,
-            fontSize: screenWidth > 450 ? 18 : 16,
-            height: 1.4,
+            fontSize: resolvedSize,
+            height: resolvedHeight,
           ),
         ));
       }
@@ -5090,8 +5413,8 @@ Your 3 questions (exactly 3 lines):''';
         text: verseRef,
         style: TextStyle(
           color: highlightColor,
-          fontSize: screenWidth > 450 ? 18 : 16,
-          height: 1.4,
+          fontSize: resolvedSize,
+          height: resolvedHeight,
           fontWeight: FontWeight.w600,
         ),
         recognizer: recognizer,
@@ -5106,8 +5429,8 @@ Your 3 questions (exactly 3 lines):''';
         text: text.substring(lastIndex),
         style: TextStyle(
           color: baseColor,
-          fontSize: screenWidth > 450 ? 18 : 16,
-          height: 1.4,
+          fontSize: resolvedSize,
+          height: resolvedHeight,
         ),
       ));
     }
@@ -5118,8 +5441,8 @@ Your 3 questions (exactly 3 lines):''';
         text: text,
         style: TextStyle(
           color: baseColor,
-          fontSize: screenWidth > 450 ? 18 : 16,
-          height: 1.4,
+          fontSize: resolvedSize,
+          height: resolvedHeight,
         ),
       ));
     }
@@ -5132,42 +5455,107 @@ Your 3 questions (exactly 3 lines):''';
     final themeProvider = Provider.of<ThemeProvider>(context);
     final isDark = themeProvider.themeMode == ThemeMode.dark;
 
+    // Ask AI reply — HTML-style open layout (label + lead/body), not a big plain bubble.
+    if (!isUser) {
+      final quiet = _askAiInk(context).withValues(alpha: 0.45);
+      return Padding(
+        padding: EdgeInsets.only(
+          bottom: 26,
+          right: screenWidth > 450 ? 28 : 8,
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _buildAskAiLabel(context),
+            if (_isFailedChatResponseText(message.text))
+              Text(
+                message.text,
+                style: TextStyle(
+                  color: _askAiMuted(context),
+                  fontSize: screenWidth > 450 ? 15.5 : 14.8,
+                  height: 1.6,
+                ),
+              )
+            else
+              _buildAskAiFormattedBody(message.text, screenWidth, context),
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                Text(
+                  DateFormat('HH:mm').format(message.timestamp),
+                  style: TextStyle(
+                    color: quiet,
+                    fontSize: 12,
+                  ),
+                ),
+                if (!_isFailedChatResponseText(message.text)) ...[
+                  const SizedBox(width: 22),
+                  _ChatTapFeedbackIcon(
+                    onTap: () async {
+                      await Clipboard.setData(
+                          ClipboardData(text: message.text));
+                      Constants.showToast(
+                          'Message copied to clipboard', 5000);
+                    },
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.copy_outlined, size: 15, color: quiet),
+                        const SizedBox(width: 6),
+                        Text('Copy',
+                            style: TextStyle(color: quiet, fontSize: 13)),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 22),
+                  _ChatTapFeedbackIcon(
+                    onTap: () async {
+                      final screenSize = MediaQuery.of(context).size;
+                      final sharePositionOrigin = Rect.fromLTWH(
+                        screenSize.width / 2 - 50,
+                        screenSize.height / 2 - 50,
+                        100,
+                        100,
+                      );
+                      await Share.share(
+                        _buildShareText(message.text),
+                        sharePositionOrigin: sharePositionOrigin,
+                      );
+                    },
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.share_outlined, size: 15, color: quiet),
+                        const SizedBox(width: 6),
+                        Text('Share',
+                            style: TextStyle(color: quiet, fontSize: 13)),
+                      ],
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ],
+        ),
+      );
+    }
+
     return Padding(
       padding: EdgeInsets.only(
         bottom: 10,
-        left: isUser ? screenWidth * 0.15 : 0,
-        right: isUser ? 0 : screenWidth * 0.15,
+        left: screenWidth * 0.15,
+        right: 0,
       ),
       child: Row(
-        mainAxisAlignment:
-            isUser ? MainAxisAlignment.end : MainAxisAlignment.start,
-        crossAxisAlignment:
-            isUser ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.end,
+        crossAxisAlignment: CrossAxisAlignment.end,
         children: [
-          if (!isUser) ...[
-            Padding(
-              padding: const EdgeInsets.only(top: 2),
-              child: Image.asset(
-                "assets/Mask group.png",
-                width: 30,
-                height: 30,
-              ),
-            ),
-            const SizedBox(width: 8),
-          ],
           Flexible(
             child: Container(
               padding: EdgeInsets.all(screenWidth > 450 ? 16 : 14),
               decoration: BoxDecoration(
-                color: isUser
-                    ? const Color(0xFF8D6E63) // Brown color for user messages
-                    : (isDark
-                        ? const Color(
-                            0xFF4A4A4A) // Solid dark gray for better contrast in dark mode
-                        : const Color(
-                            0xFFF6F1E9)), // Light beige like screenshot
-                borderRadius:
-                    BorderRadius.circular(20), // round like screenshot
+                color: const Color(0xFF8D6E63),
+                borderRadius: BorderRadius.circular(20),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -5175,143 +5563,44 @@ Your 3 questions (exactly 3 lines):''';
                   RichText(
                     text: TextSpan(
                       style: TextStyle(
-                        color: isUser
-                            ? const Color(
-                                0xFFF6F1E9) // Light beige text for user messages
-                            : (isDark
-                                ? Colors.white.withOpacity(0.9)
-                                : const Color(
-                                    0xFF8D6E63)), // Brown text like screenshot
+                        color: const Color(0xFFF6F1E9),
                         fontSize: screenWidth > 450 ? 18 : 16,
                         fontWeight: FontWeight.w500,
                         height: 1.4,
                       ),
                       children: _parseTextWithVerseHighlights(
-                          message.text, isUser, screenWidth, context),
+                          message.text, true, screenWidth, context),
                     ),
                   ),
                   const SizedBox(height: 4),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    crossAxisAlignment: CrossAxisAlignment.center,
-                    children: [
-                      Text(
-                        DateFormat('HH:mm').format(message.timestamp),
-                        style: TextStyle(
-                          color: isUser
-                              ? const Color(0xFFF6F1E9).withOpacity(
-                                  0.8) // Light beige for user timestamp
-                              : (isDark
-                                  ? Colors.white.withOpacity(0.7)
-                                  : const Color(0xFF8D6E63).withOpacity(
-                                      0.6)), // Dark brown for AI timestamp
-                          fontSize: screenWidth > 450 ? 12 : 11,
-                        ),
-                      ),
-                      // Hide copy/share when no real AI response was generated.
-                      if (!isUser && !_isFailedChatResponseText(message.text))
-                        Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            _ChatTapFeedbackIcon(
-                              onTap: () async {
-                                await Clipboard.setData(
-                                    ClipboardData(text: message.text));
-                                Constants.showToast(
-                                    'Message copied to clipboard', 5000);
-                              },
-                              child: Padding(
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: 2, vertical: 2),
-                                child: Container(
-                                  padding: const EdgeInsets.all(4),
-                                  decoration: BoxDecoration(
-                                    borderRadius: BorderRadius.circular(8),
-                                    border: Border.all(
-                                      color: isDark
-                                          ? Colors.white.withOpacity(0.14)
-                                          : Colors.black.withOpacity(0.12),
-                                      width: 1.0,
-                                    ),
-                                  ),
-                                  child: Image.asset(
-                                    "assets/Bookmark icons/Frame 3630.png",
-                                    height: screenWidth > 450 ? 18 : 15,
-                                    width: screenWidth > 450 ? 18 : 15,
-                                    color: isDark
-                                        ? Colors.white.withOpacity(0.8)
-                                        : Colors.black.withOpacity(0.6),
-                                  ),
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 2),
-                            _ChatTapFeedbackIcon(
-                              onTap: () async {
-                                final screenSize = MediaQuery.of(context).size;
-                                final sharePositionOrigin = Rect.fromLTWH(
-                                  screenSize.width / 2 - 50,
-                                  screenSize.height / 2 - 50,
-                                  100,
-                                  100,
-                                );
-                                await Share.share(
-                                  _buildShareText(message.text),
-                                  sharePositionOrigin: sharePositionOrigin,
-                                );
-                              },
-                              child: Padding(
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: 2, vertical: 2),
-                                child: Container(
-                                  padding: const EdgeInsets.all(4),
-                                  decoration: BoxDecoration(
-                                    borderRadius: BorderRadius.circular(8),
-                                    border: Border.all(
-                                      color: isDark
-                                          ? Colors.white.withOpacity(0.14)
-                                          : Colors.black.withOpacity(0.12),
-                                      width: 1.0,
-                                    ),
-                                  ),
-                                  child: Icon(
-                                    Icons.share,
-                                    size: screenWidth > 450 ? 18 : 15,
-                                    color: isDark
-                                        ? Colors.white.withOpacity(0.8)
-                                        : Colors.black.withOpacity(0.6),
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                    ],
+                  Text(
+                    DateFormat('HH:mm').format(message.timestamp),
+                    style: TextStyle(
+                      color: const Color(0xFFF6F1E9).withOpacity(0.8),
+                      fontSize: screenWidth > 450 ? 12 : 11,
+                    ),
                   ),
                 ],
               ),
             ),
           ),
-          if (isUser) ...[
-            const SizedBox(width: 8),
-            Padding(
-              padding: const EdgeInsets.only(
-                  bottom: 4), // Add slight padding for better alignment
-              child: CircleAvatar(
-                radius: screenWidth > 450 ? 18 : 16,
-                backgroundColor:
-                    CommanColor.lightDarkPrimary(context).withOpacity(
-                  isDark ? 0.25 : 0.15,
-                ),
-                child: Image.asset(
-                  "assets/home icons/My Account.png",
-                  width: screenWidth > 450 ? 20 : 18,
-                  height: screenWidth > 450 ? 20 : 18,
-                  color: Colors.white,
-                ),
+          const SizedBox(width: 8),
+          Padding(
+            padding: const EdgeInsets.only(bottom: 4),
+            child: CircleAvatar(
+              radius: screenWidth > 450 ? 18 : 16,
+              backgroundColor:
+                  CommanColor.lightDarkPrimary(context).withOpacity(
+                isDark ? 0.25 : 0.15,
+              ),
+              child: Image.asset(
+                "assets/home icons/My Account.png",
+                width: screenWidth > 450 ? 20 : 18,
+                height: screenWidth > 450 ? 20 : 18,
+                color: Colors.white,
               ),
             ),
-          ],
+          ),
         ],
       ),
     );
