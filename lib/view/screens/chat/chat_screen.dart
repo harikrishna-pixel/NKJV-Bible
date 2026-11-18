@@ -2161,8 +2161,9 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
 8. Provide well-structured responses that are easy to understand
 9. If asked about specific verses, provide context and meaning
 10. Always respond in plain text format without using asterisks (*), markdown formatting, or special characters
-11. Do not repeat yourself: avoid restating the same sentences, bullet points, or stock phrases you already used in this conversation unless the user explicitly asks you to repeat or summarize.
-12. Each new reply should add fresh detail, a different angle, or a deeper step—do not copy, closely paraphrase, or recycle your previous answer when the user asks a follow-up question.
+11. When discussing a specific verse, include the exact verse wording in straight double quotes (example: "For God so loved the world...") so the app can show The passage.
+12. Do not repeat yourself: avoid restating the same sentences, bullet points, or stock phrases you already used in this conversation unless the user explicitly asks you to repeat or summarize.
+13. Each new reply should add fresh detail, a different angle, or a deeper step—do not copy, closely paraphrase, or recycle your previous answer when the user asks a follow-up question.
 
 ${answerLengthInstruction}
 ${AppApiConstant.chatLanguage != null ? '\nIMPORTANT: Always respond in ${AppApiConstant.chatLanguage == 'TN' ? 'Tamil' : AppApiConstant.chatLanguage} language. All your responses must be in ${AppApiConstant.chatLanguage == 'TN' ? 'Tamil' : AppApiConstant.chatLanguage}.' : ''}
@@ -4851,6 +4852,7 @@ Your 3 questions (exactly 3 lines):''';
 
   Widget _buildLoadingIndicator() {
     final screenWidth = MediaQuery.of(context).size.width;
+    final accent = _askAiAccent(context);
 
     return Padding(
       padding: EdgeInsets.only(
@@ -4860,8 +4862,31 @@ Your 3 questions (exactly 3 lines):''';
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _buildAskAiLabel(context),
-          _WaveLoader(color: _askAiAccent(context)),
+          Padding(
+            padding: const EdgeInsets.only(bottom: 14),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 6,
+                  height: 6,
+                  decoration:
+                      BoxDecoration(color: accent, shape: BoxShape.circle),
+                ),
+                const SizedBox(width: 7),
+                Text(
+                  'Searching Scriptures....',
+                  style: TextStyle(
+                    color: accent,
+                    fontSize: 10.5,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 1.4,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          _WaveLoader(color: accent),
         ],
       ),
     );
@@ -4901,10 +4926,11 @@ Your 3 questions (exactly 3 lines):''';
   }
 
   Color _askAiAccent(BuildContext context) {
+    // Old Paper theme (was teal).
     final isDark =
         Provider.of<ThemeProvider>(context, listen: false).themeMode ==
             ThemeMode.dark;
-    return isDark ? const Color(0xFF45B8C2) : const Color(0xFF0E7C86);
+    return isDark ? const Color(0xFFE8C989) : const Color(0xFF8D6E63);
   }
 
   Color _askAiInk(BuildContext context) {
@@ -5012,11 +5038,12 @@ Your 3 questions (exactly 3 lines):''';
 
   Widget _buildAskAiPartRule(BuildContext context, String label) {
     final accent = _askAiAccent(context);
+    // Old Paper hairline (was cool blue-gray in dark).
     final hair = Provider.of<ThemeProvider>(context, listen: false)
                 .themeMode ==
             ThemeMode.dark
-        ? const Color(0xFF232A34)
-        : const Color(0xFFE8ECF2);
+        ? const Color(0xFF4A3A28)
+        : const Color(0xFFE2D2B2);
     return Padding(
       padding: const EdgeInsets.only(bottom: 11),
       child: Row(
@@ -5089,7 +5116,7 @@ Your 3 questions (exactly 3 lines):''';
     );
   }
 
-  /// Prefer verse-context passage; else first verse ref + nearby quoted text in the reply.
+  /// Prefer verse-context passage; else first verse ref + nearby quoted / spoken text.
   ({String? cite, String? quote}) _resolveAskAiPassage(String responseText) {
     final ctx = widget.verseContext;
     if (ctx != null) {
@@ -5108,25 +5135,57 @@ Your 3 questions (exactly 3 lines):''';
     final refMatch = RegExp(
       r'\b(?:[1-3]\s+)?[A-Za-z][A-Za-z]+(?:\s+[A-Za-z]+)?\s+\d{1,3}:\d{1,3}(?:-\d{1,3})?\b',
     ).firstMatch(responseText);
-    final cite = refMatch?.group(0)?.trim();
+    var cite = refMatch?.group(0)?.trim();
+    if ((cite == null || cite.isEmpty) && ctx != null) {
+      final book = (ctx['book'] ?? '').toString().trim();
+      final chapter = (ctx['chapter'] ?? '').toString().trim();
+      final verse = (ctx['verse'] ?? '').toString().trim();
+      if (book.isNotEmpty && chapter.isNotEmpty && verse.isNotEmpty) {
+        cite = '$book $chapter:$verse';
+      }
+    }
 
     String? quote;
-    final curly = RegExp(r'[“"]([^”"]{20,})[”"]').firstMatch(responseText);
-    if (curly != null) {
-      quote = curly.group(1)?.trim();
+    // Straight or curly double quotes (AI often omits curly quotes).
+    final quoted = RegExp(r'[“"«]([^”"»]{12,})[”"»]').firstMatch(responseText);
+    if (quoted != null) {
+      quote = quoted.group(1)?.trim();
     }
-    if ((quote == null || quote.isEmpty) && cite != null) {
-      // Line after a "Passage:" / "Scripture:" style label in the model reply.
+    if ((quote == null || quote.isEmpty)) {
       final labeled = RegExp(
-        r'(?:Passage|Scripture|Verse)\s*[:\-–]\s*(.+)',
+        r'(?:Passage|Scripture|Verse)\s*[:\-–]\s*[“"]?(.+?)[”"]?(?:\n|$)',
         caseSensitive: false,
       ).firstMatch(responseText);
       if (labeled != null) {
         quote = labeled.group(1)?.trim();
       }
     }
+    // Common Gemini style: "Isaiah 41:10 ... God promises, Don't be afraid..."
+    if ((quote == null || quote.isEmpty) && refMatch != null) {
+      final after = responseText.substring(refMatch.end);
+      final spoken = RegExp(
+        r'(?:promises?|says?|said|declares?|states?|writes?|reminds?\s+us(?:\s+to)?)\s*[,:]?\s*[“"]?(.+?)[”"]?(?=\.\s+(?:Another|Additionally|Also|In\s|The\s)|$)',
+        caseSensitive: false,
+        dotAll: true,
+      ).firstMatch(after);
+      quote = spoken?.group(1)?.trim();
+    }
 
-    if (cite == null || cite.isEmpty || quote == null || quote.isEmpty) {
+    if (quote != null) {
+      quote = quote
+          .replaceAll(RegExp(r'^[“"«]+'), '')
+          .replaceAll(RegExp(r'[”"»]+$'), '')
+          .trim();
+      if (quote.endsWith('.') && !quote.endsWith('..')) {
+        // Keep sentence-final period inside the quote block visually clean.
+      }
+    }
+
+    if (cite == null ||
+        cite.isEmpty ||
+        quote == null ||
+        quote.isEmpty ||
+        quote.length < 12) {
       return (cite: null, quote: null);
     }
     return (cite: cite, quote: quote);
@@ -5478,18 +5537,10 @@ Your 3 questions (exactly 3 lines):''';
               )
             else
               _buildAskAiFormattedBody(message.text, screenWidth, context),
-            const SizedBox(height: 16),
-            Row(
-              children: [
-                Text(
-                  DateFormat('HH:mm').format(message.timestamp),
-                  style: TextStyle(
-                    color: quiet,
-                    fontSize: 12,
-                  ),
-                ),
-                if (!_isFailedChatResponseText(message.text)) ...[
-                  const SizedBox(width: 22),
+            if (!_isFailedChatResponseText(message.text)) ...[
+              const SizedBox(height: 16),
+              Row(
+                children: [
                   _ChatTapFeedbackIcon(
                     onTap: () async {
                       await Clipboard.setData(
@@ -5533,8 +5584,8 @@ Your 3 questions (exactly 3 lines):''';
                     ),
                   ),
                 ],
-              ],
-            ),
+              ),
+            ],
           ],
         ),
       );
@@ -5570,14 +5621,6 @@ Your 3 questions (exactly 3 lines):''';
                       ),
                       children: _parseTextWithVerseHighlights(
                           message.text, true, screenWidth, context),
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    DateFormat('HH:mm').format(message.timestamp),
-                    style: TextStyle(
-                      color: const Color(0xFFF6F1E9).withOpacity(0.8),
-                      fontSize: screenWidth > 450 ? 12 : 11,
                     ),
                   ),
                 ],
@@ -5997,6 +6040,7 @@ class _ChatTapFeedbackIconState extends State<_ChatTapFeedbackIcon>
     with SingleTickerProviderStateMixin {
   late final AnimationController _controller;
   late final Animation<double> _scale;
+  bool _busy = false;
 
   @override
   void initState() {
@@ -6005,6 +6049,7 @@ class _ChatTapFeedbackIconState extends State<_ChatTapFeedbackIcon>
       vsync: this,
       duration: const Duration(milliseconds: 220),
     );
+    // One press pulse (ends at 1.0) — no reverse (that looked like a 2nd tap).
     _scale = TweenSequence<double>([
       TweenSequenceItem(tween: Tween(begin: 1.0, end: 0.82), weight: 40),
       TweenSequenceItem(tween: Tween(begin: 0.82, end: 1.08), weight: 35),
@@ -6019,10 +6064,16 @@ class _ChatTapFeedbackIconState extends State<_ChatTapFeedbackIcon>
   }
 
   Future<void> _handleTap() async {
-    await _controller.forward(from: 0);
-    await widget.onTap();
-    if (mounted) {
-      await _controller.reverse();
+    if (_busy) return;
+    _busy = true;
+    try {
+      await _controller.forward(from: 0);
+      await widget.onTap();
+    } finally {
+      if (mounted) {
+        _controller.reset();
+        _busy = false;
+      }
     }
   }
 

@@ -11,6 +11,7 @@ import 'package:biblebookapp/view/screens/dashboard/eproducts_screen.dart'
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:internet_connection_checker_plus/internet_connection_checker_plus.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -322,6 +323,13 @@ class _MyDigitalLibraryScreenState extends State<MyDigitalLibraryScreen> {
       Get.back();
       return;
     }
+    final hasInternet = await InternetConnection().hasInternetAccess;
+    if (!hasInternet) {
+      Constants.showToast(
+        'Digital Products are currently unavailable. Please check your internet connection and try again.',
+      );
+      return;
+    }
     var bookAdsAppId = 0;
     try {
       if (Get.isRegistered<DashBoardController>()) {
@@ -333,7 +341,9 @@ class _MyDigitalLibraryScreenState extends State<MyDigitalLibraryScreen> {
       bookAdsAppId = prefs.getInt('bookAdsAppId') ?? 0;
     }
     if (bookAdsAppId <= 0) {
-      Constants.showToast('Digital products are unavailable right now.');
+      Constants.showToast(
+        'Digital Products are currently unavailable. Please check your internet connection and try again.',
+      );
       return;
     }
     await Get.off(() => BooksScreen(bookAdId: bookAdsAppId));

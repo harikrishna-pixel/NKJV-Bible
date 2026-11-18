@@ -6619,7 +6619,7 @@ class _HomeScreenState extends State<HomeScreen>
           }
           final hasInternet = await InternetConnection().hasInternetAccess;
           if (!hasInternet) {
-            Constants.showToast('No internet connection');
+            Constants.showToast('Please check your internet connection');
             return;
           }
           try {

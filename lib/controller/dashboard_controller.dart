@@ -450,17 +450,15 @@ class DashBoardController extends GetxController with WidgetsBindingObserver {
     goldValue = value.data?.subFields?[1]?.identifier ?? '';
     platinumValue = value.data?.subFields?[2]?.identifier ?? '';
 
-    // Extract exit offer ID from subFields
-    String exitOfferId = BibleInfo.exitOfferPlanid; // Default to constant
-    if (value.data?.subFields != null) {
-      for (var field in value.data!.subFields!) {
-        if (field?.identifier != null &&
-            field!.identifier!.contains('exitoffer')) {
-          exitOfferId = field.identifier!;
-          break;
-        }
-      }
-    }
+    // Extract exit offer ID — GetappInfo field_num 8 (Exit Offer Yearly).
+    String exitOfferId = BibleInfo.exitOfferPlanid;
+    String exitOfferValue = BibleInfo.exitOfferPlanDiscount;
+    final exitField =
+        BibleInfo.findExitOfferSubField(value.data?.subFields);
+    final exitId = (exitField?.identifier ?? '').toString().trim();
+    if (exitId.isNotEmpty) exitOfferId = exitId;
+    final exitVal = (exitField?.value ?? '').toString().trim();
+    if (exitVal.isNotEmpty) exitOfferValue = exitVal;
 
     // Extract coin pack IDs from subFields
     String coinPack1Id = BibleInfo.coinPack1Id; // Default to constant
@@ -491,6 +489,7 @@ class DashBoardController extends GetxController with WidgetsBindingObserver {
       SharPreferences.setString('oneYearPlan', oneYearPlan.toString() ?? ""),
       SharPreferences.setString('lifeTimePlan', lifeTimePlan.toString() ?? ""),
       SharPreferences.setString('exitOfferPlan', exitOfferId),
+      SharPreferences.setString('exitOfferPlanValue', exitOfferValue),
       SharPreferences.setString('coinPack1Id', coinPack1Id),
       SharPreferences.setString('coinPack2Id', coinPack2Id),
       SharPreferences.setString('coinPack3Id', coinPack3Id),

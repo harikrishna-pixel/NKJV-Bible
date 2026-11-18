@@ -68,6 +68,8 @@ class _WalletScreenState extends State<WalletScreen>
 
   /// AR Monthly/Yearly AI Premium: show Unlimited instead of credit count.
   bool _unlimitedAi = false;
+  /// Prevents multi-tap on info from dismissing the sheet immediately.
+  bool _aboutCreditsSheetOpen = false;
 
   /// Lifetime / platinum ad-free (still uses credits for AI).
   bool _isLifetime = false;
@@ -1843,6 +1845,8 @@ class _WalletScreenState extends State<WalletScreen>
     BuildContext context,
     bool isDark,
   ) async {
+    if (_aboutCreditsSheetOpen) return;
+    _aboutCreditsSheetOpen = true;
     // Colors only from isDark — safe inside a tap handler.
     final bg = isDark ? const Color(0xFF2C2118) : const Color(0xFFFFFBF5);
     final ink = isDark ? Colors.white : const Color(0xFF3D2914);
@@ -1901,10 +1905,14 @@ class _WalletScreenState extends State<WalletScreen>
             ),
           ];
 
+    try {
     await showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
+      // Stay open until user dismisses; ignore barrier multi-taps from info icon.
+      isDismissible: true,
+      enableDrag: true,
       builder: (ctx) {
         return SafeArea(
           child: Padding(
@@ -2058,6 +2066,9 @@ class _WalletScreenState extends State<WalletScreen>
         );
       },
     );
+    } finally {
+      _aboutCreditsSheetOpen = false;
+    }
   }
 
   Widget _buildFreeCreditCard(

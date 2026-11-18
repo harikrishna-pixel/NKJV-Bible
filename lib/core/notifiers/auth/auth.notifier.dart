@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:biblebookapp/Model/bookoffer_model.dart';
 import 'package:biblebookapp/core/api/bookoffer_api.dart';
+import 'package:biblebookapp/utils/network_error_message.dart';
 import 'package:biblebookapp/view/constants/constant.dart';
 import 'package:biblebookapp/view/screens/auth/splash.dart';
 import 'package:biblebookapp/view/screens/authenitcation/view/login_screen.dart';
@@ -348,12 +349,8 @@ class AuthNotifier extends ChangeNotifier {
 
       if (!hasInternet) {
         print("AUTH NOTIFIER: No internet connection detected");
-        SnackbarUtil.showSnackbar(
-          context: context,
-          message:
-              'No internet connection. Please check your network and try again.',
-          backgroundColor: Colors.redAccent,
-        );
+        // Match app toasts (no red snackbar) for offline / low-data.
+        Constants.showToast(kCheckInternetConnectionMessage);
         return false;
       }
     } catch (connectivityError) {
@@ -460,11 +457,7 @@ class AuthNotifier extends ChangeNotifier {
             .timeout(const Duration(seconds: 5), onTimeout: () => true);
 
         if (!hasInternet) {
-          SnackbarUtil.showSnackbar(
-            context: context,
-            message: 'No Internet Connection',
-            backgroundColor: Colors.redAccent,
-          );
+          Constants.showToast(kCheckInternetConnectionMessage);
         } else {
           SnackbarUtil.showSnackbar(
             context: context,

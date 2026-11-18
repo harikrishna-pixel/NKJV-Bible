@@ -300,30 +300,16 @@ class _ChatHistoryScreenState extends State<ChatHistoryScreen> {
     }
   }
 
-  void _showConversationBottomSheet(String conversationId, double screenWidth, bool isDark) {
-    showModalBottomSheet(
-      isScrollControlled: true,
-      enableDrag: true,
-      backgroundColor: Colors.black.withOpacity(0.5),
-      context: context,
-      builder: (BuildContext context) {
-        return _ConversationBottomSheet(
-          conversationId: conversationId,
-          screenWidth: screenWidth,
-          isDark: isDark,
-          onOpenChat: () {
-            Navigator.pop(context);
-            Get.to(
-              () => ChatScreen(historyDateKey: conversationId),
-              transition: Transition.cupertinoDialog,
-              duration: const Duration(milliseconds: 300),
-            )?.then((_) {
-              _loadHistory();
-            });
-          },
-        );
-      },
-    );
+  void _openConversationInFaithChat(String conversationId) {
+    // Open Faith Chat directly so ASK AI / THE PASSAGE / WHY IT MATTERS
+    // match the main chat layout (history sheet used a plain merged paragraph).
+    Get.to(
+      () => ChatScreen(historyDateKey: conversationId),
+      transition: Transition.cupertinoDialog,
+      duration: const Duration(milliseconds: 300),
+    )?.then((_) {
+      _loadHistory();
+    });
   }
 
   @override
@@ -681,7 +667,7 @@ class _ChatHistoryScreenState extends State<ChatHistoryScreen> {
               if (_isSelectionMode) {
                 _toggleItemSelection(item.conversationId);
               } else {
-                _showConversationBottomSheet(item.conversationId, screenWidth, isDark);
+                _openConversationInFaithChat(item.conversationId);
               }
             },
             onLongPress: () {

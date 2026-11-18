@@ -1,14 +1,19 @@
+import 'package:biblebookapp/view/constants/constant.dart';
 import 'package:biblebookapp/view/screens/dashboard/constants.dart';
 import 'package:biblebookapp/view/screens/intro_subcribtion_screen.dart';
 import 'package:biblebookapp/view/screens/multi_select_paywall.dart';
 import 'package:biblebookapp/view/screens/yearly_trial_paywall.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:internet_connection_checker_plus/internet_connection_checker_plus.dart';
 
 /// Routes to the visible paywall UI based on [BibleInfo.paywallShows].
 /// IAP / restore always run through [SubscriptionScreen] (invisible host when multi).
 class PaywallNavigation {
   PaywallNavigation._();
+
+  static const _offlinePaywallToast =
+      "You're offline. Please check your internet connection and try again.";
 
   static bool get _useArProductIds => BibleInfo.isAutoRenewablePaywallMode;
 
@@ -65,7 +70,12 @@ class PaywallNavigation {
     required String checkad,
     bool fromHomeExitOffer = false,
     bool selectLifetime = false,
-  }) {
+  }) async {
+    // Offline / 2G / no data: do not open paywall — toast only.
+    if (!await InternetConnection().hasInternetAccess) {
+      Constants.showToast(_offlinePaywallToast, 3000);
+      return null;
+    }
     return Get.to<T>(
       () => buildVisiblePaywall(
         sixMonthPlan: sixMonthPlan,
@@ -77,7 +87,6 @@ class PaywallNavigation {
       ),
       transition: SubscriptionScreen.paywallRouteTransition,
       duration: SubscriptionScreen.paywallRouteDuration,
-    ) ??
-        Future<T?>.value(null);
+    );
   }
 }

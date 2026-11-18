@@ -1,10 +1,13 @@
 import 'dart:io';
 
+import 'package:biblebookapp/controller/dashboard_controller.dart';
 import 'package:biblebookapp/core/notifiers/download.notifier.dart';
 import 'package:biblebookapp/view/constants/share_preferences.dart';
 import 'package:biblebookapp/view/screens/dashboard/constants.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
+import 'package:get/get.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 /// Additive: home/drawer hook for premium plan labels.
 /// Does **not** auto-apply Keychain/last-IAP memory as a live plan.
@@ -35,6 +38,49 @@ class PremiumEntitlementLabelSync {
       debugPrint('PremiumEntitlementLabelSync: keychain read failed: $e');
     }
     return null;
+  }
+
+  /// QA only: clear local premium / last-buy memory so buy can be retested
+  /// after Store purchase history is cleared. Does not change StoreKit.
+  static Future<void> clearLocalEntitlementForQa({
+    DownloadProvider? download,
+  }) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('subscription_plan', '');
+    await prefs.remove('isRewardAdViewTime');
+    await prefs.remove(_lastIapProductPrefKey);
+    await prefs.remove('last_iap_expires_at');
+    await prefs.setBool(BibleInfo.aiPremiumCreditSkipGrantedKey, false);
+    await prefs.setBool('ad_enabled', true);
+    await prefs.setString('premiumalrt', '1');
+    await SharPreferences.setBoolean(SharPreferences.isAdsEnabled, true);
+    await SharPreferences.setString(SharPreferences.isRewardAdViewTime, '');
+    await SharPreferences.setBoolean('startpurches', false);
+    await SharPreferences.setBoolean('restorepurches', false);
+
+    if (Platform.isIOS) {
+      try {
+        await _iapMemoryChannel.invokeMethod('clearLastIapProduct');
+      } catch (e) {
+        debugPrint(
+          'PremiumEntitlementLabelSync: keychain clear failed: $e',
+        );
+      }
+    }
+
+    if (download != null) {
+      await download.setSubscriptionPlan('');
+    }
+
+    if (Get.isRegistered<DashBoardController>()) {
+      final c = Get.find<DashBoardController>();
+      c.adFree.value = false;
+      c.RewardAdExpireDate.value = '';
+      c.isGetRewardAd.value = false;
+      c.adsDisplayTim.value = true;
+    }
+
+    debugPrint('PremiumEntitlementLabelSync: QA local entitlement cleared');
   }
 
   /// One label for Restore, the active-plan box, and Subscription Info.

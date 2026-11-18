@@ -1,3 +1,4 @@
+import 'package:biblebookapp/utils/network_error_message.dart';
 import 'package:biblebookapp/view/widget/thanks_for_love_rating_dialog_content.dart';
 import 'package:biblebookapp/view/constants/colors.dart';
 import 'package:biblebookapp/view/constants/constant.dart';
@@ -5,6 +6,7 @@ import 'package:biblebookapp/view/constants/share_preferences.dart';
 import 'package:biblebookapp/view/screens/dashboard/constants.dart';
 import 'package:flutter/material.dart';
 import 'package:in_app_review/in_app_review.dart';
+import 'package:internet_connection_checker_plus/internet_connection_checker_plus.dart';
 
 class RatingDialogHelper {
   /// Shows rating dialog on first share action
@@ -66,10 +68,13 @@ class RatingDialogHelper {
               onClose: () => Navigator.of(dialogContext).pop(),
               onRate: () async {
                 Navigator.pop(dialogContext);
-                // Same as Settings Rate Us: do not block on Connectivity().
-                // That check often false-fails after Share and shows
-                // "Check your Internet connection" with no App Store action.
                 await SharPreferences.setString('OpenAd', '1');
+                final hasInternet =
+                    await InternetConnection().hasInternetAccess;
+                if (!hasInternet) {
+                  Constants.showToast(kCheckInternetConnectionMessage);
+                  return;
+                }
                 await _requestReview();
               },
               onMaybeLater: () => Navigator.pop(dialogContext),

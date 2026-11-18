@@ -759,7 +759,6 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
             icon: Icons.card_giftcard_outlined,
             title: 'Get Free Credits',
             subtitle: 'Refer friends & earn credits!',
-            background: const Color(0xFFE8C989).withOpacity(0.28),
             onTap: () =>
                 Get.to(() => LoginScreen(hasSkip: false, popOnBack: true)),
           ),

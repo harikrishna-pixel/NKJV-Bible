@@ -1,5 +1,7 @@
 import 'dart:async';
 
+import 'package:biblebookapp/Model/get_audio_model.dart';
+
 import 'package:biblebookapp/constant/app_api_constant.dart';
 
 import 'package:biblebookapp/controller/dashboard_controller.dart';
@@ -27,6 +29,9 @@ import 'package:flutter_easyloading/flutter_easyloading.dart';
 import 'package:get/get.dart';
 
 import 'package:in_app_purchase/in_app_purchase.dart';
+
+import 'package:in_app_purchase_storekit/in_app_purchase_storekit.dart';
+import 'package:in_app_purchase_storekit/store_kit_2_wrappers.dart';
 
 import 'package:internet_connection_checker_plus/internet_connection_checker_plus.dart';
 
@@ -98,7 +103,45 @@ class _MultiSelectPaywallState extends State<MultiSelectPaywall> {
   bool _exitOfferVisible = false;
   bool _exitOfferShownOnce = false;
 
+  /// Exit-offer product (GetappInfo field_num 8) — display + claim only.
+  ProductDetails? _exitOfferProduct;
+  String _exitOfferProductId = '';
+  /// Display title for exit offer card (copy); product id still from API.
+  String _exitOfferHeadline = 'Yearly Premium';
+  String _exitOfferBadge = 'SAVE';
+  String _exitOfferPrice = '';
+  String _exitOfferRenewPrice = '';
+  int? _exitOfferPercent;
+  String? _exitOfferApiValuePercent;
+
   bool get _exitOfferEnabled => widget.checkad == 'onboard';
+
+  /// Prevents double Home handoff if host Get.offAll and fallback both fire.
+  bool _purchaseSuccessHandoffDone = false;
+
+  String get _exitOfferDisplayPrice {
+    if (_exitOfferPrice.isNotEmpty) return _exitOfferPrice;
+    final live = _exitOfferProduct?.price ?? '';
+    if (live.isNotEmpty) return live;
+    return '';
+  }
+
+  String get _exitOfferOriginalPrice {
+    if (_exitOfferRenewPrice.isNotEmpty) return _exitOfferRenewPrice;
+    return '';
+  }
+
+  String get _exitOfferPercentLabel {
+    final p = _resolvedExitOfferPercent();
+    if (p > 0) return 'SAVE $p%';
+    return 'SAVE';
+  }
+
+  String get _exitOfferCtaLabel {
+    final p = _resolvedExitOfferPercent();
+    if (p > 0) return 'Unlock $p% Off ›';
+    return 'Unlock Offer ›';
+  }
 
   Future<bool> _shouldShowExitOffer() async {
     if (!_exitOfferEnabled || _exitOfferShownOnce) return false;
@@ -108,12 +151,188 @@ class _MultiSelectPaywallState extends State<MultiSelectPaywall> {
   }
 
   Future<void> _presentExitOffer() async {
+    await _ensureExitOfferProductLoaded();
     await SharPreferences.setBoolean(_exitOfferConsumedPref, true);
     if (!mounted) return;
     setState(() {
       _exitOfferShownOnce = true;
       _exitOfferVisible = true;
     });
+  }
+
+  /// Always [BibleInfo.exitOfferPlanid] (`oneyearautoexit`) — never regular 1Y.
+  Future<String> _resolveExitOfferProductId() async {
+    try {
+      if (Get.isRegistered<DashBoardController>()) {
+        final fields =
+            Get.find<DashBoardController>().audioData.value.data?.subFields;
+        final match = BibleInfo.findExitOfferSubField(fields);
+        final id = (match?.identifier ?? '').trim();
+        if (id.isNotEmpty && BibleInfo.isExitOfferYearlyProductId(id)) {
+          return id;
+        }
+      }
+    } catch (_) {}
+    final prefsId = (await SharPreferences.getString('exitOfferPlan') ?? '')
+        .trim();
+    if (prefsId.isNotEmpty &&
+        BibleInfo.isExitOfferYearlyProductId(prefsId)) {
+      return prefsId;
+    }
+    return BibleInfo.exitOfferPlanid;
+  }
+
+  Future<void> _loadExitOfferMetaFromApi(String productId) async {
+    // Default matches GetappInfo field_num 8 value when live field missing.
+    _exitOfferApiValuePercent ??= BibleInfo.exitOfferPlanDiscount;
+    try {
+      if (Get.isRegistered<DashBoardController>()) {
+        final fields =
+            Get.find<DashBoardController>().audioData.value.data?.subFields;
+        final match = BibleInfo.findExitOfferSubField(fields);
+        if (match != null) {
+          final value = (match.value ?? '').trim();
+          // Keep fixed exit-offer display copy (Yearly Premium / SAVE %).
+          if (value.isNotEmpty) _exitOfferApiValuePercent = value;
+        }
+      }
+      final prefsVal =
+          (await SharPreferences.getString('exitOfferPlanValue') ?? '')
+              .trim();
+      if (prefsVal.isNotEmpty) _exitOfferApiValuePercent = prefsVal;
+    } catch (_) {}
+    _exitOfferApiValuePercent ??= BibleInfo.exitOfferPlanDiscount;
+  }
+
+  String _formatMoney(double amount, String symbol) {
+    final rounded = amount == amount.roundToDouble()
+        ? amount.toStringAsFixed(0)
+        : amount.toStringAsFixed(2);
+    return '$symbol$rounded';
+  }
+
+  int _resolvedExitOfferPercent() {
+    final live = _exitOfferPercent;
+    if (live != null && live > 0 && live < 100) return live;
+    final api = int.tryParse(
+        _exitOfferApiValuePercent ?? BibleInfo.exitOfferPlanDiscount);
+    if (api != null && api > 0 && api < 100) return api;
+    return 25;
+  }
+
+  /// Same-id first-year vs renewal + strikethrough; API value=25 when no intro.
+  void _applyExitOfferPricingFromStore(ProductDetails product) {
+    if (!BibleInfo.isExitOfferYearlyProductId(product.id)) {
+      debugPrint(
+          'MultiSelectPaywall: ignore non-exit product ${product.id}');
+      return;
+    }
+    _exitOfferProduct = product;
+    final symbol = product.currencySymbol.isNotEmpty
+        ? product.currencySymbol
+        : '\$';
+
+    double? firstYear;
+    double? renewYear = product.rawPrice;
+    String firstDisplay = product.price;
+    String renewDisplay = product.price;
+
+    if (product is AppStoreProductDetails) {
+      renewYear = double.tryParse(product.skProduct.price) ?? product.rawPrice;
+      renewDisplay = product.skProduct.priceLocale.currencySymbol.isNotEmpty
+          ? '${product.skProduct.priceLocale.currencySymbol}${product.skProduct.price}'
+          : product.price;
+      final intro = product.skProduct.introductoryPrice;
+      if (intro != null) {
+        firstYear = double.tryParse(intro.price);
+        final sym = intro.priceLocale.currencySymbol.isNotEmpty
+            ? intro.priceLocale.currencySymbol
+            : symbol;
+        firstDisplay = '$sym${intro.price}';
+      }
+    } else if (product is AppStoreProduct2Details) {
+      renewYear = product.sk2Product.price;
+      renewDisplay = product.sk2Product.displayPrice;
+      final offers =
+          product.sk2Product.subscription?.promotionalOffers ?? const [];
+      for (final offer in offers) {
+        if (offer.type == SK2SubscriptionOfferType.introductory &&
+            offer.price > 0 &&
+            renewYear != null &&
+            renewYear > offer.price) {
+          firstYear = offer.price;
+          firstDisplay = _formatMoney(offer.price, symbol);
+          break;
+        }
+      }
+    }
+
+    if (firstYear != null &&
+        renewYear != null &&
+        renewYear > 0 &&
+        renewYear > firstYear) {
+      _exitOfferPrice = firstDisplay;
+      _exitOfferRenewPrice = renewDisplay;
+      _exitOfferPercent =
+          (((renewYear - firstYear) / renewYear) * 100).round();
+      return;
+    }
+
+    // Store only returned one price ($39.99): treat it as offer, strike via value%.
+    final pct = _resolvedExitOfferPercent();
+    _exitOfferPercent = pct;
+    _exitOfferPrice = product.price;
+    if (product.rawPrice > 0 && pct > 0 && pct < 100) {
+      final renew = product.rawPrice / (1 - (pct / 100.0));
+      _exitOfferRenewPrice = _formatMoney(renew, symbol);
+    } else {
+      _exitOfferRenewPrice = '';
+    }
+  }
+
+  Future<void> _ensureExitOfferProductLoaded() async {
+    // Hard-lock to Exit Offer Yearly id — do not use regular oneyearauto.
+    final id = BibleInfo.exitOfferPlanid;
+    _exitOfferProductId = id;
+    await _loadExitOfferMetaFromApi(id);
+
+    try {
+      await SharPreferences.setString('exitOfferPlan', id);
+    } catch (_) {}
+
+    if (_exitOfferProduct != null &&
+        BibleInfo.isExitOfferYearlyProductId(_exitOfferProduct!.id)) {
+      _applyExitOfferPricingFromStore(_exitOfferProduct!);
+      if (_exitOfferPrice.isNotEmpty && _exitOfferRenewPrice.isNotEmpty) {
+        return;
+      }
+    }
+
+    try {
+      if (await InAppPurchase.instance.isAvailable()) {
+        final response = await InAppPurchase.instance
+            .queryProductDetails(<String>{id})
+            .timeout(const Duration(seconds: 10));
+        ProductDetails? found;
+        for (final p in response.productDetails) {
+          if (BibleInfo.isExitOfferYearlyProductId(p.id)) {
+            found = p;
+            break;
+          }
+        }
+        if (found != null) {
+          _applyExitOfferPricingFromStore(found);
+          return;
+        }
+        debugPrint(
+            'MultiSelectPaywall: exit offer id not in store response '
+            '(notFound=${response.notFoundIDs})');
+      }
+    } catch (e) {
+      debugPrint('MultiSelectPaywall: exit offer product load failed: $e');
+    }
+
+    _exitOfferPercent = _resolvedExitOfferPercent();
   }
 
   ProductDetails? _sixMonth;
@@ -213,6 +432,8 @@ class _MultiSelectPaywallState extends State<MultiSelectPaywall> {
   Future<void> _onInvisibleHostFinished(bool success,
       {required bool wasPurchase}) async {
     if (!success || !mounted) return;
+    if (_purchaseSuccessHandoffDone) return;
+    _purchaseSuccessHandoffDone = true;
 
     if (Get.isRegistered<DashBoardController>()) {
       await Get.find<DashBoardController>().refreshPremiumStatusFromPrefs();
@@ -560,15 +781,79 @@ class _MultiSelectPaywallState extends State<MultiSelectPaywall> {
     await _navigateAwayFromPaywall();
   }
 
-  /// Exit sheet CTA — same yearly purchase path (no new product / pricing logic).
+  /// Exit sheet CTA — buys oneyearautoexit only (never regular 1Y plan).
   Future<void> _claimExitGift() async {
     if (!mounted) return;
-    setState(() {
-      _exitOfferVisible = false;
-      _sel = _PwCard.ai;
-      _dur = _AiDur.oneYear;
-    });
-    await _onPrimaryCta();
+    await _ensureExitOfferProductLoaded();
+    if (!mounted) return;
+    setState(() => _exitOfferVisible = false);
+
+    final productId = BibleInfo.exitOfferPlanid;
+    _exitOfferProductId = productId;
+    await _startExitOfferPurchase(productId);
+  }
+
+  Future<void> _startExitOfferPurchase(String productId) async {
+    if (!await SubscriptionScreen.isDashboardIapEnabled()) return;
+    if (!mounted) return;
+
+    final expiryBefore = await _ownedExpiry();
+    if (!mounted) return;
+
+    final ok = await Navigator.of(context).push<bool>(
+      PageRouteBuilder<bool>(
+        opaque: false,
+        barrierDismissible: false,
+        barrierColor: Colors.transparent,
+        pageBuilder: (ctx, _, __) => SubscriptionScreen(
+          sixMonthPlan: _resolvedSixMonth,
+          oneYearPlan: _resolvedOneYear,
+          lifeTimePlan: _resolvedLifetime,
+          checkad: widget.checkad,
+          invisiblePurchaseHost: true,
+          autoStartProductId: productId,
+        ),
+      ),
+    );
+
+    await _finishPurchaseHostIfSucceeded(ok, expiryBefore: expiryBefore);
+  }
+
+  /// Host sometimes pops null/false after a successful local entitlement write.
+  /// Retry briefly so You're in / trial drawer prefs can still run via Home.
+  Future<bool> _localEntitlementLooksActiveAfterBuy(
+    DateTime? expiryBefore,
+  ) async {
+    for (var attempt = 0; attempt < 4; attempt++) {
+      if (attempt > 0) {
+        await Future<void>.delayed(Duration(milliseconds: 250 * attempt));
+      }
+      if (!mounted) return false;
+      final expiry = await _ownedExpiry();
+      if (expiry != null &&
+          expiry.isAfter(DateTime.now()) &&
+          (expiryBefore == null || expiry.isAfter(expiryBefore))) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  Future<void> _finishPurchaseHostIfSucceeded(
+    bool? ok, {
+    required DateTime? expiryBefore,
+  }) async {
+    if (!mounted) return;
+    if (ok == true) {
+      await _onInvisibleHostFinished(true, wasPurchase: true);
+      return;
+    }
+    // Host success path may Get.offAll Home itself — wait so we don't double.
+    await Future<void>.delayed(const Duration(milliseconds: 400));
+    if (!mounted) return;
+    if (await _localEntitlementLooksActiveAfterBuy(expiryBefore)) {
+      await _onInvisibleHostFinished(true, wasPurchase: true);
+    }
   }
 
   String _formatPlanExpiry(DateTime date) {
@@ -1016,6 +1301,9 @@ class _MultiSelectPaywallState extends State<MultiSelectPaywall> {
 
     if (!mounted) return;
 
+    final expiryBefore = await _ownedExpiry();
+    if (!mounted) return;
+
     final ok = await Navigator.of(context).push<bool>(
       PageRouteBuilder<bool>(
         opaque: false,
@@ -1033,23 +1321,7 @@ class _MultiSelectPaywallState extends State<MultiSelectPaywall> {
       ),
     );
 
-      if (!mounted) return;
-    if (ok == true) {
-      await _onInvisibleHostFinished(true, wasPurchase: true);
-      return;
-    }
-    // 1 Month host sometimes pops without true after a successful write.
-    try {
-      final raw = await SharPreferences.getString(
-        SharPreferences.isRewardAdViewTime,
-      );
-      if (raw != null &&
-          raw.isNotEmpty &&
-          DateTime.parse(raw).isAfter(DateTime.now()) &&
-          mounted) {
-        await _onInvisibleHostFinished(true, wasPurchase: true);
-      }
-    } catch (_) {}
+    await _finishPurchaseHostIfSucceeded(ok, expiryBefore: expiryBefore);
   }
 
   Future<void> _restorePurchases() async {
@@ -1085,7 +1357,59 @@ class _MultiSelectPaywallState extends State<MultiSelectPaywall> {
   Widget build(BuildContext context) {
     final w = MediaQuery.sizeOf(context).width;
     final isTablet = w > 600;
-    final hPad = isTablet ? (w * 0.08).clamp(36.0, 64.0) : 22.0;
+    // Keep tablet content wider so plan cards / benefits aren't sparse.
+    final hPad = isTablet ? (w * 0.05).clamp(24.0, 40.0) : 22.0;
+
+    final header = <Widget>[
+      // Top inset only — close is a SafeArea overlay (clears iPad status bar).
+      SizedBox(height: MediaQuery.paddingOf(context).top + (isTablet ? 16 : 8)),
+      const SizedBox(height: 28),
+      _buildAppIconHeader(isTablet),
+      SizedBox(height: isTablet ? 14 : 8),
+      Text(
+        _headline,
+        textAlign: TextAlign.center,
+        style: TextStyle(
+          fontFamily: _serif,
+          fontWeight: FontWeight.w700,
+          fontSize: isTablet ? 32 : 24,
+          height: 1.08,
+          letterSpacing: -0.3,
+          color: const Color(0xFF241A0F),
+        ),
+      ),
+      SizedBox(height: isTablet ? 8 : 4),
+      Text(
+        _subhead,
+        textAlign: TextAlign.center,
+        style: TextStyle(
+          fontSize: isTablet ? 17 : 13.5,
+          fontWeight: FontWeight.w600,
+          color: _soft,
+        ),
+      ),
+      SizedBox(height: isTablet ? 18 : 11),
+      _buildBenefits(isTablet),
+      SizedBox(height: isTablet ? 16 : 11),
+      Container(
+        height: 1,
+        margin: const EdgeInsets.symmetric(horizontal: 2),
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            colors: [
+              Colors.transparent,
+              Color(0xFFE2D2B2),
+              Colors.transparent,
+            ],
+          ),
+        ),
+      ),
+      SizedBox(height: isTablet ? 14 : 9),
+      _buildConfidence(isTablet),
+      SizedBox(height: isTablet ? 16 : 14),
+      _buildReassure(isTablet),
+      SizedBox(height: isTablet ? 20 : 16),
+    ];
 
     return PopScope(
       canPop: false,
@@ -1113,86 +1437,81 @@ class _MultiSelectPaywallState extends State<MultiSelectPaywall> {
                 ),
               ),
             ),
-            Column(
-              children: [
-                Expanded(
+            // iPad: one scroll (header + plans) so mid-screen gap disappears.
+            // Phone: keep plans pinned above the home indicator.
+            if (isTablet)
+              Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 720),
                   child: SingleChildScrollView(
                     physics: const BouncingScrollPhysics(),
-                    padding: EdgeInsets.fromLTRB(hPad, 0, hPad, 8),
+                    padding: EdgeInsets.fromLTRB(hPad, 0, hPad, 12),
                     child: Column(
                       children: [
-                        SizedBox(height: MediaQuery.paddingOf(context).top + 8),
-                        Align(
-                          alignment: Alignment.centerRight,
-                          child: InkWell(
-                            onTap: _onClose,
-                            customBorder: const CircleBorder(),
-                            child: SizedBox(
-                              width: 28,
-                              height: 28,
-                              child: Icon(
-                                Icons.close,
-                                size: 20,
-                                color: const Color(0xFF6B5A44),
-                              ),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 2),
-                        _buildAppIconHeader(isTablet),
-                        const SizedBox(height: 8),
-                        Text(
-                          _headline,
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                            fontFamily: _serif,
-                            fontWeight: FontWeight.w700,
-                            fontSize: isTablet ? 28 : 24,
-                            height: 1.08,
-                            letterSpacing: -0.3,
-                            color: const Color(0xFF241A0F),
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          _subhead,
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                            fontSize: isTablet ? 15 : 13.5,
-                            fontWeight: FontWeight.w600,
-                            color: _soft,
-                          ),
-                        ),
-                        const SizedBox(height: 11),
-                        _buildBenefits(isTablet),
-                        const SizedBox(height: 11),
-                        Container(
-                          height: 1,
-                          margin: const EdgeInsets.symmetric(horizontal: 2),
-                          decoration: const BoxDecoration(
-                            gradient: LinearGradient(
-                              colors: [
-                                Colors.transparent,
-                                Color(0xFFE2D2B2),
-                                Colors.transparent,
-                              ],
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 9),
-                        _buildConfidence(isTablet),
-                        const SizedBox(height: 14),
-                        _buildReassure(isTablet),
-                        const SizedBox(height: 16),
+                        ...header,
+                        _buildFooter(isTablet, w),
                       ],
                     ),
                   ),
                 ),
-                _buildFooter(isTablet, w),
-              ],
-            ),
+              )
+            else
+              Column(
+                children: [
+                  Expanded(
+                    child: SingleChildScrollView(
+                      physics: const BouncingScrollPhysics(),
+                      padding: EdgeInsets.fromLTRB(hPad, 0, hPad, 8),
+                      child: Column(children: header),
+                    ),
+                  ),
+                  _buildFooter(isTablet, w),
+                ],
+              ),
             if (_exitOfferVisible) _buildExitOffer(isTablet),
             if (_priceUi != _PriceUiState.ready) _buildPriceStatusOverlay(isTablet),
+            // True top-right of screen; SafeArea clears Wi‑Fi / battery on iPad.
+            if (!_exitOfferVisible)
+              Positioned(
+                top: 0,
+                right: 0,
+                child: SafeArea(
+                  child: Padding(
+                    padding: EdgeInsets.only(
+                      top: isTablet ? 6 : 4,
+                      right: isTablet ? 20 : 12,
+                    ),
+                    child: Material(
+                      color: Colors.transparent,
+                      child: InkWell(
+                        onTap: _onClose,
+                        customBorder: const CircleBorder(),
+                        child: Container(
+                          width: isTablet ? 36 : 32,
+                          height: isTablet ? 36 : 32,
+                          alignment: Alignment.center,
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: 0.92),
+                            shape: BoxShape.circle,
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withValues(alpha: 0.12),
+                                blurRadius: 8,
+                                offset: const Offset(0, 2),
+                              ),
+                            ],
+                          ),
+                          child: Icon(
+                            Icons.close,
+                            size: isTablet ? 20 : 18,
+                            color: const Color(0xFF6B5A44),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
           ],
         ),
       ),
@@ -1449,7 +1768,7 @@ class _MultiSelectPaywallState extends State<MultiSelectPaywall> {
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Icon(row.$1, size: isTablet ? 26 : 25, color: const Color(0xFF6B5A44)),
+                Icon(row.$1, size: isTablet ? 28 : 25, color: const Color(0xFF6B5A44)),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Padding(
@@ -1457,7 +1776,7 @@ class _MultiSelectPaywallState extends State<MultiSelectPaywall> {
                     child: Text(
                       row.$2,
                       style: TextStyle(
-                        fontSize: isTablet ? 15 : 14,
+                        fontSize: isTablet ? 17 : 14,
                         fontWeight: FontWeight.w600,
                         height: 1.2,
                         color: const Color(0xFF2E2214),
@@ -1625,7 +1944,7 @@ class _MultiSelectPaywallState extends State<MultiSelectPaywall> {
     required bool isTablet,
   }) {
     // Fixed equal size for all three cards (match 1 Year footprint).
-    final cardH = isTablet ? 130.0 : 120.0;
+    final cardH = isTablet ? 148.0 : 120.0;
 
     Widget badgeChip(String label) {
       return Container(
@@ -1788,7 +2107,8 @@ class _MultiSelectPaywallState extends State<MultiSelectPaywall> {
   }
 
   Widget _buildFooter(bool isTablet, double w) {
-    final hPad = isTablet ? (w * 0.08).clamp(36.0, 64.0) : 22.0;
+    // When embedded in the tablet scroll, outer padding already applied.
+    final hPad = isTablet ? 0.0 : 22.0;
     final save = _yearSavePercent;
     final saveBadge = save != null ? 'SAVE $save%' : 'SAVE 44%';
 
@@ -1800,7 +2120,7 @@ class _MultiSelectPaywallState extends State<MultiSelectPaywall> {
           mainAxisSize: MainAxisSize.min,
           children: [
             Padding(
-              padding: const EdgeInsets.only(top: 12),
+              padding: EdgeInsets.only(top: isTablet ? 4 : 12),
               child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -1922,7 +2242,7 @@ class _MultiSelectPaywallState extends State<MultiSelectPaywall> {
     );
   }
 
-  Widget _buildLegalRow({bool isTablet = false}) {
+  Widget _buildLegalRow({bool isTablet = false, bool exitOfferCopy = false}) {
     Widget link(String label, VoidCallback onTap) {
       return GestureDetector(
         behavior: HitTestBehavior.opaque,
@@ -1946,23 +2266,27 @@ class _MultiSelectPaywallState extends State<MultiSelectPaywall> {
       );
     }
 
+    final restore = exitOfferCopy ? 'Restore' : 'Restore Purchases';
+    final terms = exitOfferCopy ? 'Terms of Use' : 'Terms';
+    final privacy = exitOfferCopy ? 'Privacy Policy' : 'Privacy';
+
     return Wrap(
       alignment: WrapAlignment.center,
       crossAxisAlignment: WrapCrossAlignment.center,
       children: [
-        link('Restore Purchases', _restorePurchases),
+        link(restore, _restorePurchases),
         Text(' · ',
             style: TextStyle(
                 fontSize: isTablet ? 12 : 11, color: const Color(0xFF6B5A44))),
         link(
-          'Terms',
+          terms,
           () => _openLegal('https://bibleoffice.com/terms_conditions.html'),
         ),
         Text(' · ',
             style: TextStyle(
                 fontSize: isTablet ? 12 : 11, color: const Color(0xFF6B5A44))),
         link(
-          'Privacy',
+          privacy,
           () => _openLegal('https://bibleoffice.com/privacy_policy.html'),
         ),
       ],
@@ -2037,7 +2361,7 @@ class _MultiSelectPaywallState extends State<MultiSelectPaywall> {
                       ),
                       const SizedBox(height: 12),
                       Text(
-                        '✦ ONE-TIME OFFER',
+                        '✦ EXCLUSIVE YEARLY OFFER',
                         style: TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.w800,
@@ -2055,20 +2379,21 @@ class _MultiSelectPaywallState extends State<MultiSelectPaywall> {
                             height: 1.1,
                             color: const Color(0xFF241A0F),
                           ),
-                          children: const [
-                            TextSpan(text: 'Wait — a '),
+                          children: [
+                            const TextSpan(text: 'Before you go, '),
                             TextSpan(
-                              text: 'gift',
-                              style: TextStyle(color: Color(0xFF9A5323)),
+                              text: _resolvedExitOfferPercent() > 0
+                                  ? 'save ${_resolvedExitOfferPercent()}%'
+                                  : 'save',
+                              style: const TextStyle(color: Color(0xFF9A5323)),
                             ),
-                            TextSpan(text: '\nbefore you go'),
                           ],
                         ),
                         textAlign: TextAlign.center,
                       ),
                       const SizedBox(height: 9),
                       Text(
-                        "We'd love for you to keep growing in the Word. Here's a gift to begin.",
+                        'Continue growing in the Word with Premium at a special price.',
                         textAlign: TextAlign.center,
                         style: TextStyle(
                           fontSize: isTablet ? 15 : 14,
@@ -2118,9 +2443,9 @@ class _MultiSelectPaywallState extends State<MultiSelectPaywall> {
                                       ),
                                     ),
                                     const SizedBox(width: 6),
-                                    const Text(
-                                      'A GIFT TO BEGIN',
-                                      style: TextStyle(
+                                    Text(
+                                      _exitOfferPercentLabel,
+                                      style: const TextStyle(
                                         fontSize: 11,
                                         fontWeight: FontWeight.w800,
                                         color: Colors.white,
@@ -2131,32 +2456,51 @@ class _MultiSelectPaywallState extends State<MultiSelectPaywall> {
                               ),
                             ),
                             Text(
-                              '1 Year Premium · Unlimited AI',
+                              _exitOfferHeadline,
                               textAlign: TextAlign.center,
                               style: TextStyle(
                                 fontFamily: _serif,
                                 fontWeight: FontWeight.w700,
-                                fontSize: isTablet ? 19 : 18,
+                                fontSize: isTablet ? 22 : 20,
                                 color: const Color(0xFF241A0F),
                               ),
                             ),
-                            const SizedBox(height: 6),
-                            // Original (anchor) struck + real yearly StoreKit price.
-                            Text(
-                              _yearAnchor,
-                              style: const TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.w600,
-                                color: Color(0xFFA9966F),
-                                decoration: TextDecoration.lineThrough,
+                            const SizedBox(height: 8),
+                            if (_exitOfferOriginalPrice.isNotEmpty &&
+                                _exitOfferOriginalPrice !=
+                                    _exitOfferDisplayPrice)
+                              Text.rich(
+                                TextSpan(
+                                  style: const TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w600,
+                                    color: Color(0xFF8A7550),
+                                  ),
+                                  children: [
+                                    const TextSpan(text: 'Regularly '),
+                                    TextSpan(
+                                      text: _exitOfferOriginalPrice,
+                                      style: const TextStyle(
+                                        color: Color(0xFF8A7550),
+                                        decoration: TextDecoration.lineThrough,
+                                        // Explicit color — dark theme otherwise
+                                        // paints a near-invisible strike.
+                                        decorationColor: Color(0xFF5C4033),
+                                        decorationThickness: 2,
+                                      ),
+                                    ),
+                                  ],
+                                ),
                               ),
-                            ),
-                            const SizedBox(height: 2),
+                            if (_exitOfferOriginalPrice.isNotEmpty &&
+                                _exitOfferOriginalPrice !=
+                                    _exitOfferDisplayPrice)
+                              const SizedBox(height: 4),
                             Text.rich(
                               TextSpan(
                                 children: [
                                   TextSpan(
-                                    text: '$_yearPrice',
+                                    text: _exitOfferDisplayPrice,
                                     style: TextStyle(
                                       fontFamily: _serif,
                                       fontSize: 30,
@@ -2165,7 +2509,7 @@ class _MultiSelectPaywallState extends State<MultiSelectPaywall> {
                                     ),
                                   ),
                                   const TextSpan(
-                                    text: ' / year',
+                                    text: ' / first year',
                                     style: TextStyle(
                                       fontSize: 13,
                                       fontWeight: FontWeight.w700,
@@ -2175,26 +2519,32 @@ class _MultiSelectPaywallState extends State<MultiSelectPaywall> {
                                 ],
                               ),
                             ),
-                            const SizedBox(height: 4),
-                            Text(
-                              '$_yearPrice/year · auto-renews · cancel anytime',
-                              textAlign: TextAlign.center,
-                              style: const TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w600,
-                                color: Color(0xFF6B5A44),
-                              ),
+                            const SizedBox(height: 14),
+                            Container(
+                              height: 1,
+                              margin:
+                                  const EdgeInsets.symmetric(horizontal: 8),
+                              color: const Color(0xFFE2D2B2),
                             ),
-                            const SizedBox(height: 13),
-                            Wrap(
-                              alignment: WrapAlignment.center,
-                              spacing: 8,
-                              runSpacing: 6,
-                              children: const [
-                                _ExitChip('✓ Unlimited AI'),
-                                _ExitChip('✓ Ad-free'),
-                                _ExitChip('✓ All features'),
-                              ],
+                            const SizedBox(height: 12),
+                            // One centered block so all checkmarks share one left edge.
+                            const Center(
+                              child: IntrinsicWidth(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    _ExitFeatureRow(
+                                      'Unlimited AI conversations',
+                                    ),
+                                    SizedBox(height: 8),
+                                    _ExitFeatureRow('Ad-free Bible reading'),
+                                    SizedBox(height: 8),
+                                    _ExitFeatureRow(
+                                      'Premium features included',
+                                    ),
+                                  ],
+                                ),
+                              ),
                             ),
                           ],
                         ),
@@ -2230,12 +2580,12 @@ class _MultiSelectPaywallState extends State<MultiSelectPaywall> {
                             ),
                           ),
                           child: Text(
-                            'Claim My Gift ›',
-                            style: TextStyle(
+                            _exitOfferCtaLabel,
+                            style: const TextStyle(
                               fontFamily: _serif,
                               fontSize: 18,
                               fontWeight: FontWeight.w700,
-                              color: const Color(0xFFFFF6EA),
+                              color: Color(0xFFFFF6EA),
                             ),
                           ),
                         ),
@@ -2243,7 +2593,9 @@ class _MultiSelectPaywallState extends State<MultiSelectPaywall> {
                     ),
                     const SizedBox(height: 9),
                     Text(
-                      '$_yearPrice/year · auto-renews · cancel anytime',
+                      _exitOfferOriginalPrice.isNotEmpty
+                          ? 'Then $_exitOfferOriginalPrice/year. Auto-renews until canceled.'
+                          : 'Auto-renews until canceled.',
                       textAlign: TextAlign.center,
                       style: const TextStyle(
                         fontSize: 10.5,
@@ -2257,7 +2609,7 @@ class _MultiSelectPaywallState extends State<MultiSelectPaywall> {
                         setState(() => _exitOfferVisible = false);
                       },
                       child: const Text(
-                        'No thanks, continue with limited access',
+                        'Continue with Free Version',
                         style: TextStyle(
                           fontSize: 12.5,
                           fontWeight: FontWeight.w700,
@@ -2266,6 +2618,8 @@ class _MultiSelectPaywallState extends State<MultiSelectPaywall> {
                         ),
                       ),
                     ),
+                    const SizedBox(height: 10),
+                    _buildLegalRow(isTablet: isTablet, exitOfferCopy: true),
                   ],
                 ),
               ),
@@ -2277,26 +2631,34 @@ class _MultiSelectPaywallState extends State<MultiSelectPaywall> {
   }
 }
 
-class _ExitChip extends StatelessWidget {
-  const _ExitChip(this.label);
+class _ExitFeatureRow extends StatelessWidget {
+  const _ExitFeatureRow(this.label);
   final String label;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 5),
-      decoration: BoxDecoration(
-        color: const Color(0xFFE8F1E3),
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: Text(
-        label,
-        style: const TextStyle(
-          fontSize: 11.5,
-          fontWeight: FontWeight.w700,
-          color: Color(0xFF4F6A45),
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 20,
+          height: 20,
+          decoration: const BoxDecoration(
+            color: Color(0xFF5F7A52),
+            shape: BoxShape.circle,
+          ),
+          child: const Icon(Icons.check, size: 13, color: Colors.white),
         ),
-      ),
+        const SizedBox(width: 10),
+        Text(
+          label,
+          style: const TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+            color: Color(0xFF2E2214),
+          ),
+        ),
+      ],
     );
   }
 }

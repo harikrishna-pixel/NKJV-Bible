@@ -218,19 +218,17 @@ class BackgroundApiService {
       await prefs.setString('oneYearPlanvalue', value.data?.subIdentifierOneyearValue ?? '');
       await prefs.setString('lifeTimePlanvalue', value.data?.subIdentifierLifetimeValue ?? '');
       
-      // Extract and save exit offer ID from subFields
-      String exitOfferId = BibleInfo.exitOfferPlanid; // Default to constant
-      if (value.data?.subFields != null) {
-        for (var field in value.data!.subFields!) {
-          if (field?.identifier != null && 
-              field!.identifier!.isNotEmpty && 
-              field.identifier!.contains('exitoffer')) {
-            exitOfferId = field.identifier!;
-            break;
-          }
-        }
-      }
+      // Extract exit offer ID — GetappInfo field_num 8 (Exit Offer Yearly).
+      String exitOfferId = BibleInfo.exitOfferPlanid;
+      String exitOfferValue = BibleInfo.exitOfferPlanDiscount;
+      final exitField =
+          BibleInfo.findExitOfferSubField(value.data?.subFields);
+      final exitId = (exitField?.identifier ?? '').toString().trim();
+      if (exitId.isNotEmpty) exitOfferId = exitId;
+      final exitVal = (exitField?.value ?? '').toString().trim();
+      if (exitVal.isNotEmpty) exitOfferValue = exitVal;
       await prefs.setString('exitOfferPlan', exitOfferId);
+      await prefs.setString('exitOfferPlanValue', exitOfferValue);
       
       // Extract coin pack IDs from subFields
       String coinPack1Id = BibleInfo.coinPack1Id; // Default to constant

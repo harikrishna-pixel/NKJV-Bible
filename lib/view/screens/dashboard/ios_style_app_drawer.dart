@@ -197,6 +197,7 @@ class _IosStyleAppDrawerState extends State<IosStyleAppDrawer>
   }
 
   TrialDrawerState _trial = TrialDrawerState.none;
+  bool _drawerWasOpen = false;
 
   @override
   void initState() {
@@ -204,6 +205,14 @@ class _IosStyleAppDrawerState extends State<IosStyleAppDrawer>
     WidgetsBinding.instance.addObserver(this);
     _loadWidgetsRowState();
     _loadTrialDrawerState();
+  }
+
+  @override
+  void didUpdateWidget(covariant IosStyleAppDrawer oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.isPremium != widget.isPremium) {
+      _loadTrialDrawerState();
+    }
   }
 
   Future<void> _loadTrialDrawerState() async {
@@ -258,6 +267,17 @@ class _IosStyleAppDrawerState extends State<IosStyleAppDrawer>
 
   @override
   Widget build(BuildContext context) {
+    // Trial prefs are written in You're in… after Home mounts — reload on open.
+    final drawerOpen = Scaffold.maybeOf(context)?.isDrawerOpen ?? false;
+    if (drawerOpen && !_drawerWasOpen) {
+      _drawerWasOpen = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _loadTrialDrawerState();
+      });
+    } else if (!drawerOpen) {
+      _drawerWasOpen = false;
+    }
+
     final topInset = MediaQuery.of(context).padding.top;
 
     final dailyChildren = <_DrawerSubItem>[
@@ -387,14 +407,14 @@ class _IosStyleAppDrawerState extends State<IosStyleAppDrawer>
     ];
 
     // More = outside Account (mock): Digital Products, Backup, apps, contact.
+    // Always show Digital Products (offline tap shows connection message).
     final moreChildren = <_DrawerSubItem>[
-      if (widget.showBooks)
-        _DrawerSubItem(
-          label: 'Digital Products',
-          icon: Icons.layers_outlined,
-          asset: 'assets/home icons/book.png',
-          onTap: widget.onBooksTap,
-        ),
+      _DrawerSubItem(
+        label: 'Digital Products',
+        icon: Icons.layers_outlined,
+        asset: 'assets/home icons/book.png',
+        onTap: widget.onBooksTap,
+      ),
       _DrawerSubItem(
         label: 'Backup & Sync',
         icon: Icons.cloud_upload_outlined,

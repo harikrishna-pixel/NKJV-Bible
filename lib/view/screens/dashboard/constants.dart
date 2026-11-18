@@ -36,8 +36,37 @@ class BibleInfo {
   static String lifeTimePlanid =
       'com.balaklrapps.newlivingtranslation.lifetimeadsfree';
   static String subIdentifierTwoYear = twoYearPlanid;
+  /// GetappInfo `sub_fields` field_num 8 — Exit Offer Yearly.
   static String exitOfferPlanid =
-      'com.balaklrapps.newkingsjamesversion.lifetime.exitoffer';
+      'com.balaklrapps.newlivingtranslation.oneyearautoexit';
+
+  static bool isExitOfferYearlyProductId(String productId) {
+    final id = productId.toLowerCase();
+    return productId == exitOfferPlanid ||
+        id.contains('oneyearautoexit') ||
+        (id.contains('exit') && id.contains('oneyear'));
+  }
+
+  /// Prefer oneyearautoexit id, then field_num 8 (if that id), then exitoffer.
+  static T? findExitOfferSubField<T>(List<T?>? fields) {
+    if (fields == null || fields.isEmpty) return null;
+    for (final f in fields) {
+      if (f == null) continue;
+      try {
+        final id = ((f as dynamic).identifier ?? '').toString();
+        if (isExitOfferYearlyProductId(id)) return f;
+      } catch (_) {}
+    }
+    for (final f in fields) {
+      if (f == null) continue;
+      try {
+        final num = ((f as dynamic).fieldNum ?? '').toString().trim();
+        final id = ((f as dynamic).identifier ?? '').toString();
+        if (num == '8' && id.trim().isNotEmpty) return f;
+      } catch (_) {}
+    }
+    return null;
+  }
 
   // IAP Discounts (for offline mode)
   static String sixMonthPlanDiscount = '0';
@@ -45,7 +74,8 @@ class BibleInfo {
   static String oneYearPlanDiscount = '30';
   static String twoYearPlanDiscount = '50';
   static String lifeTimePlanDiscount = 'Best Value';
-  static String exitOfferPlanDiscount = '0';
+  /// GetappInfo field_num 8 `value` — used when StoreKit has no intro pair.
+  static String exitOfferPlanDiscount = '25';
 
   /// Fallback display discount for AR one-month (paywall 2).
   static String arOneMonthPlanDiscount = '0';

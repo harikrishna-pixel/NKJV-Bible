@@ -158,6 +158,15 @@ import workmanager
             return
           }
           result(productId)
+        } else if call.method == "clearLastIapProduct" {
+          // QA: remove last-buy memory so buy can be retested after Store history clear.
+          let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrAccount as String: key,
+            kSecAttrService as String: "com.biblebookapp.iap_memory",
+          ]
+          SecItemDelete(query as CFDictionary)
+          result(true)
         } else {
           result(FlutterMethodNotImplemented)
         }

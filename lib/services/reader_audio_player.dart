@@ -1,10 +1,14 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:audio_service/audio_service.dart' show MediaItem;
 import 'package:audio_session/audio_session.dart';
 import 'package:audioplayers/audioplayers.dart' as ap;
+import 'package:biblebookapp/view/constants/images.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:just_audio/just_audio.dart' as ja;
+import 'package:path_provider/path_provider.dart';
 
 /// The chapter waiting in the native playlist after the current one.
 class QueuedChapter {
@@ -45,6 +49,9 @@ class ReaderAudioPlayer {
 
   /// Lock-screen / notification album line.
   static String albumTitle = '';
+
+  /// Cached file URI for NLT app icon (lock-screen artwork).
+  static Uri? _lockScreenArtUri;
 
   final ja.AudioPlayer _p = ja.AudioPlayer();
 
@@ -163,12 +170,30 @@ class ReaderAudioPlayer {
     }
   }
 
-  ja.AudioSource _sourceFor(String urlOrPath, {String? title}) {
+  Future<Uri?> _ensureLockScreenArtUri() async {
+    if (_lockScreenArtUri != null) return _lockScreenArtUri;
+    try {
+      final data = await rootBundle.load(Images.appIcon1024);
+      final dir = await getTemporaryDirectory();
+      final file = File('${dir.path}/nlt_bible_lock_art.png');
+      await file.writeAsBytes(
+        data.buffer.asUint8List(data.offsetInBytes, data.lengthInBytes),
+        flush: true,
+      );
+      _lockScreenArtUri = Uri.file(file.path);
+    } catch (e) {
+      debugPrint('ReaderAudioPlayer lock-screen art failed: $e');
+    }
+    return _lockScreenArtUri;
+  }
+
+  ja.AudioSource _sourceFor(String urlOrPath, {String? title, Uri? artUri}) {
     final isFile = !urlOrPath.startsWith('http');
     final item = MediaItem(
       id: '${_itemSeq++}:$urlOrPath',
       title: title ?? titleBuilder?.call() ?? 'Bible Audio',
       album: albumTitle.isEmpty ? null : albumTitle,
+      artUri: artUri,
     );
     return isFile
         ? ja.AudioSource.file(urlOrPath, tag: item)
@@ -177,12 +202,13 @@ class ReaderAudioPlayer {
 
   Future<void> _load(String urlOrPath, {String? title, Duration? at}) async {
     await _ensureSession();
+    final artUri = await _ensureLockScreenArtUri();
     _queued = null;
     _queuedIndex = null;
     _queuedTarget = null;
     _currentTarget = urlOrPath;
     await _p.setAudioSources(
-      [_sourceFor(urlOrPath, title: title)],
+      [_sourceFor(urlOrPath, title: title, artUri: artUri)],
       initialPosition: at,
     );
   }
@@ -267,7 +293,10 @@ class ReaderAudioPlayer {
         while (_p.sequence.length > current + 1) {
           await _p.removeAudioSourceAt(_p.sequence.length - 1);
         }
-        await _p.addAudioSource(_sourceFor(urlOrPath, title: title));
+        final artUri = await _ensureLockScreenArtUri();
+        await _p.addAudioSource(
+          _sourceFor(urlOrPath, title: title, artUri: artUri),
+        );
         _queued = chapter;
         _queuedIndex = current + 1;
         _queuedTarget = urlOrPath;

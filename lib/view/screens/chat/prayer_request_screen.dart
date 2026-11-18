@@ -308,19 +308,29 @@ class _PrayerRequestScreenState extends State<PrayerRequestScreen> {
                                 TextButton.icon(
                                   onPressed: () => setState(
                                       () => _request.text = _defaultFor(_for)),
-                                  // Gold + light halo so it stays readable on
-                                  // the dark photo areas (same accent as Change).
+                                  // Cream text + dark halo — readable on dark
+                                  // hillside areas of the prayer photo bg.
                                   icon: const Icon(Icons.refresh,
-                                      size: 16, color: _gold),
+                                      size: 16, color: Color(0xFFFFF6EA)),
                                   label: Text(
                                     'Use default',
                                     style: TextStyle(
                                       fontSize: 13,
-                                      fontWeight: FontWeight.w600,
-                                      color: _gold,
+                                      fontWeight: FontWeight.w700,
+                                      color: const Color(0xFFFFF6EA),
                                       decoration: TextDecoration.underline,
-                                      decorationColor: _gold,
-                                      shadows: _onPhotoShadow(_ink),
+                                      decorationColor: const Color(0xFFFFF6EA),
+                                      shadows: const [
+                                        Shadow(
+                                          color: Color(0xCC000000),
+                                          blurRadius: 8,
+                                          offset: Offset(0, 1),
+                                        ),
+                                        Shadow(
+                                          color: Color(0x99000000),
+                                          blurRadius: 2,
+                                        ),
+                                      ],
                                     ),
                                   ),
                                 ),

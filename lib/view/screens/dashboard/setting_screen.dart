@@ -1,5 +1,7 @@
 import 'dart:io';
 import 'dart:ui' as ui;
+import 'package:biblebookapp/core/notifiers/download.notifier.dart';
+import 'package:biblebookapp/services/premium_entitlement_label_sync.dart';
 import 'package:biblebookapp/view/constants/constant.dart';
 import 'package:biblebookapp/view/constants/theme_provider.dart';
 import 'package:biblebookapp/streak_flow/streak_saved_list_screen.dart';
@@ -121,7 +123,7 @@ class _SettingScreenState extends State<SettingScreen>
             ? () async {
                 if (!await InternetConnection().hasInternetAccess) {
                   Constants.showToast(
-                      'Please check your internet connection and try again.',
+                      "You're offline. Please check your internet connection and try again.",
                       3000);
                   return;
                 }
@@ -146,8 +148,46 @@ class _SettingScreenState extends State<SettingScreen>
           chevron: false,
           onTap: null,
         ),
+      // QA row hidden for now — uncomment to clear local plan in TestFlight/IPA.
+      // row(
+      //   label: 'Clear local plan (QA)',
+      //   onTap: () => _confirmClearLocalPlanQa(),
+      // ),
       SizedBox(height: screenWidth < 380 ? 10 : 12),
     ];
+  }
+
+  Future<void> _confirmClearLocalPlanQa() async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Clear local plan?'),
+        content: const Text(
+          'Removes this device’s saved premium / last-buy memory so QA can buy again after clearing Store purchase history. Does not change App Store.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('Clear'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true || !mounted) return;
+    DownloadProvider? download;
+    try {
+      download = Provider.of<DownloadProvider>(context, listen: false);
+    } catch (_) {}
+    await PremiumEntitlementLabelSync.clearLocalEntitlementForQa(
+      download: download,
+    );
+    await _loadWalletSummary();
+    if (!mounted) return;
+    Constants.showToast('Local plan cleared. You can buy again.');
   }
 
   @override

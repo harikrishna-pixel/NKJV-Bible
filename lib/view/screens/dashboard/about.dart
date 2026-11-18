@@ -2,6 +2,7 @@ import 'dart:io';
 import 'dart:ui' as ui;
 
 import 'package:biblebookapp/main.dart';
+import 'package:biblebookapp/utils/network_error_message.dart';
 import 'package:biblebookapp/view/constants/constant.dart';
 import 'package:biblebookapp/view/constants/share_preferences.dart';
 import 'package:biblebookapp/view/constants/theme_provider.dart';
@@ -34,41 +35,31 @@ class _AboutUsState extends State<AboutUs> {
   final String _microsoftStoreId = '';
 
   Future<void> _requestReview() async {
-    // final isAvailable = await _inAppReview.isAvailable();
-    // log('Is Available: $isAvailable');
-    // if (isAvailable) {
-    //   try {
-    //     await _inAppReview.requestReview();
-    //   } catch (e, st) {
-    //     log('Error: $e,$st');
-    //   }
-    // }
-    // Retry-friendly connectivity check to avoid false "offline" on first run
+    // Link / access check — toast only when truly offline (not when Wi‑Fi works
+    // but Connectivity briefly reports empty).
+    var online = false;
     final connectivityResult = await Connectivity().checkConnectivity();
-    final hasConnection = connectivityResult.isNotEmpty &&
+    online = connectivityResult.isNotEmpty &&
         (connectivityResult.contains(ConnectivityResult.wifi) ||
             connectivityResult.contains(ConnectivityResult.mobile) ||
             connectivityResult.contains(ConnectivityResult.ethernet));
-    if (!hasConnection) {
+    if (!online) {
       await Future.delayed(const Duration(milliseconds: 500));
       final retry = await Connectivity().checkConnectivity();
-      final retryHasConnection = retry.isNotEmpty &&
+      online = retry.isNotEmpty &&
           (retry.contains(ConnectivityResult.wifi) ||
               retry.contains(ConnectivityResult.mobile) ||
               retry.contains(ConnectivityResult.ethernet));
-      if (!retryHasConnection) {
-        // Check actual internet access
-        try {
-          final hasInternet = await InternetConnection().hasInternetAccess;
-          if (!hasInternet) {
-            return Constants.showToast("No Internet Connection");
-          } else {
-            return Constants.showToast("Check your Internet connection");
-          }
-        } catch (_) {
-          return Constants.showToast("No Internet Connection");
-        }
+    }
+    if (!online) {
+      try {
+        online = await InternetConnection().hasInternetAccess;
+      } catch (_) {
+        online = false;
       }
+    }
+    if (!online) {
+      return Constants.showToast('Check your internet connection');
     }
 
     final InAppReview inAppReview = InAppReview.instance;

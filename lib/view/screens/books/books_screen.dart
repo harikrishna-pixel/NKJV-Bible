@@ -65,7 +65,7 @@ class BooksScreen extends HookConsumerWidget {
         final hasInternet = await InternetConnection().hasInternetAccess;
         final message = hasInternet
             ? 'Unable to load products right now. Please try again later.'
-            : 'No internet connection. Please check your network and try again.';
+            : 'Digital Products are currently unavailable. Please check your internet connection and try again.';
         bloc.cancelLoading(message: message);
         Constants.showToast(message);
       });

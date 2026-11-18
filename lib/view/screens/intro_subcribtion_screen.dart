@@ -57,6 +57,10 @@ class SubscriptionScreen extends StatefulWidget {
   /// Transparent host: runs IAP (e.g. milestone Unlock) without showing paywall UI.
   final bool invisiblePurchaseHost;
 
+  /// Invisible-host only: buy this exact StoreKit product id once (e.g. exit offer).
+  /// Null keeps all existing auto-start / plan-slot purchase paths unchanged.
+  final String? autoStartProductId;
+
   const SubscriptionScreen({
     super.key,
     required this.sixMonthPlan,
@@ -68,6 +72,7 @@ class SubscriptionScreen extends StatefulWidget {
     this.autoStartSelectedPlanPurchase = false,
     this.autoStartRestore = false,
     this.invisiblePurchaseHost = false,
+    this.autoStartProductId,
   });
 
   /// iOS-style slide used for paywall push/pop so back matches forward.
@@ -881,6 +886,46 @@ class _SubscriptionScreenState extends State<SubscriptionScreen>
     await SharPreferences.setString('OpenAd', '1');
     await SharPreferences.setBoolean('startpurches', true);
     _buyProduct(_products[idx]);
+  }
+
+  /// Additive: invisible host buys [autoStartProductId] only (exit-offer path).
+  Future<void> _autoStartProductIdPurchaseIfNeeded() async {
+    final id = (widget.autoStartProductId ?? '').trim();
+    if (id.isEmpty || _autoPurchaseTriggered) return;
+    if (!widget.invisiblePurchaseHost) return;
+    _autoPurchaseTriggered = true;
+
+    ProductDetails? prod;
+    for (final p in _products) {
+      if (p.id == id) {
+        prod = p;
+        break;
+      }
+    }
+    if (prod == null) {
+      try {
+        final response =
+            await _inAppPurchase.queryProductDetails(<String>{id});
+        if (response.productDetails.isNotEmpty) {
+          prod = response.productDetails.first;
+        }
+      } catch (e) {
+        debugPrint('autoStartProductId query failed: $e');
+      }
+    }
+    if (prod == null) {
+      debugPrint('autoStartProductId: product not found ($id)');
+      if (mounted && Navigator.of(context).canPop()) {
+        Navigator.of(context).pop(false);
+      }
+      return;
+    }
+
+    _exitOfferProduct = prod;
+    _pendingBuyProductId = prod.id;
+    await SharPreferences.setString('OpenAd', '1');
+    await SharPreferences.setBoolean('startpurches', true);
+    await _buyProduct(prod);
   }
 
   Future<void> _autoStartRestoreIfNeeded() async {
@@ -1828,7 +1873,14 @@ class _SubscriptionScreenState extends State<SubscriptionScreen>
 
       debugPrint('📊 SubFields count: ${subFields?.length ?? 0}');
 
-      // Get exit offer ID from SharedPreferences (with fallback to constant)
+      // Prefer GetappInfo field_num 8 (Exit Offer Yearly), then prefs id.
+      final byField = BibleInfo.findExitOfferSubField(subFields);
+      if (byField != null) {
+        debugPrint(
+            '✅ Exit offer field_num 8 / match: ${byField.identifier}');
+        return byField;
+      }
+
       final exitOfferId = await SharPreferences.getString('exitOfferPlan') ??
           BibleInfo.exitOfferPlanid;
 
@@ -1845,16 +1897,15 @@ class _SubscriptionScreenState extends State<SubscriptionScreen>
         debugPrint('⚠️ No subFields found in API response');
       }
 
-      // Fallback to constant data if API and cache both failed
+      // Fallback to constant Exit Offer Yearly (field_num 8 id)
       debugPrint(
           '⚠️ Exit offer not found in API/cache, using constant data as fallback');
       try {
-        // Create a fallback exit offer using constant lifetime plan ID
         final fallbackExitOffer = GetAudioModelDataSubFields(
-          identifier: BibleInfo.lifeTimePlanid, // Use constant lifetime plan ID
-          item_1: "Unlock every Premium Bible feature",
-          item_2: "30% Off for the next 10 minutes",
-          value: "30",
+          identifier: BibleInfo.exitOfferPlanid,
+          item_1: "Exit Offer Yearly",
+          item_2: "",
+          value: "25",
         );
         debugPrint('✅ Created fallback exit offer with constant data');
         return fallbackExitOffer;
@@ -1866,13 +1917,12 @@ class _SubscriptionScreenState extends State<SubscriptionScreen>
       return null;
     } catch (e) {
       debugPrint('❌ Error getting exit offer from API: $e');
-      // Try fallback even on error
       try {
         final fallbackExitOffer = GetAudioModelDataSubFields(
-          identifier: BibleInfo.lifeTimePlanid,
-          item_1: "Unlock every Premium Bible feature",
-          item_2: "30% Off for the next 10 minutes",
-          value: "30",
+          identifier: BibleInfo.exitOfferPlanid,
+          item_1: "Exit Offer Yearly",
+          item_2: "",
+          value: "25",
         );
         debugPrint('✅ Created fallback exit offer after error');
         return fallbackExitOffer;
@@ -1914,6 +1964,9 @@ class _SubscriptionScreenState extends State<SubscriptionScreen>
         } catch (_) {}
       }
 
+      final byField = BibleInfo.findExitOfferSubField(subFields);
+      if (byField != null) return byField;
+
       final exitOfferId = await SharPreferences.getString('exitOfferPlan') ??
           BibleInfo.exitOfferPlanid;
 
@@ -1924,18 +1977,18 @@ class _SubscriptionScreenState extends State<SubscriptionScreen>
       }
 
       return GetAudioModelDataSubFields(
-        identifier: BibleInfo.lifeTimePlanid,
-        item_1: "Unlock every Premium Bible feature",
-        item_2: "30% Off for the next 10 minutes",
-        value: "30",
+        identifier: BibleInfo.exitOfferPlanid,
+        item_1: "Exit Offer Yearly",
+        item_2: "",
+        value: "25",
       );
     } catch (e) {
       debugPrint('getExitOfferFromApiStatic error: $e');
       return GetAudioModelDataSubFields(
-        identifier: BibleInfo.lifeTimePlanid,
-        item_1: "Unlock every Premium Bible feature",
-        item_2: "30% Off for the next 10 minutes",
-        value: "30",
+        identifier: BibleInfo.exitOfferPlanid,
+        item_1: "Exit Offer Yearly",
+        item_2: "",
+        value: "25",
       );
     }
   }
@@ -2683,13 +2736,14 @@ class _SubscriptionScreenState extends State<SubscriptionScreen>
                   if (purchaseDetails.productID == exitOfferId ||
                       (_exitOfferProduct != null &&
                           purchaseDetails.productID == _exitOfferProduct!.id)) {
-                    // Handle exit offer purchase success
-                    await controller
-                        .disableAd(const Duration(days: 3650012345));
-                    // Set subscription plan to platinum for exit offer (lifetime) purchase
+                    // Exit Offer Yearly → gold/1Y; legacy lifetime exit → platinum.
+                    final exitIdLower =
+                        purchaseDetails.productID.toLowerCase();
+                    final isYearlyExit = exitIdLower.contains('oneyear') ||
+                        (exitIdLower.contains('year') &&
+                            !exitIdLower.contains('lifetime'));
                     DownloadProvider? downloadProvider = _myProvider;
                     if (downloadProvider == null) {
-                      // Try to get from Get.context as fallback
                       final getContext = Get.context;
                       if (getContext != null) {
                         downloadProvider = Provider.of<DownloadProvider>(
@@ -2697,11 +2751,19 @@ class _SubscriptionScreenState extends State<SubscriptionScreen>
                             listen: false);
                       }
                     }
-                    if (downloadProvider != null) {
-                      await downloadProvider.setSubscriptionPlan('platinum');
+                    if (isYearlyExit) {
+                      await controller.disableAd(const Duration(days: 366));
+                      if (downloadProvider != null) {
+                        await downloadProvider.setSubscriptionPlan('gold');
+                      }
+                    } else {
+                      await controller
+                          .disableAd(const Duration(days: 3650012345));
+                      if (downloadProvider != null) {
+                        await downloadProvider.setSubscriptionPlan('platinum');
+                      }
                     }
                     await Future.delayed(Duration(seconds: 2));
-                    // Complete the purchase for iOS - critical to prevent infinite loading
                     if (Platform.isIOS) {
                       await _awaitPurchaseStep(
                           _inAppPurchase.completePurchase(purchaseDetails));
@@ -2712,7 +2774,14 @@ class _SubscriptionScreenState extends State<SubscriptionScreen>
                     await SharPreferences.setBoolean('closead', true);
                     debugPrint(
                         "exit offer purchase success - redirecting to home");
-                    await _finishAfterLifetimePurchaseSuccess();
+                    if (isYearlyExit) {
+                      await _completePaywallSubscriptionNavigation(
+                        startFlag: true,
+                        invisiblePopSuccess: true,
+                      );
+                    } else {
+                      await _finishAfterLifetimePurchaseSuccess();
+                    }
                     return;
                   } else {
                     // Fallback: If product ID doesn't match any known plan, treat as lifetime purchase
@@ -2922,6 +2991,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen>
 
     _logPaywallData(source: 'initialize');
 
+    await _autoStartProductIdPurchaseIfNeeded();
     await _autoStartPurchaseIfNeeded();
     await _autoStartRestoreIfNeeded();
 
