@@ -506,6 +506,15 @@ class floatingButtonState extends State<floatingButton>
       return;
     }
     if (audioPlayer.state != PlayerState.playing && !isAudioPlaying) return;
+    // Last ~12s: do not re-edit the playlist — causes last-seconds stall.
+    final totalMs = duration.inMilliseconds;
+    final remainMs = totalMs - position.inMilliseconds;
+    if (audioPlayer.hasQueuedNext &&
+        totalMs > 0 &&
+        remainMs >= 0 &&
+        remainMs <= 12000) {
+      return;
+    }
     final target = await _nextChapterTarget();
     if (target == null) {
       try {
@@ -584,8 +593,10 @@ class floatingButtonState extends State<floatingButton>
       if (_prefetchedKey == key &&
           existing != null &&
           File(existing).existsSync()) {
-        // Refresh native queue to prefer the local file when already queued.
-        unawaited(_queueNativeNextChapter());
+        // Queue once only — re-queue every position tick stalls near EOF.
+        if (!audioPlayer.hasQueuedNext) {
+          unawaited(_queueNativeNextChapter());
+        }
         return;
       }
       final res = await http
@@ -3373,9 +3384,14 @@ class floatingButtonState extends State<floatingButton>
                       ),
                       onPressed: () async {
                         final current = position;
+                        // Avoid seek-to-exact-end (can stick at completed).
+                        final endSafe = duration >
+                                const Duration(milliseconds: 300)
+                            ? duration - const Duration(milliseconds: 300)
+                            : Duration.zero;
                         final newPos = (duration - current).inSeconds >= 10
                             ? current + const Duration(seconds: 10)
-                            : duration;
+                            : endSafe;
                         await audioPlayer.seek(newPos);
                         await audioPlayer.resume();
                         if (mounted && context.mounted) setState(() {});

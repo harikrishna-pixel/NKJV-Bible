@@ -32,6 +32,7 @@ import 'package:biblebookapp/view/screens/calendar_screen/view/calendar_screen.d
 import 'package:biblebookapp/view/screens/category_detail_screen/view/image_detail_screen.dart';
 import 'package:biblebookapp/view/screens/dashboard/add_widget_intro_screen.dart';
 import 'package:biblebookapp/view/screens/dashboard/ios_style_app_drawer.dart';
+import 'package:biblebookapp/view/screens/dashboard/manage_premium_screen.dart';
 import 'package:biblebookapp/view/screens/journey/connection_insights_screen.dart';
 import 'package:biblebookapp/view/screens/connection_paths/connection_paths_screen.dart';
 import 'package:biblebookapp/view/screens/milestones/milestones_screen.dart';
@@ -152,6 +153,117 @@ String _subscriptionPeriodDisplayText(
   return 'Your subscription expires on ${DateFormat('dd-MM-yyyy').format(expiryDate)}';
 }
 
+bool _isLifetimePlanDisplay(String? plan, int diffDy) {
+  final planKey = plan?.toLowerCase() ?? '';
+  return planKey == 'platinum' ||
+      planKey.contains('lifetime') ||
+      _isLifetimeSubscriptionDisplay(diffDy);
+}
+
+/// Lifetime purchase info — display-only (attached Manage Premium Lifetime UI).
+Widget _buildLifetimeSubscriptionInfoDetails({
+  required BuildContext context,
+  required double screenWidth,
+}) {
+  final ink = CommanColor.lightDarkPrimary(context);
+  final muted = ink.withValues(alpha: 0.72);
+  final bodySize = screenWidth < 380
+      ? BibleInfo.fontSizeScale * 13
+      : BibleInfo.fontSizeScale * 14;
+  const includes = <String>[
+    'Remove ads permanently',
+    'Access to all premium reading & study tools',
+    '5,000 AI credits (~250 AI chats)',
+    'Join and participate in the Prayer Wall community',
+  ];
+
+  return Padding(
+    padding: const EdgeInsets.symmetric(horizontal: 24),
+    child: Column(
+      children: [
+        Text(
+          'Premium Active',
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            letterSpacing: BibleInfo.letterSpacing,
+            fontSize: BibleInfo.fontSizeScale * 18,
+            color: ink,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        const SizedBox(height: 10),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+          decoration: BoxDecoration(
+            color: ink.withValues(alpha: 0.12),
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: ink.withValues(alpha: 0.28)),
+          ),
+          child: Text(
+            '∞  Lifetime Access',
+            style: TextStyle(
+              fontSize: BibleInfo.fontSizeScale * 13,
+              fontWeight: FontWeight.w700,
+              color: ink,
+            ),
+          ),
+        ),
+        const SizedBox(height: 10),
+        Text(
+          'You have unlocked Lifetime access to all premium features.',
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            letterSpacing: BibleInfo.letterSpacing,
+            fontSize: bodySize,
+            color: muted,
+            fontWeight: FontWeight.w400,
+            height: 1.35,
+          ),
+        ),
+        const SizedBox(height: 16),
+        Align(
+          alignment: Alignment.centerLeft,
+          child: Text(
+            'Premium Includes',
+            style: TextStyle(
+              letterSpacing: BibleInfo.letterSpacing,
+              fontSize: BibleInfo.fontSizeScale * 15,
+              color: ink,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ),
+        const SizedBox(height: 8),
+        for (final item in includes) ...[
+          Padding(
+            padding: const EdgeInsets.only(bottom: 6),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(Icons.check_rounded, size: 18, color: ink),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    item,
+                    style: TextStyle(
+                      letterSpacing: BibleInfo.letterSpacing,
+                      fontSize: bodySize,
+                      color: muted,
+                      fontWeight: FontWeight.w400,
+                      height: 1.3,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+        const SizedBox(height: 8),
+      ],
+    ),
+  );
+}
+
 Widget _buildSubscriptionInfoDetails({
   required BuildContext context,
   required DateTime expiryDate,
@@ -164,36 +276,74 @@ Widget _buildSubscriptionInfoDetails({
     letterSpacing: BibleInfo.letterSpacing,
     fontSize: screenWidth < 380
         ? BibleInfo.fontSizeScale * 13
-        : BibleInfo.fontSizeScale * 15,
+        : BibleInfo.fontSizeScale * 14,
     color: CommanColor.lightDarkPrimary(context),
     fontWeight: FontWeight.w400,
+    height: 1.35,
   );
 
-  return FutureBuilder<String?>(
-    future: downloadProvider.getSubscriptionPlan(),
+  // Display-only: reuse existing trial prefs for info copy (no IAP logic).
+  return FutureBuilder<List<Object?>>(
+    future: Future.wait<Object?>([
+      downloadProvider.getSubscriptionPlan(),
+      TrialReminderUx.drawerState(),
+    ]),
     builder: (context, snapshot) {
-      final plan = snapshot.data;
-      return Column(
-        children: [
-          Text(
-            _subscriptionRenewalDisplayText(diffDy, plan),
-            style: textStyle,
-          ),
-          const SizedBox(height: 5),
-          Text(
-            _subscriptionPeriodDisplayText(plan, diffDy, expiryDate),
-            style: textStyle,
-          ),
-          const SizedBox(height: 5),
-        ],
+      final plan = snapshot.data?[0] as String?;
+      final trial = (snapshot.data?[1] as TrialDrawerState?) ??
+          TrialDrawerState.none;
+
+      if (_isLifetimePlanDisplay(plan, diffDy)) {
+        return _buildLifetimeSubscriptionInfoDetails(
+          context: context,
+          screenWidth: screenWidth,
+        );
+      }
+
+      late final String line1;
+      late final String line2;
+      if (trial.showEndingCard && trial.title.isNotEmpty) {
+        // Trial ends today / tomorrow.
+        line1 = trial.title;
+        line2 = trial.body.isNotEmpty
+            ? trial.body
+            : _subscriptionPeriodDisplayText(plan, diffDy, expiryDate);
+      } else if (trial.showTrialBadge) {
+        line1 = 'You\'re on a free Trial.';
+        line2 = _subscriptionPeriodDisplayText(plan, diffDy, expiryDate);
+      } else {
+        line1 = _subscriptionRenewalDisplayText(diffDy, plan);
+        line2 = _subscriptionPeriodDisplayText(plan, diffDy, expiryDate);
+      }
+
+      return Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 28),
+        child: Column(
+          children: [
+            Text(
+              line1,
+              textAlign: TextAlign.center,
+              style: textStyle,
+            ),
+            const SizedBox(height: 6),
+            Text(
+              line2,
+              textAlign: TextAlign.center,
+              style: textStyle,
+            ),
+            const SizedBox(height: 12),
+          ],
+        ),
       );
     },
   );
 }
 
 /// Subscription Info sheet (Home menu premium info icon and Wallet badge).
+/// Display-only layout matches the attached Subscription Info UI.
 void showSubscriptionInfoBottomSheet(BuildContext context, DateTime expiryDate) {
   final screenWidth = MediaQuery.of(context).size.width;
+  final ink = CommanColor.lightDarkPrimary(context);
   showModalBottomSheet<void>(
     context: context,
     backgroundColor: Colors.white,
@@ -204,42 +354,31 @@ void showSubscriptionInfoBottomSheet(BuildContext context, DateTime expiryDate) 
     builder: (BuildContext sheetContext) {
       return Stack(
         children: [
-          Container(
-            decoration: BoxDecoration(
-              border: Border.all(color: Colors.white),
-              borderRadius: const BorderRadius.only(
-                topLeft: Radius.circular(20),
-                topRight: Radius.circular(20),
-              ),
-            ),
-            height: MediaQuery.of(sheetContext).size.height * 0.30,
+          SafeArea(
+            top: false,
             child: SingleChildScrollView(
-              physics: const ScrollPhysics(),
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 20),
               child: Column(
-                mainAxisAlignment: MainAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
                 children: <Widget>[
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Image.asset(
-                        "assets/feedbacklogo.png",
-                        height: 120,
-                        width: 120,
-                        color: CommanColor.lightDarkPrimary(sheetContext),
-                      ),
-                    ],
+                  Image.asset(
+                    'assets/feedbacklogo.png',
+                    height: 100,
+                    width: 100,
+                    color: ink,
                   ),
+                  const SizedBox(height: 4),
                   Text(
                     'Subscription Info',
+                    textAlign: TextAlign.center,
                     style: TextStyle(
                       letterSpacing: BibleInfo.letterSpacing,
                       fontSize: BibleInfo.fontSizeScale * 16,
-                      color: CommanColor.lightDarkPrimary(sheetContext),
+                      color: ink,
                       fontWeight: FontWeight.w500,
                     ),
                   ),
-                  const SizedBox(height: 15),
+                  const SizedBox(height: 12),
                   _buildSubscriptionInfoDetails(
                     context: sheetContext,
                     expiryDate: expiryDate,
@@ -251,14 +390,14 @@ void showSubscriptionInfoBottomSheet(BuildContext context, DateTime expiryDate) 
           ),
           Positioned(
             top: 10,
-            right: 15,
+            right: 12,
             child: InkWell(
-              child: Icon(
-                Icons.close,
-                color: CommanColor.lightDarkPrimary(sheetContext),
-                size: 25,
-              ),
+              borderRadius: BorderRadius.circular(20),
               onTap: () => Navigator.pop(sheetContext),
+              child: Padding(
+                padding: const EdgeInsets.all(6),
+                child: Icon(Icons.close, color: ink, size: 22),
+              ),
             ),
           ),
         ],
@@ -6316,10 +6455,15 @@ class _HomeScreenState extends State<HomeScreen>
       }
     }
 
-    void showSubscriptionInfoSheet() {
+    void openManagePremium() {
       final expiryRaw = '${controller.RewardAdExpireDate}';
-      if (DateTime.tryParse(expiryRaw) == null) return;
-      showSubscriptionInfoBottomSheet(context, DateTime.parse(expiryRaw));
+      final expiry = DateTime.tryParse(expiryRaw);
+      if (expiry == null) return;
+      Get.to(
+        () => ManagePremiumScreen(expiryDate: expiry),
+        transition: Transition.cupertino,
+        duration: const Duration(milliseconds: 350),
+      );
     }
 
     return Drawer(
@@ -6373,7 +6517,7 @@ class _HomeScreenState extends State<HomeScreen>
             debugPrint('Premium Info plan sync error: $e');
           }
           if (DateTime.tryParse('${controller.RewardAdExpireDate}') != null) {
-            showSubscriptionInfoSheet();
+            openManagePremium();
           } else if (controller.isSubscriptionEnabled ?? false) {
             openPaywallFromDrawer();
           }

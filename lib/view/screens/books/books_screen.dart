@@ -111,7 +111,8 @@ class BooksScreen extends HookConsumerWidget {
                   children: [
                     IconButton(
                       onPressed: () => Get.back(),
-                      icon: Icon(Icons.arrow_back_ios_new, size: 18, color: ink),
+                      icon:
+                          Icon(Icons.arrow_back_ios_new, size: 18, color: ink),
                     ),
                     Expanded(
                       child: Text(
@@ -123,8 +124,8 @@ class BooksScreen extends HookConsumerWidget {
                     IconButton(
                       tooltip: 'My Digital Library',
                       onPressed: () async {
-                        await Get.to(() =>
-                            const MyDigitalLibraryScreen(openedFromProducts: true));
+                        await Get.to(() => const MyDigitalLibraryScreen(
+                            openedFromProducts: true));
                         await loadOwnedStatus();
                       },
                       icon: Icon(Icons.layers_outlined, color: ink),
@@ -180,7 +181,8 @@ class BooksScreen extends HookConsumerWidget {
                                   Icon(
                                     Icons.cloud_off_outlined,
                                     size: 48,
-                                    color: CommanColor.lightDarkPrimary(context),
+                                    color:
+                                        CommanColor.lightDarkPrimary(context),
                                   ),
                                   const SizedBox(height: 16),
                                   Text(
@@ -191,9 +193,8 @@ class BooksScreen extends HookConsumerWidget {
                                   ),
                                   const SizedBox(height: 20),
                                   TextButton(
-                                    onPressed: () => ref
-                                        .read(bookBloc)
-                                        .retryLoad(bookAdId),
+                                    onPressed: () =>
+                                        ref.read(bookBloc).retryLoad(bookAdId),
                                     child: Text(
                                       'Try Again',
                                       style: TextStyle(
@@ -334,8 +335,7 @@ class BooksScreen extends HookConsumerWidget {
     required String? ownedLabel,
     required Future<void> Function() onReturn,
   }) {
-    final paid =
-        DigitalProductDetailScreen.driveFileIdOf(book.bookUrl) != null;
+    final paid = DigitalProductDetailScreen.driveFileIdOf(book.bookUrl) != null;
     return Material(
       color: card,
       borderRadius: BorderRadius.circular(14),
@@ -360,9 +360,8 @@ class BooksScreen extends HookConsumerWidget {
                   height: 68,
                   child: book.bookThumbURL.isEmpty
                       ? ColoredBox(
-                          color: isDark
-                              ? Colors.white12
-                              : const Color(0xFFE8DCC8),
+                          color:
+                              isDark ? Colors.white12 : const Color(0xFFE8DCC8),
                           child: Icon(Icons.menu_book, color: muted, size: 24),
                         )
                       : CachedNetworkImage(

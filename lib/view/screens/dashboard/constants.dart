@@ -36,6 +36,7 @@ class BibleInfo {
   static String lifeTimePlanid =
       'com.balaklrapps.newlivingtranslation.lifetimeadsfree';
   static String subIdentifierTwoYear = twoYearPlanid;
+
   /// GetappInfo `sub_fields` field_num 8 — Exit Offer Yearly.
   static String exitOfferPlanid =
       'com.balaklrapps.newlivingtranslation.oneyearautoexit';
@@ -74,6 +75,7 @@ class BibleInfo {
   static String oneYearPlanDiscount = '30';
   static String twoYearPlanDiscount = '50';
   static String lifeTimePlanDiscount = 'Best Value';
+
   /// GetappInfo field_num 8 `value` — used when StoreKit has no intro pair.
   static String exitOfferPlanDiscount = '25';
 
@@ -243,6 +245,8 @@ class BibleInfo {
 
   static bool isArOneYearProductId(String productId) {
     final id = productId.toLowerCase();
+    // Exit (`oneyearautoexit`) contains "oneyearauto" but is not AR 1Y trial.
+    if (isExitOfferYearlyProductId(productId)) return false;
     return productId == arOneYearPlanid ||
         id.contains('oneyearauto') ||
         id.contains('aroney');
@@ -295,9 +299,7 @@ class BibleInfo {
   //     "ca-app-pub-4194577750257069/8842883017";
 
 // add folder names here  assets/zipped/
-  static List<String> folders = [
-    "NLT Bible"
-  ];
+  static List<String> folders = ["NLT Bible"];
 
   static String emailVerify = "0";
 
@@ -333,7 +335,7 @@ class BibleInfo {
   static String audioBasePath =
       "https://bibleoffice.com/BibleReplications/dev/v1/uploads/bible_audio/Portuguese/";
   static String audioBasePathType = "3";
-  
+
   static String isShowMp3Audio = "1";
   // Sample English chapter. Shown in MP3 Audio Settings only when this file loads.
   static const String englishBibleAudio =

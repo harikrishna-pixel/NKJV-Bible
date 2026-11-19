@@ -104,6 +104,10 @@ class PremiumEntitlementLabelSync {
     final sixByDays = daysRemaining >= 120 && daysRemaining <= 220;
     final monthByDays = daysRemaining >= 20 && daysRemaining <= 45;
 
+    // Exit yearly (`oneyearautoexit`) is never Lifetime — even if platinum/far expiry leftover.
+    if (BibleInfo.isExitOfferYearlyProductId(productId ?? '')) {
+      return 'year';
+    }
     if (planKey == 'platinum' ||
         id.contains('lifetime') ||
         daysRemaining > 10000) {

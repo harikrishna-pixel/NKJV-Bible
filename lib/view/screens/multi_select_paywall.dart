@@ -106,6 +106,7 @@ class _MultiSelectPaywallState extends State<MultiSelectPaywall> {
   /// Exit-offer product (GetappInfo field_num 8) — display + claim only.
   ProductDetails? _exitOfferProduct;
   String _exitOfferProductId = '';
+
   /// Display title for exit offer card (copy); product id still from API.
   String _exitOfferHeadline = 'Yearly Premium';
   String _exitOfferBadge = 'SAVE';
@@ -118,6 +119,10 @@ class _MultiSelectPaywallState extends State<MultiSelectPaywall> {
 
   /// Prevents double Home handoff if host Get.offAll and fallback both fire.
   bool _purchaseSuccessHandoffDone = false;
+
+  /// Close ✕: hidden briefly on open, then small / slightly transparent (no circle).
+  bool _closeIconVisible = false;
+  Timer? _closeIconTimer;
 
   String get _exitOfferDisplayPrice {
     if (_exitOfferPrice.isNotEmpty) return _exitOfferPrice;
@@ -145,8 +150,7 @@ class _MultiSelectPaywallState extends State<MultiSelectPaywall> {
 
   Future<bool> _shouldShowExitOffer() async {
     if (!_exitOfferEnabled || _exitOfferShownOnce) return false;
-    final consumed =
-        await SharPreferences.getBoolean(_exitOfferConsumedPref);
+    final consumed = await SharPreferences.getBoolean(_exitOfferConsumedPref);
     return consumed != true;
   }
 
@@ -173,10 +177,9 @@ class _MultiSelectPaywallState extends State<MultiSelectPaywall> {
         }
       }
     } catch (_) {}
-    final prefsId = (await SharPreferences.getString('exitOfferPlan') ?? '')
-        .trim();
-    if (prefsId.isNotEmpty &&
-        BibleInfo.isExitOfferYearlyProductId(prefsId)) {
+    final prefsId =
+        (await SharPreferences.getString('exitOfferPlan') ?? '').trim();
+    if (prefsId.isNotEmpty && BibleInfo.isExitOfferYearlyProductId(prefsId)) {
       return prefsId;
     }
     return BibleInfo.exitOfferPlanid;
@@ -197,8 +200,7 @@ class _MultiSelectPaywallState extends State<MultiSelectPaywall> {
         }
       }
       final prefsVal =
-          (await SharPreferences.getString('exitOfferPlanValue') ?? '')
-              .trim();
+          (await SharPreferences.getString('exitOfferPlanValue') ?? '').trim();
       if (prefsVal.isNotEmpty) _exitOfferApiValuePercent = prefsVal;
     } catch (_) {}
     _exitOfferApiValuePercent ??= BibleInfo.exitOfferPlanDiscount;
@@ -223,14 +225,12 @@ class _MultiSelectPaywallState extends State<MultiSelectPaywall> {
   /// Same-id first-year vs renewal + strikethrough; API value=25 when no intro.
   void _applyExitOfferPricingFromStore(ProductDetails product) {
     if (!BibleInfo.isExitOfferYearlyProductId(product.id)) {
-      debugPrint(
-          'MultiSelectPaywall: ignore non-exit product ${product.id}');
+      debugPrint('MultiSelectPaywall: ignore non-exit product ${product.id}');
       return;
     }
     _exitOfferProduct = product;
-    final symbol = product.currencySymbol.isNotEmpty
-        ? product.currencySymbol
-        : '\$';
+    final symbol =
+        product.currencySymbol.isNotEmpty ? product.currencySymbol : '\$';
 
     double? firstYear;
     double? renewYear = product.rawPrice;
@@ -273,8 +273,7 @@ class _MultiSelectPaywallState extends State<MultiSelectPaywall> {
         renewYear > firstYear) {
       _exitOfferPrice = firstDisplay;
       _exitOfferRenewPrice = renewDisplay;
-      _exitOfferPercent =
-          (((renewYear - firstYear) / renewYear) * 100).round();
+      _exitOfferPercent = (((renewYear - firstYear) / renewYear) * 100).round();
       return;
     }
 
@@ -310,9 +309,8 @@ class _MultiSelectPaywallState extends State<MultiSelectPaywall> {
 
     try {
       if (await InAppPurchase.instance.isAvailable()) {
-        final response = await InAppPurchase.instance
-            .queryProductDetails(<String>{id})
-            .timeout(const Duration(seconds: 10));
+        final response = await InAppPurchase.instance.queryProductDetails(
+            <String>{id}).timeout(const Duration(seconds: 10));
         ProductDetails? found;
         for (final p in response.productDetails) {
           if (BibleInfo.isExitOfferYearlyProductId(p.id)) {
@@ -324,8 +322,7 @@ class _MultiSelectPaywallState extends State<MultiSelectPaywall> {
           _applyExitOfferPricingFromStore(found);
           return;
         }
-        debugPrint(
-            'MultiSelectPaywall: exit offer id not in store response '
+        debugPrint('MultiSelectPaywall: exit offer id not in store response '
             '(notFound=${response.notFoundIDs})');
       }
     } catch (e) {
@@ -352,16 +349,16 @@ class _MultiSelectPaywallState extends State<MultiSelectPaywall> {
   String get _resolvedSixMonth => BibleInfo.isAutoRenewablePaywallMode
       ? BibleInfo.arOneMonthPlanid
       : AppApiConstant.resolveSubscriptionProductId(
-        widget.sixMonthPlan,
-        BibleInfo.sixMonthPlanid,
-      );
+          widget.sixMonthPlan,
+          BibleInfo.sixMonthPlanid,
+        );
 
   String get _resolvedOneYear => BibleInfo.isAutoRenewablePaywallMode
       ? BibleInfo.arOneYearPlanid
       : AppApiConstant.resolveSubscriptionProductId(
-        widget.oneYearPlan,
-        BibleInfo.oneYearPlanid,
-      );
+          widget.oneYearPlan,
+          BibleInfo.oneYearPlanid,
+        );
 
   String get _resolvedLifetime => AppApiConstant.resolveSubscriptionProductId(
         widget.lifeTimePlan,
@@ -376,7 +373,18 @@ class _MultiSelectPaywallState extends State<MultiSelectPaywall> {
       unawaited(_onPaywallOpen());
     });
 
+    _closeIconTimer = Timer(const Duration(milliseconds: 1500), () {
+      if (!mounted) return;
+      setState(() => _closeIconVisible = true);
+    });
+
     _loadProducts();
+  }
+
+  @override
+  void dispose() {
+    _closeIconTimer?.cancel();
+    super.dispose();
   }
 
   Future<void> _onPaywallOpen() async {
@@ -534,30 +542,9 @@ class _MultiSelectPaywallState extends State<MultiSelectPaywall> {
 
   Future<void> _loadProducts({bool isRetry = false}) async {
     if (!mounted) return;
-    setState(() {
-      _loading = true;
-      _priceUi =
-          isRetry ? _PriceUiState.retrying : _PriceUiState.loading;
-    });
 
     await _readPriceCaches();
-
-    final online = await InternetConnection().hasInternetAccess;
     if (!mounted) return;
-    if (!online) {
-      if (_hasCachedDisplayPrices) {
-        setState(() {
-          _loading = false;
-          _priceUi = _PriceUiState.ready;
-        });
-      } else {
-        setState(() {
-          _loading = false;
-          _priceUi = _PriceUiState.noInternet;
-        });
-      }
-      return;
-    }
 
     // Same data path as SubscriptionScreen / PaywallPreloadService.
     ProductDetails? six;
@@ -584,8 +571,55 @@ class _MultiSelectPaywallState extends State<MultiSelectPaywall> {
       }
     }
 
+    // Session preload first (no StoreKit) — paint prices immediately when known.
+    assignFrom(PaywallPreloadService.getPreloadedProducts());
+    final hasPreloadPrices = (six?.price.isNotEmpty == true) ||
+        (year?.price.isNotEmpty == true) ||
+        (life?.price.isNotEmpty == true);
+    final canShowCached = _hasCachedDisplayPrices || hasPreloadPrices;
+
+    if (canShowCached && !isRetry) {
+      setState(() {
+        _sixMonth = six ?? _sixMonth;
+        _oneYear = year ?? _oneYear;
+        _lifetime = life ?? _lifetime;
+        if (_oneYear == null && _sixMonth != null) {
+          _dur = _AiDur.sixMonth;
+        }
+        _loading = false;
+        _priceUi = _PriceUiState.ready;
+      });
+    } else {
+      setState(() {
+        _loading = true;
+        _priceUi = isRetry ? _PriceUiState.retrying : _PriceUiState.loading;
+      });
+    }
+
+    final online = await InternetConnection().hasInternetAccess;
+    if (!mounted) return;
+    if (!online) {
+      if (_hasCachedDisplayPrices || hasPreloadPrices) {
+        setState(() {
+          _sixMonth = six ?? _sixMonth;
+          _oneYear = year ?? _oneYear;
+          _lifetime = life ?? _lifetime;
+          _loading = false;
+          _priceUi = _PriceUiState.ready;
+        });
+      } else {
+        setState(() {
+          _loading = false;
+          _priceUi = _PriceUiState.noInternet;
+        });
+      }
+      return;
+    }
+
     try {
       var products = PaywallPreloadService.getPreloadedProducts();
+      // Only request prices when session preload is empty (splash already
+      // fetched once). Do not re-query StoreKit on every paywall open.
       if (products.isEmpty) {
         await PaywallPreloadService.preloadPaywallData()
             .timeout(const Duration(seconds: 10));
@@ -593,8 +627,7 @@ class _MultiSelectPaywallState extends State<MultiSelectPaywall> {
       }
       assignFrom(products);
 
-      // Display-only: if a slot is still empty, requery StoreKit using the
-      // same constant / resolved product IDs (buy / restore path unchanged).
+      // Display-only fallback: StoreKit only if a slot is still missing.
       if (six == null || year == null || life == null) {
         if (await InAppPurchase.instance.isAvailable()) {
           final ids = <String>{
@@ -618,9 +651,9 @@ class _MultiSelectPaywallState extends State<MultiSelectPaywall> {
     if (!mounted) return;
 
     setState(() {
-      _sixMonth = six;
-      _oneYear = year;
-      _lifetime = life;
+      _sixMonth = six ?? _sixMonth;
+      _oneYear = year ?? _oneYear;
+      _lifetime = life ?? _lifetime;
       if (_oneYear == null && _sixMonth != null) {
         _dur = _AiDur.sixMonth;
       }
@@ -786,7 +819,7 @@ class _MultiSelectPaywallState extends State<MultiSelectPaywall> {
     if (!mounted) return;
     await _ensureExitOfferProductLoaded();
     if (!mounted) return;
-    setState(() => _exitOfferVisible = false);
+    // Keep Exit offer visible under Processing / Apple sheet (don't flash Main Paywall).
 
     final productId = BibleInfo.exitOfferPlanid;
     _exitOfferProductId = productId;
@@ -816,7 +849,12 @@ class _MultiSelectPaywallState extends State<MultiSelectPaywall> {
       ),
     );
 
-    await _finishPurchaseHostIfSucceeded(ok, expiryBefore: expiryBefore);
+    // Exit: only hand off when host reports success. Entitlement fallback can
+    // open Home + Premium Unlocked while Apple's sheet is still presenting.
+    if (!mounted) return;
+    if (ok == true) {
+      await _onInvisibleHostFinished(true, wasPurchase: true);
+    }
   }
 
   /// Host sometimes pops null/false after a successful local entitlement write.
@@ -1001,8 +1039,7 @@ class _MultiSelectPaywallState extends State<MultiSelectPaywall> {
       if (raw != null && raw.isNotEmpty) {
         expiry = DateTime.tryParse(raw);
       }
-      final active =
-          expiry != null && !expiry.isBefore(DateTime.now());
+      final active = expiry != null && !expiry.isBefore(DateTime.now());
       if (plan == 'platinum') return 'lifetime';
       if (plan == 'gold') return 'year';
       if (plan == 'silver') return 'month';
@@ -1078,8 +1115,7 @@ class _MultiSelectPaywallState extends State<MultiSelectPaywall> {
     final tryingYear = tryingKind == 'year';
     final lastPlanLabel = ownedKind == 'year' ? '1 Year' : '1 Month';
     final expired = expiry != null && expiry.isBefore(DateTime.now());
-    final expiryLabel =
-        expiry != null ? _formatPlanExpiry(expiry) : null;
+    final expiryLabel = expiry != null ? _formatPlanExpiry(expiry) : null;
 
     final title = ownedLifetime
         ? 'You Already Own\nLifetime'
@@ -1340,7 +1376,7 @@ class _MultiSelectPaywallState extends State<MultiSelectPaywall> {
           sixMonthPlan: _resolvedSixMonth,
           oneYearPlan: _resolvedOneYear,
           lifeTimePlan: _resolvedLifetime,
-      checkad: widget.checkad,
+          checkad: widget.checkad,
           invisiblePurchaseHost: true,
           autoStartRestore: true,
         ),
@@ -1351,7 +1387,6 @@ class _MultiSelectPaywallState extends State<MultiSelectPaywall> {
       await _onInvisibleHostFinished(true, wasPurchase: false);
     }
   }
-
 
   @override
   Widget build(BuildContext context) {
@@ -1406,8 +1441,11 @@ class _MultiSelectPaywallState extends State<MultiSelectPaywall> {
       ),
       SizedBox(height: isTablet ? 14 : 9),
       _buildConfidence(isTablet),
-      SizedBox(height: isTablet ? 16 : 14),
-      _buildReassure(isTablet),
+      // Lifetime already says "One payment, yours forever…" — skip duplicate box.
+      if (_sel != _PwCard.lifetime) ...[
+        SizedBox(height: isTablet ? 16 : 14),
+        _buildReassure(isTablet),
+      ],
       SizedBox(height: isTablet ? 20 : 16),
     ];
 
@@ -1469,9 +1507,11 @@ class _MultiSelectPaywallState extends State<MultiSelectPaywall> {
                 ],
               ),
             if (_exitOfferVisible) _buildExitOffer(isTablet),
-            if (_priceUi != _PriceUiState.ready) _buildPriceStatusOverlay(isTablet),
+            if (_priceUi != _PriceUiState.ready)
+              _buildPriceStatusOverlay(isTablet),
             // True top-right of screen; SafeArea clears Wi‑Fi / battery on iPad.
-            if (!_exitOfferVisible)
+            // Small ✕ only (no circle); appear after a short delay.
+            if (!_exitOfferVisible && _closeIconVisible)
               Positioned(
                 top: 0,
                 right: 0,
@@ -1481,29 +1521,16 @@ class _MultiSelectPaywallState extends State<MultiSelectPaywall> {
                       top: isTablet ? 6 : 4,
                       right: isTablet ? 20 : 12,
                     ),
-                    child: Material(
-                      color: Colors.transparent,
-                      child: InkWell(
-                        onTap: _onClose,
-                        customBorder: const CircleBorder(),
-                        child: Container(
-                          width: isTablet ? 36 : 32,
-                          height: isTablet ? 36 : 32,
-                          alignment: Alignment.center,
-                          decoration: BoxDecoration(
-                            color: Colors.white.withValues(alpha: 0.92),
-                            shape: BoxShape.circle,
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withValues(alpha: 0.12),
-                                blurRadius: 8,
-                                offset: const Offset(0, 2),
-                              ),
-                            ],
-                          ),
+                    child: GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onTap: _onClose,
+                      child: Padding(
+                        padding: const EdgeInsets.all(8),
+                        child: Opacity(
+                          opacity: 0.55,
                           child: Icon(
                             Icons.close,
-                            size: isTablet ? 20 : 18,
+                            size: isTablet ? 20 : 16,
                             color: const Color(0xFF6B5A44),
                           ),
                         ),
@@ -1519,8 +1546,8 @@ class _MultiSelectPaywallState extends State<MultiSelectPaywall> {
   }
 
   Widget _buildPriceStatusOverlay(bool isTablet) {
-    final loading = _priceUi == _PriceUiState.loading ||
-        _priceUi == _PriceUiState.retrying;
+    final loading =
+        _priceUi == _PriceUiState.loading || _priceUi == _PriceUiState.retrying;
     final noNet = _priceUi == _PriceUiState.noInternet;
     final title = loading
         ? (_priceUi == _PriceUiState.retrying
@@ -1768,7 +1795,8 @@ class _MultiSelectPaywallState extends State<MultiSelectPaywall> {
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Icon(row.$1, size: isTablet ? 28 : 25, color: const Color(0xFF6B5A44)),
+                Icon(row.$1,
+                    size: isTablet ? 28 : 25, color: const Color(0xFF6B5A44)),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Padding(
@@ -2008,9 +2036,8 @@ class _MultiSelectPaywallState extends State<MultiSelectPaywall> {
                                 : const [Color(0xFFFCF4DD), Color(0xFFF7EBCB)],
                           )
                         : null,
-                    color: recommended
-                        ? null
-                        : (selected ? Colors.white : _paper),
+                    color:
+                        recommended ? null : (selected ? Colors.white : _paper),
                     boxShadow: selected
                         ? [
                             BoxShadow(
@@ -2071,9 +2098,8 @@ class _MultiSelectPaywallState extends State<MultiSelectPaywall> {
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
                           border: Border.all(
-                            color: selected
-                                ? _selBorder
-                                : const Color(0xFFC4B084),
+                            color:
+                                selected ? _selBorder : const Color(0xFFC4B084),
                             width: 2,
                           ),
                         ),
@@ -2122,45 +2148,45 @@ class _MultiSelectPaywallState extends State<MultiSelectPaywall> {
             Padding(
               padding: EdgeInsets.only(top: isTablet ? 4 : 12),
               child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _buildPlanCard(
-                  selected: _sel == _PwCard.ai && _dur == _AiDur.sixMonth,
-                  recommended: false,
-                  name: '1 Month',
-                  price: '$_monthPrice / mo',
-                  onTap: () => setState(() {
-                    _sel = _PwCard.ai;
-                    _dur = _AiDur.sixMonth;
-                  }),
-                  isTablet: isTablet,
-                ),
-                const SizedBox(width: 9),
-                _buildPlanCard(
-                  selected: _sel == _PwCard.ai && _dur == _AiDur.oneYear,
-                  recommended: true,
-                  name: '1 Year',
-                  price: '$_yearPrice / yr',
-                  anchor: _yearAnchor,
-                  badge: saveBadge,
-                  onTap: () => setState(() {
-                    _sel = _PwCard.ai;
-                    _dur = _AiDur.oneYear;
-                  }),
-                  isTablet: isTablet,
-                ),
-                const SizedBox(width: 9),
-                _buildPlanCard(
-                  selected: _sel == _PwCard.lifetime,
-                  recommended: false,
-                  name: 'Lifetime',
-                  price: '$_lifetimePrice once',
-                  badge: 'BEST VALUE',
-                  onTap: () => setState(() => _sel = _PwCard.lifetime),
-                  isTablet: isTablet,
-                ),
-              ],
-            ),
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildPlanCard(
+                    selected: _sel == _PwCard.ai && _dur == _AiDur.sixMonth,
+                    recommended: false,
+                    name: '1 Month',
+                    price: '$_monthPrice / mo',
+                    onTap: () => setState(() {
+                      _sel = _PwCard.ai;
+                      _dur = _AiDur.sixMonth;
+                    }),
+                    isTablet: isTablet,
+                  ),
+                  const SizedBox(width: 9),
+                  _buildPlanCard(
+                    selected: _sel == _PwCard.ai && _dur == _AiDur.oneYear,
+                    recommended: true,
+                    name: '1 Year',
+                    price: '$_yearPrice / yr',
+                    anchor: _yearAnchor,
+                    badge: saveBadge,
+                    onTap: () => setState(() {
+                      _sel = _PwCard.ai;
+                      _dur = _AiDur.oneYear;
+                    }),
+                    isTablet: isTablet,
+                  ),
+                  const SizedBox(width: 9),
+                  _buildPlanCard(
+                    selected: _sel == _PwCard.lifetime,
+                    recommended: false,
+                    name: 'Lifetime',
+                    price: '$_lifetimePrice once',
+                    badge: 'BEST VALUE',
+                    onTap: () => setState(() => _sel = _PwCard.lifetime),
+                    isTablet: isTablet,
+                  ),
+                ],
+              ),
             ),
             const SizedBox(height: 12),
             SizedBox(
@@ -2208,7 +2234,8 @@ class _MultiSelectPaywallState extends State<MultiSelectPaywall> {
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                const Icon(Icons.lock_outline, size: 15, color: Color(0xFF6B5A44)),
+                const Icon(Icons.lock_outline,
+                    size: 15, color: Color(0xFF6B5A44)),
                 const SizedBox(width: 7),
                 Text(
                   _trustLine,
@@ -2300,66 +2327,36 @@ class _MultiSelectPaywallState extends State<MultiSelectPaywall> {
         child: SafeArea(
           child: Column(
             children: [
-              Align(
-                alignment: Alignment.topRight,
-                child: Padding(
-                  padding: const EdgeInsets.only(right: 16, top: 8),
-                  child: InkWell(
-                    onTap: () {
-                      setState(() => _exitOfferVisible = false);
-                    },
-                    customBorder: const CircleBorder(),
-                    child: Container(
-                      width: 30,
-                      height: 30,
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        shape: BoxShape.circle,
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.14),
-                            blurRadius: 8,
-                            offset: const Offset(0, 2),
+              if (_closeIconVisible)
+                Align(
+                  alignment: Alignment.topRight,
+                  child: Padding(
+                    padding: const EdgeInsets.only(right: 16, top: 8),
+                    child: GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onTap: () {
+                        setState(() => _exitOfferVisible = false);
+                      },
+                      child: const Padding(
+                        padding: EdgeInsets.all(8),
+                        child: Opacity(
+                          opacity: 0.55,
+                          child: Icon(
+                            Icons.close,
+                            size: 16,
+                            color: Color(0xFF3A2B18),
                           ),
-                        ],
+                        ),
                       ),
-                      child: const Icon(Icons.close, size: 18, color: Color(0xFF3A2B18)),
                     ),
                   ),
                 ),
-              ),
               Expanded(
                 child: SingleChildScrollView(
                   padding: EdgeInsets.symmetric(horizontal: isTablet ? 40 : 24),
                   child: Column(
                     children: [
                       const SizedBox(height: 8),
-                      Container(
-                        width: 88,
-                        height: 88,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          gradient: const RadialGradient(
-                            center: Alignment(0, -0.3),
-                            colors: [Color(0xFFFBEFCF), Color(0xFFEEDBA6)],
-                          ),
-                          boxShadow: [
-                            BoxShadow(
-                              color: _goldDeep.withValues(alpha: 0.35),
-                              blurRadius: 30,
-                              offset: const Offset(0, 14),
-                            ),
-                          ],
-                        ),
-                        child: Padding(
-                          padding: const EdgeInsets.all(18),
-                          child: Image.asset(
-                            'assets/dove.png',
-                            fit: BoxFit.contain,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 12),
                       Text(
                         '✦ EXCLUSIVE YEARLY OFFER',
                         style: TextStyle(
@@ -2417,14 +2414,18 @@ class _MultiSelectPaywallState extends State<MultiSelectPaywall> {
                         child: Column(
                           children: [
                             Transform.translate(
-                              offset: const Offset(0, -30),
+                              // Sit on the card top border line (was too low).
+                              offset: const Offset(0, -36),
                               child: Container(
                                 padding: const EdgeInsets.symmetric(
                                     horizontal: 15, vertical: 6),
                                 decoration: BoxDecoration(
                                   borderRadius: BorderRadius.circular(20),
                                   gradient: const LinearGradient(
-                                    colors: [Color(0xFFB5712E), Color(0xFFC9A35A)],
+                                    colors: [
+                                      Color(0xFFB5712E),
+                                      Color(0xFFC9A35A)
+                                    ],
                                   ),
                                 ),
                                 child: Row(
@@ -2435,8 +2436,7 @@ class _MultiSelectPaywallState extends State<MultiSelectPaywall> {
                                       width: 16,
                                       height: 16,
                                       fit: BoxFit.contain,
-                                      errorBuilder: (_, __, ___) =>
-                                          const Icon(
+                                      errorBuilder: (_, __, ___) => const Icon(
                                         Icons.card_giftcard,
                                         size: 16,
                                         color: Colors.white,
@@ -2522,8 +2522,7 @@ class _MultiSelectPaywallState extends State<MultiSelectPaywall> {
                             const SizedBox(height: 14),
                             Container(
                               height: 1,
-                              margin:
-                                  const EdgeInsets.symmetric(horizontal: 8),
+                              margin: const EdgeInsets.symmetric(horizontal: 8),
                               color: const Color(0xFFE2D2B2),
                             ),
                             const SizedBox(height: 12),
@@ -2554,7 +2553,8 @@ class _MultiSelectPaywallState extends State<MultiSelectPaywall> {
                 ),
               ),
               Padding(
-                padding: EdgeInsets.fromLTRB(isTablet ? 40 : 24, 0, isTablet ? 40 : 24, 16),
+                padding: EdgeInsets.fromLTRB(
+                    isTablet ? 40 : 24, 0, isTablet ? 40 : 24, 16),
                 child: Column(
                   children: [
                     SizedBox(
@@ -2605,8 +2605,9 @@ class _MultiSelectPaywallState extends State<MultiSelectPaywall> {
                     ),
                     const SizedBox(height: 11),
                     GestureDetector(
-                      onTap: () {
-                        setState(() => _exitOfferVisible = false);
+                      onTap: () async {
+                        // Leave exit offer → Reading (Home), not back to main paywall.
+                        await _navigateAwayFromPaywall();
                       },
                       child: const Text(
                         'Continue with Free Version',
@@ -2662,7 +2663,6 @@ class _ExitFeatureRow extends StatelessWidget {
     );
   }
 }
-
 
 class _RadioDot extends StatelessWidget {
   const _RadioDot({required this.selected, required this.color});
@@ -2809,9 +2809,7 @@ class _DurChip extends StatelessWidget {
           color: selected ? const Color(0xFFF4F0FF) : Colors.white,
           borderRadius: BorderRadius.circular(14),
           border: Border.all(
-            color: selected
-                ? const Color(0xFF6D4AFF)
-                : const Color(0xFFE6E1F2),
+            color: selected ? const Color(0xFF6D4AFF) : const Color(0xFFE6E1F2),
             width: selected ? 1.6 : 1.2,
           ),
         ),

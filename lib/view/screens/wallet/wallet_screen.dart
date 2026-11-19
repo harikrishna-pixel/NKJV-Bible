@@ -10,8 +10,7 @@ import 'package:biblebookapp/view/constants/images.dart';
 import 'package:biblebookapp/view/constants/share_preferences.dart';
 import 'package:biblebookapp/view/constants/theme_provider.dart';
 import 'package:biblebookapp/view/screens/books/books_screen.dart';
-import 'package:biblebookapp/view/screens/dashboard/home_screen.dart'
-    show showSubscriptionInfoBottomSheet;
+import 'package:biblebookapp/view/screens/dashboard/manage_premium_screen.dart';
 import 'package:intl/intl.dart' show NumberFormat;
 import 'package:biblebookapp/view/screens/dashboard/constants.dart';
 import 'package:biblebookapp/view/widget/wallet_entry.dart';
@@ -1639,7 +1638,11 @@ class _WalletScreenState extends State<WalletScreen>
         final expiry =
             DateTime.tryParse(prefs.getString('isRewardAdViewTime') ?? '');
         if (expiry == null || !mounted) return;
-        showSubscriptionInfoBottomSheet(context, expiry);
+        Get.to(
+          () => ManagePremiumScreen(expiryDate: expiry),
+          transition: Transition.cupertino,
+          duration: const Duration(milliseconds: 350),
+        );
       },
       child: badge,
     );
@@ -1765,9 +1768,14 @@ class _WalletScreenState extends State<WalletScreen>
       borderRadius: BorderRadius.circular(12),
       child: InkWell(
         borderRadius: BorderRadius.circular(12),
-        onTap: () {
+        onTap: () async {
           if (_bookAdsAppId <= 0) {
             Constants.showToast('Digital products are unavailable right now.');
+            return;
+          }
+          final hasInternet = await InternetConnection().hasInternetAccess;
+          if (!hasInternet) {
+            Constants.showToast('No internet connection');
             return;
           }
           Get.to(() => BooksScreen(bookAdId: _bookAdsAppId));

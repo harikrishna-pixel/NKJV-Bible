@@ -148,7 +148,6 @@ class _SettingScreenState extends State<SettingScreen>
           chevron: false,
           onTap: null,
         ),
-      // QA row hidden for now — uncomment to clear local plan in TestFlight/IPA.
       // row(
       //   label: 'Clear local plan (QA)',
       //   onTap: () => _confirmClearLocalPlanQa(),

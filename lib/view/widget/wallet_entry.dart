@@ -31,6 +31,10 @@ class WalletSummary {
     if (planLabel == 'Lifetime') return 'Lifetime access';
     final e = expiry;
     if (e == null) return 'Premium';
+    // Lifetime stores a far-future expiry (e.g. year 58002) — never show that.
+    if (e.year >= 5000 || e.difference(DateTime.now()).inDays > 10000) {
+      return 'Lifetime access';
+    }
     return 'Valid until ${DateFormat('d MMM yyyy').format(e)}';
   }
 

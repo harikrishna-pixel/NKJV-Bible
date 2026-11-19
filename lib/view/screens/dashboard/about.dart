@@ -7,7 +7,6 @@ import 'package:biblebookapp/view/constants/constant.dart';
 import 'package:biblebookapp/view/constants/share_preferences.dart';
 import 'package:biblebookapp/view/constants/theme_provider.dart';
 import 'package:biblebookapp/view/screens/dashboard/constants.dart';
-import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:device_info_plus/device_info_plus.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
@@ -35,28 +34,12 @@ class _AboutUsState extends State<AboutUs> {
   final String _microsoftStoreId = '';
 
   Future<void> _requestReview() async {
-    // Link / access check — toast only when truly offline (not when Wi‑Fi works
-    // but Connectivity briefly reports empty).
+    // Low data / offline: probe real access (Connectivity alone can look "up").
     var online = false;
-    final connectivityResult = await Connectivity().checkConnectivity();
-    online = connectivityResult.isNotEmpty &&
-        (connectivityResult.contains(ConnectivityResult.wifi) ||
-            connectivityResult.contains(ConnectivityResult.mobile) ||
-            connectivityResult.contains(ConnectivityResult.ethernet));
-    if (!online) {
-      await Future.delayed(const Duration(milliseconds: 500));
-      final retry = await Connectivity().checkConnectivity();
-      online = retry.isNotEmpty &&
-          (retry.contains(ConnectivityResult.wifi) ||
-              retry.contains(ConnectivityResult.mobile) ||
-              retry.contains(ConnectivityResult.ethernet));
-    }
-    if (!online) {
-      try {
-        online = await InternetConnection().hasInternetAccess;
-      } catch (_) {
-        online = false;
-      }
+    try {
+      online = await InternetConnection().hasInternetAccess;
+    } catch (_) {
+      online = false;
     }
     if (!online) {
       return Constants.showToast('Check your internet connection');

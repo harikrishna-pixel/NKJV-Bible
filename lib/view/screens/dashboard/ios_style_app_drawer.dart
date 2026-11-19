@@ -1,11 +1,7 @@
-import 'dart:io';
-
 import 'package:biblebookapp/home_widget/widget_prompt_service.dart';
-import 'package:biblebookapp/services/trial_reminder_ux.dart';
 import 'package:biblebookapp/view/constants/colors.dart';
 import 'package:biblebookapp/view/constants/images.dart';
 import 'package:flutter/material.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 /// Accordion iOS-style cream drawer (collapsed rows + expanded sub-items).
 /// Visual-only; navigation stays in existing callbacks.
@@ -196,46 +192,11 @@ class _IosStyleAppDrawerState extends State<IosStyleAppDrawer>
     Future.microtask(action);
   }
 
-  TrialDrawerState _trial = TrialDrawerState.none;
-  bool _drawerWasOpen = false;
-
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _loadWidgetsRowState();
-    _loadTrialDrawerState();
-  }
-
-  @override
-  void didUpdateWidget(covariant IosStyleAppDrawer oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (oldWidget.isPremium != widget.isPremium) {
-      _loadTrialDrawerState();
-    }
-  }
-
-  Future<void> _loadTrialDrawerState() async {
-    try {
-      final state = await TrialReminderUx.drawerState();
-      if (!mounted) return;
-      setState(() => _trial = state);
-    } catch (_) {}
-  }
-
-  Future<void> _openManageSubscriptions() async {
-    final uri = Uri.parse(
-      Platform.isIOS
-          ? 'https://apps.apple.com/account/subscriptions'
-          : 'https://play.google.com/store/account/subscriptions',
-    );
-    try {
-      final opened = await launchUrl(uri, mode: LaunchMode.externalApplication);
-      if (opened) return;
-    } catch (_) {}
-    try {
-      await launchUrl(uri, mode: LaunchMode.inAppBrowserView);
-    } catch (_) {}
   }
 
   @override
@@ -248,7 +209,6 @@ class _IosStyleAppDrawerState extends State<IosStyleAppDrawer>
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
       _loadWidgetsRowState();
-      _loadTrialDrawerState();
     }
   }
 
@@ -267,17 +227,6 @@ class _IosStyleAppDrawerState extends State<IosStyleAppDrawer>
 
   @override
   Widget build(BuildContext context) {
-    // Trial prefs are written in You're in… after Home mounts — reload on open.
-    final drawerOpen = Scaffold.maybeOf(context)?.isDrawerOpen ?? false;
-    if (drawerOpen && !_drawerWasOpen) {
-      _drawerWasOpen = true;
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) _loadTrialDrawerState();
-      });
-    } else if (!drawerOpen) {
-      _drawerWasOpen = false;
-    }
-
     final topInset = MediaQuery.of(context).padding.top;
 
     final dailyChildren = <_DrawerSubItem>[
@@ -450,19 +399,6 @@ class _IosStyleAppDrawerState extends State<IosStyleAppDrawer>
           SizedBox(height: topInset + 12),
           _buildHeader(),
           const SizedBox(height: 16),
-          // Day 2 trial status (premium during free trial) — HTML trial UX.
-          if (widget.isPremium && _trial.showEndingCard) ...[
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: _TrialEndingCard(
-                crownAsset: widget.crownAsset,
-                title: _trial.title,
-                body: _trial.body,
-                onTap: () => _closeDrawerThen(_openManageSubscriptions),
-              ),
-            ),
-            const SizedBox(height: 8),
-          ],
           // Free plan only — completely hidden for Premium users.
           if (!widget.isPremium && widget.showPremiumBanner) ...[
             Padding(
@@ -618,15 +554,6 @@ class _IosStyleAppDrawerState extends State<IosStyleAppDrawer>
                     icon: Icons.workspace_premium_outlined,
                     outlined: false,
                   )
-                else if (_trial.showTrialBadge)
-                  _PlanBadge(
-                    label: 'Trial',
-                    crownAsset: widget.crownAsset,
-                    outlined: true,
-                    showInfoIcon: true,
-                    onInfoTap: () =>
-                        _closeDrawerThen(_openManageSubscriptions),
-                  )
                 else
                   _PlanBadge(
                     label: 'Premium Active',
@@ -730,110 +657,6 @@ class _PlanBadge extends StatelessWidget {
       onTap: onInfoTap,
       behavior: HitTestBehavior.opaque,
       child: badge,
-    );
-  }
-}
-
-class _TrialEndingCard extends StatelessWidget {
-  const _TrialEndingCard({
-    required this.crownAsset,
-    required this.title,
-    required this.body,
-    required this.onTap,
-  });
-
-  final String crownAsset;
-  final String title;
-  final String body;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(15),
-        child: Container(
-          padding: const EdgeInsets.fromLTRB(12, 11, 10, 11),
-          decoration: BoxDecoration(
-            gradient: const LinearGradient(
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-              colors: [Color(0xFFFCEFD2), Color(0xFFF7E4B9)],
-            ),
-            borderRadius: BorderRadius.circular(15),
-            border: Border.all(color: const Color(0xFFE7CF98)),
-            boxShadow: [
-              BoxShadow(
-                color: const Color(0xFF8C641E).withValues(alpha: 0.18),
-                blurRadius: 14,
-                offset: const Offset(0, 6),
-              ),
-            ],
-          ),
-          child: Row(
-            children: [
-              Image.asset(
-                crownAsset,
-                width: 36,
-                height: 36,
-                fit: BoxFit.contain,
-                errorBuilder: (_, __, ___) => const Text(
-                  '👑',
-                  style: TextStyle(fontSize: 28),
-                ),
-              ),
-              const SizedBox(width: 11),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      title,
-                      style: const TextStyle(
-                        fontFamily: 'Georgia',
-                        fontWeight: FontWeight.w700,
-                        fontSize: 15.5,
-                        color: Color(0xFF8A5A1E),
-                        height: 1.1,
-                      ),
-                    ),
-                    const SizedBox(height: 3),
-                    Text(
-                      body,
-                      style: const TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w600,
-                        height: 1.3,
-                        color: Color(0xFF5A4A30),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 6),
-              Container(
-                width: 26,
-                height: 26,
-                decoration: const BoxDecoration(
-                  shape: BoxShape.circle,
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [Color(0xFFE7B64D), Color(0xFFC78F2E)],
-                  ),
-                ),
-                child: const Icon(
-                  Icons.chevron_right_rounded,
-                  size: 18,
-                  color: Colors.white,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
     );
   }
 }

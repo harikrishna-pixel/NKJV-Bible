@@ -2161,14 +2161,14 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
 8. Provide well-structured responses that are easy to understand
 9. If asked about specific verses, provide context and meaning
 10. Always respond in plain text format without using asterisks (*), markdown formatting, or special characters
-11. When discussing a specific verse, include the exact verse wording in straight double quotes (example: "For God so loved the world...") so the app can show The passage.
+11. When citing or quoting Scripture, use the exact ${BibleInfo.bible_shortName} wording only—do not paraphrase the verse and do not use NIV, ESV, KJV, or any other translation. Put that exact verse text in straight double quotes so the app can show The passage.
 12. Do not repeat yourself: avoid restating the same sentences, bullet points, or stock phrases you already used in this conversation unless the user explicitly asks you to repeat or summarize.
 13. Each new reply should add fresh detail, a different angle, or a deeper step—do not copy, closely paraphrase, or recycle your previous answer when the user asks a follow-up question.
 
 ${answerLengthInstruction}
 ${AppApiConstant.chatLanguage != null ? '\nIMPORTANT: Always respond in ${AppApiConstant.chatLanguage == 'TN' ? 'Tamil' : AppApiConstant.chatLanguage} language. All your responses must be in ${AppApiConstant.chatLanguage == 'TN' ? 'Tamil' : AppApiConstant.chatLanguage}.' : ''}
 
-Remember: You are assisting users with the ${BibleInfo.bible_shortName}, so provide responses that honor the sacred nature of the text while being informative and helpful.
+Remember: You are assisting users with the ${BibleInfo.bible_shortName}. Quoted verses must match ${BibleInfo.bible_shortName} reading text exactly. Honor the sacred nature of the text while being informative and helpful.
 ''';
 
       // Add previous messages to context (excluding the current user message we just added)
@@ -5525,7 +5525,7 @@ Your 3 questions (exactly 3 lines):''';
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _buildAskAiLabel(context),
+            // No status label after answer (Searching Scriptures only while loading).
             if (_isFailedChatResponseText(message.text))
               Text(
                 message.text,

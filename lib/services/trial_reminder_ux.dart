@@ -52,13 +52,16 @@ class TrialReminderUx {
   static String formatWeekdayShort(DateTime date) =>
       _weekdayShort[date.weekday - 1];
 
-  /// Subscriptions that use the 3-day trial confirmation UX (not lifetime).
+  /// Subscriptions that use the 3-day trial confirmation UX.
+  /// Lifetime and Exit Offer yearly have no free trial → Premium Unlocked instead.
   static Future<bool> shouldShowTrialStartedFlow() async {
     final id =
         (await PremiumEntitlementLabelSync.readLastProductId() ?? '')
             .toLowerCase()
             .trim();
     if (id.contains('lifetime')) return false;
+    // Exit (`oneyearautoexit`) contains "oneyear" but is not a free-trial SKU.
+    if (BibleInfo.isExitOfferYearlyProductId(id)) return false;
     if (id.isEmpty) return true;
     if (id.contains('oneyear') ||
         id.contains('1year') ||

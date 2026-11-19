@@ -269,10 +269,14 @@ class _SubscriptionScreenState extends State<SubscriptionScreen>
             _isPaywallProductForThisApp(productId));
   }
 
-  bool _isOneYearProductId(String productId) =>
-      productId == _resolvedOneYearPlanId ||
-      productId == widget.oneYearPlan ||
-      (productId.contains('oneyear') && _isPaywallProductForThisApp(productId));
+  bool _isOneYearProductId(String productId) {
+    // Exit yearly contains "oneyear" but is not a free-trial 1Y SKU.
+    if (BibleInfo.isExitOfferYearlyProductId(productId)) return false;
+    return productId == _resolvedOneYearPlanId ||
+        productId == widget.oneYearPlan ||
+        (productId.contains('oneyear') &&
+            _isPaywallProductForThisApp(productId));
+  }
 
   bool _isTwoYearProductId(String productId) =>
       productId == _twoYearPlanId ||
@@ -292,7 +296,11 @@ class _SubscriptionScreenState extends State<SubscriptionScreen>
         id.toLowerCase().contains('lifetime.exitoffer') ||
             id.toLowerCase().contains('exitoffer');
     if (_isLifetimeProductId(id) || isExitOfferLifetime) return 3;
-    if (_isTwoYearProductId(id) || _isOneYearProductId(id)) return 2;
+    if (_isTwoYearProductId(id) ||
+        _isOneYearProductId(id) ||
+        BibleInfo.isExitOfferYearlyProductId(id)) {
+      return 2;
+    }
     if (BibleInfo.isArOneMonthProductId(id) || _isSixMonthProductId(id)) {
       return 1;
     }
@@ -980,6 +988,53 @@ class _SubscriptionScreenState extends State<SubscriptionScreen>
     }
   }
 
+  /// Exit Claim only: after Apple success, grant + leave without the shared
+  /// multi-second Processing delays used by Main Month/Year/Lifetime.
+  Future<void> _finishExitOfferYearlyBuyUiFast({
+    required PurchaseDetails purchaseDetails,
+    required DashBoardController controller,
+    required String productId,
+  }) async {
+    _loadingTimeoutTimer?.cancel();
+    EasyLoading.show(status: 'Processing......');
+    try {
+      // Receipt upload in background — do not block Exit UI on it.
+      unawaited(_awaitPurchaseStep(purchaseSubmit(
+        receiptData:
+            '${purchaseDetails.purchaseID}-productId:${purchaseDetails.productID}-date:${DateTime.now()}',
+      )));
+      await SharPreferences.setBoolean('downloadreward', true);
+      await _rememberLastIapProduct(productId);
+      await controller.disableAd(const Duration(days: 366));
+      DownloadProvider? downloadProvider = _myProvider;
+      if (downloadProvider == null) {
+        final getContext = Get.context;
+        if (getContext != null) {
+          downloadProvider =
+              Provider.of<DownloadProvider>(getContext, listen: false);
+        }
+      }
+      if (downloadProvider != null) {
+        await downloadProvider.setSubscriptionPlan('gold');
+      }
+      if (Platform.isIOS && purchaseDetails.pendingCompletePurchase) {
+        await _awaitPurchaseStep(
+            _inAppPurchase.completePurchase(purchaseDetails));
+      }
+    } finally {
+      try {
+        await EasyLoading.dismiss();
+      } catch (_) {}
+    }
+    await _addLifetimeWalletBonusOnce();
+    Constants.showToast('Purchase Successful');
+    await SharPreferences.setBoolean('closead', true);
+    await _completePaywallSubscriptionNavigation(
+      startFlag: true,
+      invisiblePopSuccess: true,
+    );
+  }
+
   /// UI only: drop Buy Processing/toast before Get.offAll so Home is not frozen.
   Future<void> _releasePurchaseUiLock() async {
     try {
@@ -997,9 +1052,9 @@ class _SubscriptionScreenState extends State<SubscriptionScreen>
   Future<void> _navigateToHomeAfterPurchaseSuccess({
     required bool invisibleHostPopValue,
   }) async {
-    if (!mounted) return;
+    // Do not require [mounted] before Home — host can be disposed after toast
+    // while buy still succeeded; Get.offAll must still run for You're in.
     await _releasePurchaseUiLock();
-    if (!mounted) return;
     if (Get.isRegistered<DashBoardController>()) {
       await Get.find<DashBoardController>().refreshPremiumStatusFromPrefs();
     }
@@ -1019,7 +1074,6 @@ class _SubscriptionScreenState extends State<SubscriptionScreen>
         final prefs = await SharedPreferences.getInstance();
         await prefs.setString('premiumalrt', '1');
       } catch (_) {}
-      if (!mounted) return;
       Get.offAll(
         () => HomeScreen(
           From: "premium",
@@ -1032,6 +1086,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen>
       );
       return;
     }
+    if (!mounted) return;
     try {
       final provider = Provider.of<DownloadProvider>(context, listen: false);
       await provider.warmDataBeforeHomeScreen();
@@ -1071,7 +1126,14 @@ class _SubscriptionScreenState extends State<SubscriptionScreen>
       await _addLifetimeWalletBonusOnce();
     }
     if (widget.invisiblePurchaseHost) {
-      // Same refresh as full paywall success — keep home drawer in sync.
+      // Buy success: go Home directly (You're in). Pop-only left Main Paywall up.
+      if (startFlag && invisiblePopSuccess) {
+        await _navigateToHomeAfterPurchaseSuccess(
+          invisibleHostPopValue: true,
+        );
+        return;
+      }
+      // Restore / cancel: close invisible host only; MultiSelect handles leave.
       if (Get.isRegistered<DashBoardController>()) {
         await Get.find<DashBoardController>().refreshPremiumStatusFromPrefs();
       }
@@ -1375,9 +1437,16 @@ class _SubscriptionScreenState extends State<SubscriptionScreen>
             userTap = true;
           });
         }
-        // UI only: keep Processing...... until purchase stream finishes
-        // (success / error / cancel) — do not leave a blank gap.
-        EasyLoading.show(status: 'Processing......');
+        // Exit Claim: do not cover Exit UI with Processing before Apple's sheet.
+        // Main Month/Year/Lifetime keep the existing pre-sheet loader.
+        final isExitBuy = BibleInfo.isExitOfferYearlyProductId(prod.id) ||
+            BibleInfo.isExitOfferYearlyProductId(
+                widget.autoStartProductId ?? '');
+        if (!isExitBuy) {
+          // UI only: keep Processing...... until purchase stream finishes
+          // (success / error / cancel) — do not leave a blank gap.
+          EasyLoading.show(status: 'Processing......');
+        }
 
         // Start 6-second timeout timer for loading
         _loadingTimeoutTimer?.cancel(); // Cancel any existing timer
@@ -2335,7 +2404,9 @@ class _SubscriptionScreenState extends State<SubscriptionScreen>
           invisiblePopSuccess: true,
         );
         return;
-      } else if (_isOneYearProductId(productId)) {
+      } else if (BibleInfo.isExitOfferYearlyProductId(productId) ||
+          _isOneYearProductId(productId)) {
+        // Exit yearly: same gold/1Y entitlement; not free-trial UX.
         // Additive: final guard before mutating expiry/plan.
         if (await _shouldSkipRestoreDowngrade(
           productId,
@@ -2527,8 +2598,10 @@ class _SubscriptionScreenState extends State<SubscriptionScreen>
               ? purchaseDetails.productID
               : (_pendingBuyProductId ?? purchaseDetails.productID);
           final treatAsBuy = isBuyIntent && _pendingBuyProductId != null;
-          // Leftover restored before the Buy sheet must not grant the tapped plan.
-          final canApplyBuy = treatAsBuy && (matchesBuy || _buySheetStarted);
+          // Leftover restored before the Buy sheet must not grant / navigate Home
+          // (Exit Claim was showing Premium Unlocked under Apple's sheet).
+          final canApplyBuy =
+              treatAsBuy && _buySheetStarted && matchesBuy;
           if (canApplyBuy &&
               Platform.isIOS &&
               (purchaseDetails.status == PurchaseStatus.purchased ||
@@ -2543,9 +2616,23 @@ class _SubscriptionScreenState extends State<SubscriptionScreen>
             final data1 = true;
             debugPrint("purchase data 5 is $data1 apply=$applyProductId");
             if (data1 == true) {
+              _loadingTimeoutTimer?.cancel();
+              // Exit-only UI timing: skip multi-second Processing waits after Apple OK.
+              // Main Month/Year/Lifetime paths below are unchanged.
+              final exitProductId =
+                  BibleInfo.isExitOfferYearlyProductId(_pendingBuyProductId ?? '')
+                      ? _pendingBuyProductId!
+                      : applyProductId;
+              if (BibleInfo.isExitOfferYearlyProductId(exitProductId)) {
+                await _finishExitOfferYearlyBuyUiFast(
+                  purchaseDetails: purchaseDetails,
+                  controller: controller,
+                  productId: exitProductId,
+                );
+                return;
+              }
               // Keep UI busy until "Purchase Successful" — payment sheet
               // can leave a gap after the buy-tap loader times out.
-              _loadingTimeoutTimer?.cancel();
               EasyLoading.show(status: 'Processing......');
               if (Platform.isIOS) {
                 //  var response =

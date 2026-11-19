@@ -118,6 +118,11 @@ class ReaderAudioPlayer {
       _setState(ap.PlayerState.playing);
       return;
     }
+    // Near EOF / next-track prep: buffering must not look like a pause/stall.
+    if (s.processingState == ja.ProcessingState.buffering ||
+        s.processingState == ja.ProcessingState.loading) {
+      return;
+    }
     if (s.processingState == ja.ProcessingState.idle) {
       if (_state != ap.PlayerState.completed) {
         _setState(ap.PlayerState.stopped);
@@ -289,6 +294,10 @@ class ReaderAudioPlayer {
   }) =>
       _serial(() async {
         if (_p.sequence.isEmpty) return false;
+        // Same next already queued — skip playlist surgery (stalls near EOF).
+        if (_queued?.key == chapter.key && _queuedTarget == urlOrPath) {
+          return true;
+        }
         final current = _p.currentIndex ?? 0;
         while (_p.sequence.length > current + 1) {
           await _p.removeAudioSourceAt(_p.sequence.length - 1);
