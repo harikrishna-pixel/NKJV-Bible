@@ -1017,6 +1017,9 @@ class _SubscriptionScreenState extends State<SubscriptionScreen>
       if (downloadProvider != null) {
         await downloadProvider.setSubscriptionPlan('gold');
       }
+      if (Get.isRegistered<DashBoardController>()) {
+        await Get.find<DashBoardController>().refreshPremiumStatusFromPrefs();
+      }
       if (Platform.isIOS && purchaseDetails.pendingCompletePurchase) {
         await _awaitPurchaseStep(
             _inAppPurchase.completePurchase(purchaseDetails));
@@ -1029,10 +1032,8 @@ class _SubscriptionScreenState extends State<SubscriptionScreen>
     await _addLifetimeWalletBonusOnce();
     Constants.showToast('Purchase Successful');
     await SharPreferences.setBoolean('closead', true);
-    await _completePaywallSubscriptionNavigation(
-      startFlag: true,
-      invisiblePopSuccess: true,
-    );
+    // Always leave Exit → Home + Premium Unlocked (do not rely on host pop alone).
+    await _navigateToHomeAfterPurchaseSuccess(invisibleHostPopValue: true);
   }
 
   /// UI only: drop Buy Processing/toast before Get.offAll so Home is not frozen.

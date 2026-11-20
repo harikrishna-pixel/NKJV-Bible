@@ -148,10 +148,10 @@ class _SettingScreenState extends State<SettingScreen>
           chevron: false,
           onTap: null,
         ),
-      // row(
-      //   label: 'Clear local plan (QA)',
-      //   onTap: () => _confirmClearLocalPlanQa(),
-      // ),
+      row(
+        label: 'Clear local plan (QA)',
+        onTap: () => _confirmClearLocalPlanQa(),
+      ),
       SizedBox(height: screenWidth < 380 ? 10 : 12),
     ];
   }

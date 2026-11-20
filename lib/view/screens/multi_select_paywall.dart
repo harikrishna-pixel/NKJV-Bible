@@ -849,10 +849,16 @@ class _MultiSelectPaywallState extends State<MultiSelectPaywall> {
       ),
     );
 
-    // Exit: only hand off when host reports success. Entitlement fallback can
-    // open Home + Premium Unlocked while Apple's sheet is still presenting.
+    // Only after the host route finishes (Apple sheet closed). Safe here —
+    // cannot run under the sheet. Host often Get.offAll / pops null on success.
     if (!mounted) return;
     if (ok == true) {
+      await _onInvisibleHostFinished(true, wasPurchase: true);
+      return;
+    }
+    await Future<void>.delayed(const Duration(milliseconds: 350));
+    if (!mounted) return;
+    if (await _localEntitlementLooksActiveAfterBuy(expiryBefore)) {
       await _onInvisibleHostFinished(true, wasPurchase: true);
     }
   }
