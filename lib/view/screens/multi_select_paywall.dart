@@ -100,6 +100,9 @@ class _MultiSelectPaywallState extends State<MultiSelectPaywall> {
   /// Only during onboarding (`checkad == 'onboard'`), not Paywall Options.
   static const String _exitOfferConsumedPref = 'ms_exit_offer_consumed';
 
+  /// Set by Exit buy success host so MultiSelect can hand off if pop is null.
+  static const String _exitOfferBuySuccessPref = 'ms_exit_offer_buy_success_v1';
+
   bool _exitOfferVisible = false;
   bool _exitOfferShownOnce = false;
 
@@ -820,6 +823,9 @@ class _MultiSelectPaywallState extends State<MultiSelectPaywall> {
     await _ensureExitOfferProductLoaded();
     if (!mounted) return;
     // Keep Exit offer visible under Processing / Apple sheet (don't flash Main Paywall).
+    try {
+      await SharPreferences.setBoolean(_exitOfferBuySuccessPref, false);
+    } catch (_) {}
 
     final productId = BibleInfo.exitOfferPlanid;
     _exitOfferProductId = productId;
@@ -828,9 +834,6 @@ class _MultiSelectPaywallState extends State<MultiSelectPaywall> {
 
   Future<void> _startExitOfferPurchase(String productId) async {
     if (!await SubscriptionScreen.isDashboardIapEnabled()) return;
-    if (!mounted) return;
-
-    final expiryBefore = await _ownedExpiry();
     if (!mounted) return;
 
     final ok = await Navigator.of(context).push<bool>(
@@ -849,16 +852,21 @@ class _MultiSelectPaywallState extends State<MultiSelectPaywall> {
       ),
     );
 
-    // Only after the host route finishes (Apple sheet closed). Safe here —
-    // cannot run under the sheet. Host often Get.offAll / pops null on success.
+    // Success → Home + Premium Unlocked. Cancel / no success flag → stay on Exit.
+    // Do not use generic entitlement fallback (that sent Cancel → Home).
     if (!mounted) return;
     if (ok == true) {
       await _onInvisibleHostFinished(true, wasPurchase: true);
       return;
     }
-    await Future<void>.delayed(const Duration(milliseconds: 350));
+    await Future<void>.delayed(const Duration(milliseconds: 200));
     if (!mounted) return;
-    if (await _localEntitlementLooksActiveAfterBuy(expiryBefore)) {
+    final buyOk =
+        await SharPreferences.getBoolean(_exitOfferBuySuccessPref) ?? false;
+    try {
+      await SharPreferences.setBoolean(_exitOfferBuySuccessPref, false);
+    } catch (_) {}
+    if (buyOk) {
       await _onInvisibleHostFinished(true, wasPurchase: true);
     }
   }

@@ -996,43 +996,44 @@ class _SubscriptionScreenState extends State<SubscriptionScreen>
     required String productId,
   }) async {
     _loadingTimeoutTimer?.cancel();
-    EasyLoading.show(status: 'Processing......');
     try {
-      // Receipt upload in background — do not block Exit UI on it.
-      unawaited(_awaitPurchaseStep(purchaseSubmit(
-        receiptData:
-            '${purchaseDetails.purchaseID}-productId:${purchaseDetails.productID}-date:${DateTime.now()}',
-      )));
-      await SharPreferences.setBoolean('downloadreward', true);
-      await _rememberLastIapProduct(productId);
-      await controller.disableAd(const Duration(days: 366));
-      DownloadProvider? downloadProvider = _myProvider;
-      if (downloadProvider == null) {
-        final getContext = Get.context;
-        if (getContext != null) {
-          downloadProvider =
-              Provider.of<DownloadProvider>(getContext, listen: false);
-        }
+      await EasyLoading.dismiss();
+    } catch (_) {}
+    // Local grant only — do not await StoreKit finish / receipt (blocks Processing).
+    await SharPreferences.setBoolean('downloadreward', true);
+    await _rememberLastIapProduct(productId);
+    await controller.disableAd(const Duration(days: 366));
+    DownloadProvider? downloadProvider = _myProvider;
+    if (downloadProvider == null) {
+      final getContext = Get.context;
+      if (getContext != null) {
+        downloadProvider =
+            Provider.of<DownloadProvider>(getContext, listen: false);
       }
-      if (downloadProvider != null) {
-        await downloadProvider.setSubscriptionPlan('gold');
-      }
-      if (Get.isRegistered<DashBoardController>()) {
-        await Get.find<DashBoardController>().refreshPremiumStatusFromPrefs();
-      }
-      if (Platform.isIOS && purchaseDetails.pendingCompletePurchase) {
-        await _awaitPurchaseStep(
-            _inAppPurchase.completePurchase(purchaseDetails));
-      }
-    } finally {
-      try {
-        await EasyLoading.dismiss();
-      } catch (_) {}
     }
-    await _addLifetimeWalletBonusOnce();
+    if (downloadProvider != null) {
+      await downloadProvider.setSubscriptionPlan('gold');
+    }
+    if (Get.isRegistered<DashBoardController>()) {
+      await Get.find<DashBoardController>().refreshPremiumStatusFromPrefs();
+    }
+    unawaited(_awaitPurchaseStep(purchaseSubmit(
+      receiptData:
+          '${purchaseDetails.purchaseID}-productId:${purchaseDetails.productID}-date:${DateTime.now()}',
+    )));
+    if (Platform.isIOS && purchaseDetails.pendingCompletePurchase) {
+      unawaited(_awaitPurchaseStep(
+          _inAppPurchase.completePurchase(purchaseDetails)));
+    }
+    unawaited(_addLifetimeWalletBonusOnce());
     Constants.showToast('Purchase Successful');
     await SharPreferences.setBoolean('closead', true);
-    // Always leave Exit → Home + Premium Unlocked (do not rely on host pop alone).
+    // Signal MultiSelect: real Exit buy success (Cancel must not use entitlement alone).
+    try {
+      await SharPreferences.setBoolean('ms_exit_offer_buy_success_v1', true);
+    } catch (_) {}
+    // Pop success so Exit await gets true; then Home + Premium Unlocked.
+    _popInvisiblePurchaseHost(true);
     await _navigateToHomeAfterPurchaseSuccess(invisibleHostPopValue: true);
   }
 
