@@ -12,6 +12,7 @@ import 'package:biblebookapp/view/screens/prayer_wall/prayer_wall_service.dart';
 import 'package:biblebookapp/view/screens/prayer_wall/prayer_added_success_screen.dart';
 import 'package:biblebookapp/view/screens/prayer_wall/prayer_wall_verify_dialogs.dart';
 import 'package:biblebookapp/view/screens/milestones/milestone_celebration_coordinator.dart';
+import 'package:biblebookapp/services/analytics/mixpanel_analytics_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
@@ -348,6 +349,8 @@ class _PostPrayerScreenState extends State<PostPrayerScreen> {
         profileImage: profileImageUrl,
         email: email,
       );
+      // Never send prayer text — category only.
+      MixpanelAnalyticsService.trackPrayerWallPostCreated(category: _category);
       if (!mounted) return;
       // await WalletService.deductCredits(_totalCredits);
       if (effectiveName.isNotEmpty) {

@@ -74,6 +74,9 @@ import 'package:biblebookapp/view/screens/study_plans/study_plans_screen.dart'
     as biblebookapp;
 import 'package:popover/popover.dart';
 
+import 'package:biblebookapp/Model/bookMarkModel.dart';
+import 'package:biblebookapp/Model/highLightContentModal.dart';
+import 'package:biblebookapp/core/notifiers/bottom.notifier.dart';
 import 'package:biblebookapp/view/widget/verse_item_widget.dart';
 import 'package:biblebookapp/view/widget/wallet_entry.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
@@ -106,6 +109,7 @@ import 'chapterListScreen.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:provider/provider.dart' as p;
 import 'package:biblebookapp/services/analytics/analytics_service.dart';
+import 'package:biblebookapp/services/analytics/mixpanel_analytics_service.dart';
 import 'package:biblebookapp/utils/custom_share.dart';
 import 'package:html/parser.dart' as html;
 
@@ -1639,6 +1643,451 @@ class _HomeScreenState extends State<HomeScreen>
   /// Bumped so verse rows recreate and re-run temp highlight after widget nav.
   int _widgetHighlightEpoch = 0;
 
+  /// Long-press multi-select for bookmark / underline / highlight / copy only.
+  bool _multiVerseSelectMode = false;
+  /// Stable keys (not list indexes) so filtered chapter lists stay correct.
+  final Set<String> _multiSelectedVerseKeys = <String>{};
+  final Map<String, VerseBookContentModel> _multiSelectedVerseByKey =
+      <String, VerseBookContentModel>{};
+
+  String _multiVerseKey(VerseBookContentModel v) =>
+      '${v.id}|${v.bookNum}|${v.chapterNum}|${v.verseNum}';
+
+  void _clearMultiVerseSelection() {
+    if (!_multiVerseSelectMode && _multiSelectedVerseKeys.isEmpty) return;
+    setState(() {
+      _multiVerseSelectMode = false;
+      _multiSelectedVerseKeys.clear();
+      _multiSelectedVerseByKey.clear();
+    });
+  }
+
+  void _enterMultiVerseSelect(VerseBookContentModel verse) {
+    final key = _multiVerseKey(verse);
+    setState(() {
+      _multiVerseSelectMode = true;
+      _multiSelectedVerseKeys
+        ..clear()
+        ..add(key);
+      _multiSelectedVerseByKey
+        ..clear()
+        ..[key] = verse;
+    });
+  }
+
+  void _toggleMultiVerse(VerseBookContentModel verse) {
+    final key = _multiVerseKey(verse);
+    setState(() {
+      if (_multiSelectedVerseKeys.contains(key)) {
+        _multiSelectedVerseKeys.remove(key);
+        _multiSelectedVerseByKey.remove(key);
+        if (_multiSelectedVerseKeys.isEmpty) {
+          _multiVerseSelectMode = false;
+        }
+      } else {
+        _multiSelectedVerseKeys.add(key);
+        _multiSelectedVerseByKey[key] = verse;
+        _multiVerseSelectMode = true;
+      }
+    });
+  }
+
+  List<VerseBookContentModel> _multiSelectedVerses(
+      DashBoardController controller) {
+    final fromContent = controller.selectedBookContent
+        .where((v) => _multiSelectedVerseKeys.contains(_multiVerseKey(v)))
+        .toList();
+    if (fromContent.isNotEmpty) return fromContent;
+    if (_multiSelectedVerseByKey.isNotEmpty) {
+      return _multiSelectedVerseByKey.values.toList();
+    }
+    return _lastVisibleChapterContent
+        .where((v) => _multiSelectedVerseKeys.contains(_multiVerseKey(v)))
+        .toList();
+  }
+
+  /// Avoid Provider.listen in button handlers (CommanColor.* uses listen:true).
+  Color get _multiSelectInk => CommanColor.lightModePrimary;
+  Color get _multiSelectSheetBg => const Color(0xFFF8F3EA);
+
+  String _multiSelectedVerseRef(DashBoardController controller) {
+    final verses = _multiSelectedVerses(controller);
+    if (verses.isEmpty) return '';
+    final nums = verses
+        .map((v) {
+          final i = _contentIndexForVerse(controller, v);
+          return displayVerseNumber(v, listIndex: i >= 0 ? i : 0);
+        })
+        .toList()
+      ..sort();
+    final book = controller.selectedBook.value.toString();
+    final chapter = controller.selectedChapter.value.toString();
+    if (nums.length == 1) return '$book $chapter:${nums.first}';
+    final ranges = <String>[];
+    var start = nums.first;
+    var prev = nums.first;
+    for (var i = 1; i < nums.length; i++) {
+      if (nums[i] == prev + 1) {
+        prev = nums[i];
+        continue;
+      }
+      ranges.add(start == prev ? '$start' : '$start–$prev');
+      start = nums[i];
+      prev = nums[i];
+    }
+    ranges.add(start == prev ? '$start' : '$start–$prev');
+    return '$book $chapter:${ranges.join(', ')}';
+  }
+
+  Widget _multiVersePlusButton(DashBoardController controller) {
+    final ink = _multiSelectInk;
+    return Material(
+      elevation: 4,
+      color: ink,
+      shape: const CircleBorder(),
+      child: InkWell(
+        customBorder: const CircleBorder(),
+        onTap: () => _openMultiVerseActionsSheet(controller),
+        child: const SizedBox(
+          width: 52,
+          height: 52,
+          child: Icon(Icons.add, color: Colors.white, size: 28),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _openMultiVerseActionsSheet(
+      DashBoardController controller) async {
+    if (_multiSelectedVerseKeys.isEmpty) return;
+    final ink = _multiSelectInk;
+    final ref = _multiSelectedVerseRef(controller);
+    await showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (sheetContext) {
+        var showHighlightColors = false;
+        return StatefulBuilder(
+          builder: (context, setSheetState) {
+            return SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+                child: Material(
+                  color: _multiSelectSheetBg,
+                  borderRadius: BorderRadius.circular(18),
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 18, 16, 8),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          ref,
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            color: ink,
+                            fontWeight: FontWeight.w700,
+                            fontSize: 16,
+                            letterSpacing: BibleInfo.letterSpacing,
+                          ),
+                        ),
+                        const SizedBox(height: 18),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                          children: [
+                            _multiActionIcon(
+                              label: 'Bookmark',
+                              icon: Icons.bookmark_border,
+                              ink: ink,
+                              onTap: () async {
+                                Navigator.pop(sheetContext);
+                                await _applyMultiBookmark(controller);
+                              },
+                            ),
+                            _multiActionIcon(
+                              label: 'Copy',
+                              icon: Icons.copy_outlined,
+                              ink: ink,
+                              onTap: () async {
+                                Navigator.pop(sheetContext);
+                                await _applyMultiCopy(controller);
+                              },
+                            ),
+                            _multiActionIcon(
+                              label: 'Underline',
+                              icon: Icons.format_underline,
+                              ink: ink,
+                              onTap: () async {
+                                Navigator.pop(sheetContext);
+                                await _applyMultiUnderline(controller);
+                              },
+                            ),
+                            _multiActionIcon(
+                              label: 'Highlight',
+                              icon: Icons.edit_outlined,
+                              ink: ink,
+                              highlighted: true,
+                              onTap: () {
+                                setSheetState(() {
+                                  showHighlightColors = !showHighlightColors;
+                                });
+                              },
+                            ),
+                          ],
+                        ),
+                        if (showHighlightColors) ...[
+                          const SizedBox(height: 14),
+                          SizedBox(
+                            height: 44,
+                            child: ListView.builder(
+                              scrollDirection: Axis.horizontal,
+                              itemCount: controller.colors.length,
+                              itemBuilder: (_, colorIndex) {
+                                final color = controller.colors[colorIndex];
+                                return GestureDetector(
+                                  onTap: () async {
+                                    Navigator.pop(sheetContext);
+                                    await _applyMultiHighlight(
+                                        controller, color);
+                                  },
+                                  child: Container(
+                                    margin: const EdgeInsets.symmetric(
+                                        horizontal: 6),
+                                    width: 32,
+                                    height: 40,
+                                    decoration: BoxDecoration(
+                                      color: color,
+                                      borderRadius: BorderRadius.circular(2),
+                                      border: Border.all(
+                                          color: ink.withValues(alpha: 0.25)),
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
+                          ),
+                        ],
+                        const SizedBox(height: 14),
+                        const Divider(height: 1),
+                        TextButton(
+                          onPressed: () {
+                            Navigator.pop(sheetContext);
+                            _clearMultiVerseSelection();
+                          },
+                          child: Text(
+                            'Cancel',
+                            style: TextStyle(
+                              color: ink,
+                              fontWeight: FontWeight.w600,
+                              fontSize: 16,
+                              letterSpacing: BibleInfo.letterSpacing,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _multiActionIcon({
+    required String label,
+    required IconData icon,
+    required Color ink,
+    required VoidCallback onTap,
+    bool highlighted = false,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Column(
+        children: [
+          Container(
+            width: 48,
+            height: 48,
+            decoration: BoxDecoration(
+              color: highlighted ? const Color(0xFFFFF1C2) : Colors.transparent,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(icon, color: ink, size: 26),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            label,
+            style: TextStyle(
+              color: ink,
+              fontWeight: FontWeight.w600,
+              fontSize: 12,
+              letterSpacing: BibleInfo.letterSpacing,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  int _contentIndexForVerse(
+      DashBoardController controller, VerseBookContentModel verse) {
+    final key = _multiVerseKey(verse);
+    return controller.selectedBookContent
+        .indexWhere((v) => _multiVerseKey(v) == key);
+  }
+
+  Future<void> _applyMultiBookmark(DashBoardController controller) async {
+    final verses = _multiSelectedVerses(controller);
+    if (verses.isEmpty) return;
+    final allOn = verses.every((v) => v.isBookmarked == 'yes');
+    final turnOn = !allOn;
+    final editProvider =
+        Provider.of<HomeContentEditProvider>(context, listen: false);
+    for (final verse in verses) {
+      final isOn = verse.isBookmarked == 'yes';
+      if (isOn == turnOn) continue;
+      final content = parseVerseContent(verse.content);
+      final listIndex = _contentIndexForVerse(controller, verse);
+      final verNum = displayVerseNumber(verse,
+          listIndex: listIndex >= 0 ? listIndex : 0);
+      await editProvider.toggleBookmark(
+        verseData: verse,
+        verseId: int.parse(verse.id.toString()),
+        content: content,
+        showDialog: (_) {},
+        bookmarkModel: BookMarkModel(
+          bookNum: int.parse(controller.selectedBookNum.value.toString()),
+          chapterNum: int.parse(controller.selectedChapter.value.toString()),
+          content: content,
+          plaincontent: verse.id.toString(),
+          bookName: controller.selectedBook.value.toString(),
+          timestamp: DateTime.now().toString(),
+          verseNum: verNum,
+        ),
+        updateVerseCallback: (updated) {
+          final i = _contentIndexForVerse(controller, verse);
+          if (i >= 0) controller.selectedBookContent[i] = updated;
+        },
+      );
+    }
+    if (mounted) setState(() {});
+    Constants.showToast(
+        turnOn ? 'Bookmarked selected verses' : 'Removed bookmarks');
+    _clearMultiVerseSelection();
+  }
+
+  Future<void> _applyMultiUnderline(DashBoardController controller) async {
+    final verses = _multiSelectedVerses(controller);
+    if (verses.isEmpty) return;
+    final allOn = verses.every((v) => v.isUnderlined == 'yes');
+    final turnOn = !allOn;
+    final editProvider =
+        Provider.of<HomeContentEditProvider>(context, listen: false);
+    for (final verse in verses) {
+      final isOn = verse.isUnderlined == 'yes';
+      if (isOn == turnOn) continue;
+      final content = parseVerseContent(verse.content);
+      final listIndex = _contentIndexForVerse(controller, verse);
+      final verNum = displayVerseNumber(verse,
+          listIndex: listIndex >= 0 ? listIndex : 0);
+      await editProvider.toggleUnderline(
+        verseData: verse,
+        verseId: int.parse(verse.id.toString()),
+        content: content,
+        showDialog: (_) {},
+        underlineModel: BookMarkModel(
+          bookNum: int.parse(controller.selectedBookNum.value.toString()),
+          chapterNum: int.parse(controller.selectedChapter.value.toString()),
+          content: content,
+          plaincontent: verse.id.toString(),
+          bookName: controller.selectedBook.value.toString(),
+          timestamp: DateTime.now().toString(),
+          verseNum: verNum,
+        ),
+        updateVerseCallback: (updated) {
+          final i = _contentIndexForVerse(controller, verse);
+          if (i >= 0) controller.selectedBookContent[i] = updated;
+        },
+      );
+    }
+    if (mounted) setState(() {});
+    Constants.showToast(
+        turnOn ? 'Underlined selected verses' : 'Removed underlines');
+    _clearMultiVerseSelection();
+  }
+
+  Future<void> _applyMultiHighlight(
+      DashBoardController controller, Color color) async {
+    final verses = _multiSelectedVerses(controller);
+    if (verses.isEmpty) return;
+    unawaited(MixpanelAnalyticsService.trackFeatureUsed('highlight'));
+    final colorStr = color.value.toString();
+    final allSame = verses.every((v) => v.isHighlighted == colorStr);
+    for (final verse in verses) {
+      final content = parseVerseContent(verse.content);
+      final listIndex = _contentIndexForVerse(controller, verse);
+      final verNum = displayVerseNumber(verse,
+          listIndex: listIndex >= 0 ? listIndex : 0);
+      final nextHighlight = allSame ? 'no' : colorStr;
+      if (listIndex >= 0) {
+        controller.selectedBookContent[listIndex] =
+            verse.copyWith(isHighlighted: nextHighlight);
+      }
+      await DBHelper().updateVersesData(
+        int.parse(verse.id.toString()),
+        'is_highlighted',
+        nextHighlight,
+      );
+      await DBHelper().deleteHighlightByContent(content);
+      if (nextHighlight != 'no') {
+        await DBHelper().insertIntoHighLight(
+          HighLightContentModal(
+            plain_content: normalizeHtml(content),
+            bookNum: int.parse(controller.selectedBookNum.value.toString()),
+            chapterNum: int.parse(controller.selectedChapter.value.toString()),
+            content: content,
+            bookName: controller.selectedBook.value.toString(),
+            color: colorStr,
+            timestamp: DateTime.now().toString(),
+            verseNum: verNum,
+          ),
+        );
+      }
+    }
+    if (mounted) setState(() {});
+    Constants.showToast(
+        allSame ? 'Removed highlights' : 'Highlighted selected verses');
+    _clearMultiVerseSelection();
+  }
+
+  Future<void> _applyMultiCopy(DashBoardController controller) async {
+    final verses = _multiSelectedVerses(controller);
+    if (verses.isEmpty) return;
+    final buf = StringBuffer();
+    final nums = <int>[];
+    for (final verse in verses) {
+      final listIndex = _contentIndexForVerse(controller, verse);
+      final verNum = displayVerseNumber(verse,
+          listIndex: listIndex >= 0 ? listIndex : 0);
+      nums.add(verNum);
+      buf.writeln('$verNum. ${parseVerseContent(verse.content)}');
+    }
+    final verseRef = nums.length == 1
+        ? '${nums.first}'
+        : '${nums.first}-${nums.last}';
+    final appId = BibleInfo.apple_AppId;
+    final appPackageName = (await PackageInfo.fromPlatform()).packageName;
+    final storeLink = Platform.isAndroid
+        ? 'https://play.google.com/store/apps/details?id=$appPackageName'
+        : 'https://itunes.apple.com/app/id$appId';
+    final text =
+        '${buf.toString().trim()}\n${controller.selectedBook.value} ${controller.selectedChapter.value}:$verseRef\n\n Read more at  \n\n$storeLink';
+    await Clipboard.setData(ClipboardData(text: text));
+    Constants.showToast('Copied Successfully!');
+    _clearMultiVerseSelection();
+  }
+
   String get _effectiveSelectedVerseForRead {
     final pending = _pendingWidgetVerseText.trim();
     if (pending.isNotEmpty) return pending;
@@ -1847,6 +2296,7 @@ class _HomeScreenState extends State<HomeScreen>
     _initializeApp();
     // Track Home Screen event
     AnalyticsService.trackHomeScreen();
+    unawaited(MixpanelAnalyticsService.checkWidgetAddedOnOpen());
   }
 
   void _precacheBackupDialogAssets() {
@@ -4569,6 +5019,10 @@ class _HomeScreenState extends State<HomeScreen>
                               controller.bannerAd?.dispose();
                               controller.bannerAd?.load();
                             }
+                            unawaited(
+                              MixpanelAnalyticsService.trackFeatureUsed(
+                                  'search'),
+                            );
                             Get.to(
                                 () => SearchScreen(
                                       controller: controller,
@@ -4955,13 +5409,9 @@ class _HomeScreenState extends State<HomeScreen>
                 return false;
               },
               child: GestureDetector(
-                onPanEnd: (dragDetail) async {
-                  // Avoid triggering chapter navigation while user is scrolling vertically.
+                // Horizontal-only so verse long-press / tap are not blocked by pan.
+                onHorizontalDragEnd: (dragDetail) async {
                   final vx = dragDetail.velocity.pixelsPerSecond.dx;
-                  final vy = dragDetail.velocity.pixelsPerSecond.dy;
-                  if (vx.abs() <= vy.abs()) {
-                    return;
-                  }
                   // Require a meaningful horizontal swipe velocity.
                   if (vx.abs() < 250) {
                     return;
@@ -4996,6 +5446,7 @@ class _HomeScreenState extends State<HomeScreen>
                       await SharPreferences.setString(
                           SharPreferences.selectedChapter,
                           controller.selectedChapter.value);
+                      _clearMultiVerseSelection();
                       _restoreReaderAppBarVisibility();
 
                       await controller.getSelectedChapterAndBook();
@@ -5030,6 +5481,7 @@ class _HomeScreenState extends State<HomeScreen>
                     await SharPreferences.setString(
                         SharPreferences.selectedChapter,
                         controller.selectedChapter.value);
+                    _clearMultiVerseSelection();
                     _restoreReaderAppBarVisibility();
                     await controller.getSelectedChapterAndBook();
                     await controller.getFont();
@@ -5124,7 +5576,19 @@ class _HomeScreenState extends State<HomeScreen>
                                               padding: const EdgeInsets.only(
                                                   top: 10.0),
                                         child: GestureDetector(
+                                          behavior: HitTestBehavior.opaque,
+                                          onLongPress: () {
+                                            controller.selectedIndex.value =
+                                                index;
+                                            controller.selectedVerseView
+                                                .value = index;
+                                            _enterMultiVerseSelect(data);
+                                          },
                                           onTap: () async {
+                                            if (_multiVerseSelectMode) {
+                                              _toggleMultiVerse(data);
+                                              return;
+                                            }
                                             setState(() {
                                                     controller.selectedIndex
                                                         .value = -1;
@@ -5187,6 +5651,12 @@ class _HomeScreenState extends State<HomeScreen>
                                                 _effectiveSelectedVerseForRead,
                                             selectedColor:
                                                 selectedcolor.toString(),
+                                            isMultiSelected:
+                                                _multiSelectedVerseKeys
+                                                    .contains(
+                                                        _multiVerseKey(data)),
+                                            showMultiSelectCheckbox:
+                                                _multiVerseSelectMode,
                                           ),
                                         ),
                                       ),
@@ -5848,6 +6318,19 @@ class _HomeScreenState extends State<HomeScreen>
                                       (screenWidth > 450 ? 72 : 56),
                                   child: const PrayerWallHomeExpiryBanner(),
                                 ),
+                                // Always visible during multi-select (not tied to scroll FAB hide).
+                                if (_multiVerseSelectMode &&
+                                    _multiSelectedVerseKeys.isNotEmpty)
+                                  Positioned(
+                                    left: 0,
+                                    right: 0,
+                                    bottom: MediaQuery.paddingOf(context)
+                                            .bottom +
+                                        (screenWidth > 450 ? 88 : 72),
+                                    child: Center(
+                                      child: _multiVersePlusButton(controller),
+                                    ),
+                                  ),
                                 ],
                               ),
                 ),
@@ -6534,6 +7017,9 @@ class _HomeScreenState extends State<HomeScreen>
               duration: const Duration(milliseconds: 350));
         },
         onVersesByTopicTap: () {
+          unawaited(
+            MixpanelAnalyticsService.trackFeatureUsed('verse_by_topic'),
+          );
           Get.to(
             () => const VerseTopicsScreen(),
             transition: Transition.cupertino,
@@ -6550,6 +7036,9 @@ class _HomeScreenState extends State<HomeScreen>
           });
         },
         onAskAnythingTap: () async {
+          unawaited(
+            MixpanelAnalyticsService.trackFeatureUsed('ask_anything'),
+          );
           Get.to(ChatScreen());
         },
         onPrayerGuidanceTap: () {
@@ -6599,6 +7088,7 @@ class _HomeScreenState extends State<HomeScreen>
         },
         onConnectionPathsTap: () {
           SharPreferences.setString('OpenAd', '1');
+          unawaited(MixpanelAnalyticsService.trackFeatureUsed('plan'));
           Get.to(
             () => const ConnectionPathsScreen(),
             transition: Transition.cupertino,
@@ -6614,6 +7104,7 @@ class _HomeScreenState extends State<HomeScreen>
           );
         },
         onWallpapersTap: () async {
+          unawaited(MixpanelAnalyticsService.trackFeatureUsed('wallpaper'));
           if (controller.adFree.value == false) {
             Future(() {
               controller.bannerAd?.dispose();
@@ -6642,6 +7133,7 @@ class _HomeScreenState extends State<HomeScreen>
               duration: const Duration(milliseconds: 350));
         },
         onQuotesTap: () async {
+          unawaited(MixpanelAnalyticsService.trackFeatureUsed('quote'));
           if (controller.adFree.value == false) {
             Future(() {
               controller.bannerAd?.dispose();

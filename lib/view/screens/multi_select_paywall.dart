@@ -8,6 +8,7 @@ import 'package:biblebookapp/controller/dashboard_controller.dart';
 
 import 'package:biblebookapp/core/notifiers/download.notifier.dart';
 
+import 'package:biblebookapp/services/analytics/mixpanel_analytics_service.dart';
 import 'package:biblebookapp/services/paywall_preload_service.dart';
 import 'package:biblebookapp/services/paywall_price_cache.dart';
 import 'package:biblebookapp/services/premium_entitlement_label_sync.dart';
@@ -165,6 +166,12 @@ class _MultiSelectPaywallState extends State<MultiSelectPaywall> {
       _exitOfferShownOnce = true;
       _exitOfferVisible = true;
     });
+    unawaited(MixpanelAnalyticsService.trackExitOfferShown(
+      trigger: widget.checkad.isNotEmpty ? widget.checkad : 'paywall_close',
+      offerId: _exitOfferProductId.trim().isNotEmpty
+          ? _exitOfferProductId.trim()
+          : BibleInfo.exitOfferPlanid,
+    ));
   }
 
   /// Always [BibleInfo.exitOfferPlanid] (`oneyearautoexit`) — never regular 1Y.
@@ -399,7 +406,11 @@ class _MultiSelectPaywallState extends State<MultiSelectPaywall> {
       return;
     }
 
-    await SubscriptionScreen.trackAndMarkVisiblePaywallOpen();
+    await SubscriptionScreen.trackAndMarkVisiblePaywallOpen(
+      trigger: widget.checkad.isNotEmpty ? widget.checkad : 'multi_select',
+      placement: 'full_screen',
+      variant: 'multi_select',
+    );
 
     try {
       Provider.of<DownloadProvider>(context, listen: false).disableAd();
@@ -800,6 +811,9 @@ class _MultiSelectPaywallState extends State<MultiSelectPaywall> {
       await _presentExitOffer();
       return;
     }
+    unawaited(MixpanelAnalyticsService.trackPaywallDismissed(
+      trigger: widget.checkad.isNotEmpty ? widget.checkad : 'multi_select',
+    ));
     await _navigateAwayFromPaywall();
   }
 
@@ -814,6 +828,9 @@ class _MultiSelectPaywallState extends State<MultiSelectPaywall> {
       await _presentExitOffer();
       return;
     }
+    unawaited(MixpanelAnalyticsService.trackPaywallDismissed(
+      trigger: widget.checkad.isNotEmpty ? widget.checkad : 'multi_select',
+    ));
     await _navigateAwayFromPaywall();
   }
 
@@ -2169,10 +2186,18 @@ class _MultiSelectPaywallState extends State<MultiSelectPaywall> {
                     recommended: false,
                     name: '1 Month',
                     price: '$_monthPrice / mo',
-                    onTap: () => setState(() {
-                      _sel = _PwCard.ai;
-                      _dur = _AiDur.sixMonth;
-                    }),
+                    onTap: () {
+                      setState(() {
+                        _sel = _PwCard.ai;
+                        _dur = _AiDur.sixMonth;
+                      });
+                      unawaited(
+                        MixpanelAnalyticsService.trackPaywallPlanSelected(
+                          planId: _selectedProductId,
+                          priceTier: 'month',
+                        ),
+                      );
+                    },
                     isTablet: isTablet,
                   ),
                   const SizedBox(width: 9),
@@ -2183,10 +2208,18 @@ class _MultiSelectPaywallState extends State<MultiSelectPaywall> {
                     price: '$_yearPrice / yr',
                     anchor: _yearAnchor,
                     badge: saveBadge,
-                    onTap: () => setState(() {
-                      _sel = _PwCard.ai;
-                      _dur = _AiDur.oneYear;
-                    }),
+                    onTap: () {
+                      setState(() {
+                        _sel = _PwCard.ai;
+                        _dur = _AiDur.oneYear;
+                      });
+                      unawaited(
+                        MixpanelAnalyticsService.trackPaywallPlanSelected(
+                          planId: _selectedProductId,
+                          priceTier: 'year',
+                        ),
+                      );
+                    },
                     isTablet: isTablet,
                   ),
                   const SizedBox(width: 9),
@@ -2196,7 +2229,15 @@ class _MultiSelectPaywallState extends State<MultiSelectPaywall> {
                     name: 'Lifetime',
                     price: '$_lifetimePrice once',
                     badge: 'BEST VALUE',
-                    onTap: () => setState(() => _sel = _PwCard.lifetime),
+                    onTap: () {
+                      setState(() => _sel = _PwCard.lifetime);
+                      unawaited(
+                        MixpanelAnalyticsService.trackPaywallPlanSelected(
+                          planId: _selectedProductId,
+                          priceTier: 'lifetime',
+                        ),
+                      );
+                    },
                     isTablet: isTablet,
                   ),
                 ],

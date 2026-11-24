@@ -22,6 +22,7 @@ import 'package:biblebookapp/view/screens/dashboard/constants.dart';
 import 'package:biblebookapp/view/screens/dashboard/home_screen.dart';
 import 'package:biblebookapp/view/widget/bible_upgrade_alert.dart';
 import 'package:biblebookapp/services/wallet_service.dart';
+import 'package:biblebookapp/services/analytics/mixpanel_analytics_service.dart';
 import 'package:biblebookapp/services/daily_slot_notification_helper.dart';
 import 'package:biblebookapp/view/screens/wallet/wallet_screen.dart';
 import 'package:flutter/cupertino.dart';
@@ -2959,6 +2960,7 @@ class _StreakConnectionScreenState extends State<StreakConnectionScreen> {
     if (!widget.viewOnly) {
       _markStreakFlowStartedToday();
     }
+    unawaited(MixpanelAnalyticsService.trackFeatureUsed('mood_verse'));
   }
 
   /// Picks a random title + body for the current UI level.

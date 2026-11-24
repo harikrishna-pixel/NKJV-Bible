@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:math' as math;
@@ -20,6 +21,7 @@ import 'package:biblebookapp/view/screens/intro_subcribtion_screen.dart';
 import 'package:biblebookapp/view/screens/paywall_navigation.dart';
 import 'package:biblebookapp/view/screens/onboard_faith_screen.dart';
 import 'package:biblebookapp/services/paywall_preload_service.dart';
+import 'package:biblebookapp/services/analytics/mixpanel_analytics_service.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -1632,6 +1634,10 @@ class FaithJourneyDialog {
                             if (isFromOnboarding) {
                               await SharPreferences.setBoolean(
                                   SharPreferences.onboarding, true);
+                              unawaited(
+                                MixpanelAnalyticsService
+                                    .trackOnboardingCompleted(stepsTotal: 8),
+                              );
 
                               if (await _hasActivePremiumPlan()) {
                                 if (navContext != null && navContext.mounted) {

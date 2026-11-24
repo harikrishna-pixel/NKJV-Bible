@@ -10,6 +10,7 @@ import 'package:biblebookapp/view/constants/colors.dart';
 import 'package:biblebookapp/view/constants/constant.dart';
 import 'package:biblebookapp/view/constants/images.dart';
 import 'package:biblebookapp/services/analytics/analytics_service.dart';
+import 'package:biblebookapp/services/analytics/mixpanel_analytics_service.dart';
 import 'package:biblebookapp/services/paywall_preload_service.dart';
 import 'package:biblebookapp/services/wallet_service.dart';
 import 'package:biblebookapp/view/screens/dashboard/constants.dart';
@@ -118,8 +119,17 @@ class SubscriptionScreen extends StatefulWidget {
   }
 
   /// Analytics + first-seen prefs for visible paywall (single or multi UI).
-  static Future<void> trackAndMarkVisiblePaywallOpen() async {
+  static Future<void> trackAndMarkVisiblePaywallOpen({
+    String trigger = 'unknown',
+    String placement = 'full_screen',
+    String variant = 'default',
+  }) async {
     AnalyticsService.trackPaywallScreen();
+    unawaited(MixpanelAnalyticsService.trackPaywallShown(
+      trigger: trigger,
+      placement: placement,
+      variant: variant,
+    ));
     final hasShownPaywall =
         await SharPreferences.getBoolean('has_shown_paywall_first_time') ??
             false;
@@ -1032,6 +1042,14 @@ class _SubscriptionScreenState extends State<SubscriptionScreen>
     try {
       await SharPreferences.setBoolean('ms_exit_offer_buy_success_v1', true);
     } catch (_) {}
+    unawaited(MixpanelAnalyticsService.trackExitOfferConverted(
+      planId: productId,
+    ));
+    unawaited(MixpanelAnalyticsService.trackPurchaseSuccess(
+      planId: productId,
+      trigger: widget.checkad.isNotEmpty ? widget.checkad : 'exit_offer',
+      isTrial: false,
+    ));
     // Pop success so Exit await gets true; then Home + Premium Unlocked.
     _popInvisiblePurchaseHost(true);
     await _navigateToHomeAfterPurchaseSuccess(invisibleHostPopValue: true);
@@ -1056,6 +1074,15 @@ class _SubscriptionScreenState extends State<SubscriptionScreen>
   }) async {
     // Do not require [mounted] before Home — host can be disposed after toast
     // while buy still succeeded; Get.offAll must still run for You're in.
+    final planId = (_pendingBuyProductId ?? '').trim();
+    if (planId.isNotEmpty &&
+        !BibleInfo.isExitOfferYearlyProductId(planId)) {
+      unawaited(MixpanelAnalyticsService.trackPurchaseSuccess(
+        planId: planId,
+        trigger: widget.checkad.isNotEmpty ? widget.checkad : 'paywall',
+        isTrial: false,
+      ));
+    }
     await _releasePurchaseUiLock();
     if (Get.isRegistered<DashBoardController>()) {
       await Get.find<DashBoardController>().refreshPremiumStatusFromPrefs();
@@ -1865,6 +1892,9 @@ class _SubscriptionScreenState extends State<SubscriptionScreen>
   /// Navigate away from paywall screen
   Future<void> _navigateAwayFromPaywall() async {
     if (!mounted) return;
+    unawaited(MixpanelAnalyticsService.trackPaywallDismissed(
+      trigger: widget.checkad.isNotEmpty ? widget.checkad : 'paywall',
+    ));
     if (_myProvider != null) {
       _myProvider?.enableAd();
     }
@@ -2075,6 +2105,12 @@ class _SubscriptionScreenState extends State<SubscriptionScreen>
 
     // Mark that exit offer is showing immediately to prevent duplicate calls
     _isExitOfferShowing = true;
+    unawaited(MixpanelAnalyticsService.trackExitOfferShown(
+      trigger: widget.checkad.isNotEmpty ? widget.checkad : 'paywall_close',
+      offerId: (exitOffer.identifier ?? '').trim().isNotEmpty
+          ? exitOffer.identifier!.trim()
+          : 'exit_yearly',
+    ));
 
     final screenWidth = MediaQuery.of(context).size.width;
 
@@ -4753,6 +4789,12 @@ class _SubscriptionScreenState extends State<SubscriptionScreen>
         setState(() {
           selectedindex = index;
         });
+        if (index >= 0 && index < _products.length) {
+          unawaited(MixpanelAnalyticsService.trackPaywallPlanSelected(
+            planId: _products[index].id,
+            priceTier: _productPlanSlotLabel(_products[index].id),
+          ));
+        }
       },
       borderRadius: BorderRadius.circular(14),
       child: Column(
