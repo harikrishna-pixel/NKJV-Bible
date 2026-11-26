@@ -4,7 +4,7 @@ import flutter_local_notifications
 import workmanager
 
 @main
-@objc class AppDelegate: FlutterAppDelegate {
+@objc class AppDelegate: FlutterAppDelegate, FlutterImplicitEngineDelegate {
 
   override func application(
     _ application: UIApplication,
@@ -29,8 +29,6 @@ import workmanager
       withIdentifier: "com.biblebookapp.prayerWallActivityOneOff"
     )
 
-    GeneratedPluginRegistrant.register(with: self)
-
     let result = super.application(application, didFinishLaunchingWithOptions: launchOptions)
 
     // If launched from streak Live Activity deep link, queue Faith Journey open.
@@ -38,43 +36,41 @@ import workmanager
       Self.queueFaithJourneyIfStreakLiveActivity(url: url)
     }
 
-    // ✅ Correct: use registrar ONLY
-    if let registrar = self.registrar(forPlugin: "com.biblebookapp.move_to_back") {
-      let channel = FlutterMethodChannel(
-        name: "com.biblebookapp/move_to_back",
-        binaryMessenger: registrar.messenger()
-      )
+    return result
+  }
 
-      channel.setMethodCallHandler { (call: FlutterMethodCall, result: @escaping FlutterResult) in
-        guard call.method == "moveTaskToBack" else {
-          result(FlutterMethodNotImplemented)
-          return
-        }
+  func didInitializeImplicitFlutterEngine(_ engineBridge: FlutterImplicitEngineBridge) {
+    GeneratedPluginRegistrant.register(with: engineBridge.pluginRegistry)
+    registerAppChannels(messenger: engineBridge.applicationRegistrar.messenger())
+  }
 
-        if UIApplication.shared.responds(to: NSSelectorFromString("suspend")) {
-          DispatchQueue.main.async {
-            UIApplication.shared.perform(NSSelectorFromString("suspend"))
-          }
-          result(nil)
-        } else {
-          result(FlutterMethodNotImplemented)
+  private func registerAppChannels(messenger: FlutterBinaryMessenger) {
+    let moveToBack = FlutterMethodChannel(
+      name: "com.biblebookapp/move_to_back",
+      binaryMessenger: messenger
+    )
+
+    moveToBack.setMethodCallHandler { (call: FlutterMethodCall, result: @escaping FlutterResult) in
+      guard call.method == "moveTaskToBack" else {
+        result(FlutterMethodNotImplemented)
+        return
+      }
+
+      if UIApplication.shared.responds(to: NSSelectorFromString("suspend")) {
+        DispatchQueue.main.async {
+          UIApplication.shared.perform(NSSelectorFromString("suspend"))
         }
+        result(nil)
+      } else {
+        result(FlutterMethodNotImplemented)
       }
     }
 
-    // Streak Live Activity bridge (UI mirror only; no streak logic).
-    let streakLiveMessenger: FlutterBinaryMessenger? = {
-      if let controller = self.window?.rootViewController as? FlutterViewController {
-        return controller.binaryMessenger
-      }
-      return self.registrar(forPlugin: "com.biblebookapp.streak_live_activity")?.messenger()
-    }()
-    if let messenger = streakLiveMessenger {
-      let channel = FlutterMethodChannel(
-        name: "com.biblebookapp/streak_live_activity",
-        binaryMessenger: messenger
-      )
-      channel.setMethodCallHandler { (call: FlutterMethodCall, result: @escaping FlutterResult) in
+    let streakLive = FlutterMethodChannel(
+      name: "com.biblebookapp/streak_live_activity",
+      binaryMessenger: messenger
+    )
+    streakLive.setMethodCallHandler { (call: FlutterMethodCall, result: @escaping FlutterResult) in
         let args = call.arguments as? [String: Any]
         if let value = StreakLiveActivityBridge.handle(call: call.method, args: args) {
           result(value)
@@ -83,22 +79,13 @@ import workmanager
         } else {
           result(FlutterMethodNotImplemented)
         }
-      }
     }
 
-    // Memory Verse + Continue Reading Live Activities (UI mirrors only).
-    let contentLiveMessenger: FlutterBinaryMessenger? = {
-      if let controller = self.window?.rootViewController as? FlutterViewController {
-        return controller.binaryMessenger
-      }
-      return self.registrar(forPlugin: "com.biblebookapp.content_live_activity")?.messenger()
-    }()
-    if let messenger = contentLiveMessenger {
-      let channel = FlutterMethodChannel(
-        name: "com.biblebookapp/content_live_activity",
-        binaryMessenger: messenger
-      )
-      channel.setMethodCallHandler { (call: FlutterMethodCall, result: @escaping FlutterResult) in
+    let contentLive = FlutterMethodChannel(
+      name: "com.biblebookapp/content_live_activity",
+      binaryMessenger: messenger
+    )
+    contentLive.setMethodCallHandler { (call: FlutterMethodCall, result: @escaping FlutterResult) in
         let args = call.arguments as? [String: Any]
         if let value = ContentLiveActivityBridge.handle(call: call.method, args: args) {
           result(value)
@@ -107,22 +94,13 @@ import workmanager
         } else {
           result(FlutterMethodNotImplemented)
         }
-      }
     }
 
-    // Additive: last IAP product id in Keychain (survives delete/reinstall).
-    let iapMemoryMessenger: FlutterBinaryMessenger? = {
-      if let controller = self.window?.rootViewController as? FlutterViewController {
-        return controller.binaryMessenger
-      }
-      return self.registrar(forPlugin: "com.biblebookapp.iap_memory")?.messenger()
-    }()
-    if let messenger = iapMemoryMessenger {
-      let channel = FlutterMethodChannel(
-        name: "com.biblebookapp/iap_memory",
-        binaryMessenger: messenger
-      )
-      channel.setMethodCallHandler { (call: FlutterMethodCall, result: @escaping FlutterResult) in
+    let iapMemory = FlutterMethodChannel(
+      name: "com.biblebookapp/iap_memory",
+      binaryMessenger: messenger
+    )
+    iapMemory.setMethodCallHandler { (call: FlutterMethodCall, result: @escaping FlutterResult) in
         let key = "last_iap_product_id"
         if call.method == "setLastIapProduct" {
           let productId = (call.arguments as? [String: Any])?["productId"] as? String ?? ""
@@ -170,10 +148,7 @@ import workmanager
         } else {
           result(FlutterMethodNotImplemented)
         }
-      }
     }
-
-    return result
   }
 
   override func application(
