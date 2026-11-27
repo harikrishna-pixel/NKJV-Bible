@@ -1032,9 +1032,10 @@ class _SubscriptionScreenState extends State<SubscriptionScreen>
     try {
       await SharPreferences.setBoolean('ms_exit_offer_buy_success_v1', true);
     } catch (_) {}
-    // Pop success so Exit await gets true; then Home + Premium Unlocked.
+    await _releasePurchaseUiLock();
+    // Pop only — MultiSelect `_onInvisibleHostFinished` does one Get.offAll Home.
+    // Navigating Home here as well raced that handoff → blank screen / crash.
     _popInvisiblePurchaseHost(true);
-    await _navigateToHomeAfterPurchaseSuccess(invisibleHostPopValue: true);
   }
 
   /// UI only: drop Buy Processing/toast before Get.offAll so Home is not frozen.
@@ -1454,6 +1455,12 @@ class _SubscriptionScreenState extends State<SubscriptionScreen>
         _loadingTimeoutTimer?.cancel(); // Cancel any existing timer
         _loadingTimeoutTimer = Timer(const Duration(seconds: 6), () {
           if (!mounted || _buyDaysApplied) return;
+          // Exit Claim: Apple Sign In / sheet often takes >6s. Clearing the
+          // invisible host made the later restored event look like a leftover
+          // → Processing stuck, no Home.
+          final exitPending = BibleInfo.isExitOfferYearlyProductId(
+              _pendingBuyProductId ?? widget.autoStartProductId ?? '');
+          if (widget.invisiblePurchaseHost && exitPending) return;
           // UI only: iOS cancel often sends no stream event.
           _clearAbandonedBuyUi();
         });
@@ -2602,8 +2609,13 @@ class _SubscriptionScreenState extends State<SubscriptionScreen>
           final treatAsBuy = isBuyIntent && _pendingBuyProductId != null;
           // Leftover restored before the Buy sheet must not grant / navigate Home
           // (Exit Claim was showing Premium Unlocked under Apple's sheet).
+          // Exit invisible host: still apply if pending matches even when the
+          // 6s/resume abandon cleared `_buySheetStarted` before StoreKit replied.
+          final exitPendingBuy = widget.invisiblePurchaseHost &&
+              BibleInfo.isExitOfferYearlyProductId(_pendingBuyProductId ?? '') &&
+              matchesBuy;
           final canApplyBuy =
-              treatAsBuy && _buySheetStarted && matchesBuy;
+              treatAsBuy && matchesBuy && (_buySheetStarted || exitPendingBuy);
           if (canApplyBuy &&
               Platform.isIOS &&
               (purchaseDetails.status == PurchaseStatus.purchased ||
@@ -2928,11 +2940,28 @@ class _SubscriptionScreenState extends State<SubscriptionScreen>
                 _handleRestore(purchaseDetails, controller);
               }
             } else if (treatAsBuy) {
+              // Exit Claim: restored after host abandon — apply, don't skip.
+              if (exitPendingBuy &&
+                  !_buyDaysApplied &&
+                  BibleInfo.isExitOfferYearlyProductId(
+                      purchaseDetails.productID)) {
+                _buyDaysApplied = true;
+                _loadingTimeoutTimer?.cancel();
+                await _finishExitOfferYearlyBuyUiFast(
+                  purchaseDetails: purchaseDetails,
+                  controller: controller,
+                  productId: purchaseDetails.productID,
+                );
+                return;
+              }
               debugPrint(
                 'Buy: skip leftover restore ${purchaseDetails.productID}',
               );
               if (purchaseDetails.pendingCompletePurchase) {
                 await InAppPurchase.instance.completePurchase(purchaseDetails);
+              }
+              if (startFlag == true && !_buyDaysApplied) {
+                EasyLoading.dismiss();
               }
             }
           }
@@ -3539,6 +3568,11 @@ class _SubscriptionScreenState extends State<SubscriptionScreen>
   /// UI only: Apple payment sheet cancel often sends no purchase stream event.
   Future<void> _dismissProcessingIfBuyAbandoned() async {
     if (!_buySheetStarted || _buyDaysApplied) return;
+    // Exit Claim: presenting Apple Sign In / sheet triggers resume — do not
+    // treat that as cancel (it cleared `_buySheetStarted` and blocked Home).
+    final exitPending = BibleInfo.isExitOfferYearlyProductId(
+        _pendingBuyProductId ?? widget.autoStartProductId ?? '');
+    if (widget.invisiblePurchaseHost && exitPending) return;
     await Future.delayed(const Duration(milliseconds: 500));
     if (!mounted || _buyDaysApplied) return;
     _clearAbandonedBuyUi();

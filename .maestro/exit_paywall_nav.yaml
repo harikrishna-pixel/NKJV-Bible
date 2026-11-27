@@ -1,0 +1,83 @@
+appId: com.balaklrapps.newlivingtranslation
+name: Exit paywall claim probe
+---
+- launchApp:
+    stopApp: true
+- extendedWaitUntil:
+    visible: "Continue"
+    timeout: 20000
+- takeScreenshot: welcome
+- tapOn: "Continue"
+- waitForAnimationToEnd:
+    timeout: 5000
+# Skip through onboarding / ATT / ads if present
+- runFlow:
+    when:
+      visible: "Allow"
+    commands:
+      - tapOn: "Allow"
+- runFlow:
+    when:
+      visible: "Continue"
+    commands:
+      - tapOn: "Continue"
+- runFlow:
+    when:
+      visible: "Skip"
+    commands:
+      - tapOn: "Skip"
+- runFlow:
+    when:
+      visible: "Not Now"
+    commands:
+      - tapOn: "Not Now"
+- runFlow:
+    when:
+      visible: "Don't Allow"
+    commands:
+      - tapOn: "Don't Allow"
+- takeScreenshot: after_welcome
+# Look for paywall or home; try close on paywall to reach exit offer
+- runFlow:
+    when:
+      visible: "Restore Purchases"
+    commands:
+      - takeScreenshot: main_paywall
+      - tapOn:
+          point: "92%,8%"
+      - waitForAnimationToEnd
+      - takeScreenshot: after_paywall_close
+- runFlow:
+    when:
+      visible: "EXCLUSIVE YEARLY OFFER"
+    commands:
+      - takeScreenshot: exit_offer
+      - tapOn:
+          text: "Claim.*"
+          optional: true
+      - tapOn:
+          text: ".*SAVE.*"
+          optional: true
+      - waitForAnimationToEnd:
+          timeout: 8000
+      - takeScreenshot: after_claim
+- runFlow:
+    when:
+      visible: "Already"
+    commands:
+      - takeScreenshot: restore_or_already_dialog
+- runFlow:
+    when:
+      visible: "Restore"
+    commands:
+      - takeScreenshot: restore_visible
+- runFlow:
+    when:
+      visible: "Yes, Restore"
+    commands:
+      - takeScreenshot: yes_restore_dialog
+- runFlow:
+    when:
+      visible: "Restore My Current Plan"
+    commands:
+      - takeScreenshot: restore_my_plan_box

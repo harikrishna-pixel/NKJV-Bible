@@ -1,0 +1,82 @@
+appId: com.balaklrapps.newlivingtranslation
+name: Exit from verse picker
+---
+- launchApp:
+    stopApp: false
+- takeScreenshot: start_here
+# Verse topic picker
+- runFlow:
+    when:
+      visible: "Which verses speak to you"
+    commands:
+      - tapOn: "Faith"
+      - tapOn: "Marriage"
+      - tapOn: "Courage"
+      - tapOn: "Joyful"
+      - tapOn: "Continue"
+      - waitForAnimationToEnd
+- repeat:
+    times: 12
+    commands:
+      - runFlow:
+          when:
+            visible: "Do not consent"
+          commands:
+            - tapOn: "Do not consent"
+      - runFlow:
+          when:
+            visible: "Allow"
+          commands:
+            - tapOn: "Allow"
+      - runFlow:
+          when:
+            visible: "Don't Allow"
+          commands:
+            - tapOn: "Don't Allow"
+      - runFlow:
+          when:
+            visible: "Not Now"
+          commands:
+            - tapOn: "Not Now"
+      - runFlow:
+          when:
+            visible: "Skip"
+          commands:
+            - tapOn: "Skip"
+      - runFlow:
+          when:
+            visible: "Get Started"
+          commands:
+            - tapOn: "Get Started"
+      - runFlow:
+          when:
+            visible: "Continue"
+          commands:
+            - tapOn: "Continue"
+            - waitForAnimationToEnd
+- takeScreenshot: mid
+- runFlow:
+    when:
+      visible: "Restore Purchases"
+    commands:
+      - takeScreenshot: main_paywall
+      - tapOn:
+          point: "92%,7%"
+      - waitForAnimationToEnd
+      - takeScreenshot: after_close
+- runFlow:
+    when:
+      visible: "Before you go"
+    commands:
+      - takeScreenshot: exit_offer
+      - tapOn:
+          text: "Claim.*"
+      - waitForAnimationToEnd:
+          timeout: 15000
+      - takeScreenshot: after_claim
+- runFlow:
+    when:
+      visible: "You're Already|Would You like to Restore|Restore My Current Plan|Yes, Restore"
+    commands:
+      - takeScreenshot: restore_dialog
+- takeScreenshot: final

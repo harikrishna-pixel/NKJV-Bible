@@ -1,0 +1,81 @@
+appId: com.balaklrapps.newlivingtranslation
+name: Pick topics then paywall
+---
+- launchApp:
+    stopApp: false
+- runFlow:
+    when:
+      visible: "Do not consent"
+    commands:
+      - tapOn: "Do not consent"
+- tapOn:
+    text: "Faith"
+    optional: true
+- tapOn:
+    text: "Marriage"
+    optional: true
+- tapOn:
+    text: "Courage"
+    optional: true
+- tapOn:
+    text: "Joyful"
+    optional: true
+- tapOn:
+    text: "Healing"
+    optional: true
+- takeScreenshot: after_picks
+- tapOn:
+    text: "Continue"
+    optional: true
+- waitForAnimationToEnd
+- takeScreenshot: after_continue
+- repeat:
+    times: 10
+    commands:
+      - runFlow:
+          when:
+            visible: "Do not consent"
+          commands:
+            - tapOn: "Do not consent"
+      - runFlow:
+          when:
+            visible: "Continue"
+          commands:
+            - tapOn: "Continue"
+            - waitForAnimationToEnd
+      - runFlow:
+          when:
+            visible: "Get Started"
+          commands:
+            - tapOn: "Get Started"
+- takeScreenshot: after_loop
+- runFlow:
+    when:
+      visible: "Restore Purchases"
+    commands:
+      - takeScreenshot: paywall
+      - tapOn:
+          point: "92%,7%"
+      - waitForAnimationToEnd
+      - takeScreenshot: closed_paywall
+- runFlow:
+    when:
+      visible: "Before you go"
+    commands:
+      - takeScreenshot: exit_offer
+      - tapOn:
+          text: "Claim.*"
+      - waitForAnimationToEnd:
+          timeout: 12000
+      - takeScreenshot: after_claim
+- runFlow:
+    when:
+      visible: "Yes, Restore"
+    commands:
+      - takeScreenshot: yes_restore
+- runFlow:
+    when:
+      visible: "Restore My Current Plan"
+    commands:
+      - takeScreenshot: restore_my_plan
+- takeScreenshot: end

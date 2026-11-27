@@ -1,0 +1,8 @@
+appId: com.balaklrapps.newlivingtranslation
+---
+- launchApp:
+    stopApp: false
+- takeScreenshot: exit_probe_start
+- extendedWaitUntil:
+    visible: ".*"
+    timeout: 8000

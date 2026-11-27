@@ -1,0 +1,64 @@
+appId: com.balaklrapps.newlivingtranslation
+name: Start now to exit claim
+---
+- launchApp:
+    stopApp: false
+- tapOn: "Start now"
+- waitForAnimationToEnd:
+    timeout: 8000
+- takeScreenshot: after_start
+- runFlow:
+    when:
+      visible: "Do not consent"
+    commands:
+      - tapOn: "Do not consent"
+- runFlow:
+    when:
+      visible: "Continue"
+    commands:
+      - tapOn: "Continue"
+- runFlow:
+    when:
+      visible: "Restore Purchases"
+    commands:
+      - takeScreenshot: main_paywall
+      - tapOn:
+          point: "92%,7%"
+      - waitForAnimationToEnd
+      - takeScreenshot: after_close
+- extendedWaitUntil:
+    visible: "Before you go"
+    timeout: 10000
+    optional: true
+- takeScreenshot: maybe_exit
+- runFlow:
+    when:
+      visible: "Before you go"
+    commands:
+      - takeScreenshot: exit_offer
+      - tapOn:
+          text: "Claim.*"
+      - waitForAnimationToEnd:
+          timeout: 15000
+      - takeScreenshot: after_claim
+- runFlow:
+    when:
+      visible: "Yes, Restore"
+    commands:
+      - takeScreenshot: yes_restore
+- runFlow:
+    when:
+      visible: "Would You like to Restore"
+    commands:
+      - takeScreenshot: would_restore
+- runFlow:
+    when:
+      visible: "Restore My Current Plan"
+    commands:
+      - takeScreenshot: restore_my_plan
+- runFlow:
+    when:
+      visible: "You're Already"
+    commands:
+      - takeScreenshot: already
+- takeScreenshot: end
