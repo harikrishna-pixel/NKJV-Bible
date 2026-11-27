@@ -25,6 +25,7 @@ import 'package:biblebookapp/home_widget/bible_home_widget.dart';
 import 'package:biblebookapp/view/screens/wallet/wallet_screen.dart';
 import 'package:biblebookapp/view/screens/dashboard/constants.dart';
 import 'package:biblebookapp/services/analytics/analytics_service.dart';
+import 'package:biblebookapp/services/analytics/mixpanel_analytics_service.dart';
 import 'package:biblebookapp/services/scenario_notification_helper.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
@@ -329,6 +330,13 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     });
     // Track Geneva Bible Chat event
     AnalyticsService.trackGenevaBibleChat();
+    if (widget.verseContext != null) {
+      unawaited(
+        MixpanelAnalyticsService.trackFeatureUsed('verse_explain'),
+      );
+    } else {
+      unawaited(MixpanelAnalyticsService.trackFeatureUsed('ai_chat'));
+    }
     // Skip chat notifications for the rest of today once chat is opened.
     ScenarioNotificationHelper.markChatOpenedToday();
     _showChatIntroIfNeeded();
@@ -2164,6 +2172,9 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
 11. When citing or quoting Scripture, use the exact ${BibleInfo.bible_shortName} wording only—do not paraphrase the verse and do not use NIV, ESV, KJV, or any other translation. Put that exact verse text in straight double quotes so the app can show The passage.
 12. Do not repeat yourself: avoid restating the same sentences, bullet points, or stock phrases you already used in this conversation unless the user explicitly asks you to repeat or summarize.
 13. Each new reply should add fresh detail, a different angle, or a deeper step—do not copy, closely paraphrase, or recycle your previous answer when the user asks a follow-up question.
+14. An original starting verse (if provided) is conversation context only—not a permanent restriction. Use it as the primary reference for initial verse-related questions.
+15. For later questions, choose Scripture dynamically from the latest user question. Introduce additional relevant verses when helpful. Do not force the original verse into every response.
+16. If the user changes topic, respond with Scriptures relevant to the new topic. Avoid repeating the same Scripture and explanation unless the user asks.
 
 ${answerLengthInstruction}
 ${AppApiConstant.chatLanguage != null ? '\nIMPORTANT: Always respond in ${AppApiConstant.chatLanguage == 'TN' ? 'Tamil' : AppApiConstant.chatLanguage} language. All your responses must be in ${AppApiConstant.chatLanguage == 'TN' ? 'Tamil' : AppApiConstant.chatLanguage}.' : ''}
@@ -2185,18 +2196,22 @@ Remember: You are assisting users with the ${BibleInfo.bible_shortName}. Quoted 
         }
       }
 
-      // Add verse context if available
+      // Attach selected verse only on the first user turn (starting context, not every reply)
       String userMessageWithContext = message;
-      if (widget.verseContext != null) {
+      final isFirstUserTurn =
+          _messages.where((m) => m.isUser).length <= 1;
+      if (widget.verseContext != null && isFirstUserTurn) {
         final verseText = widget.verseContext!['verseText'] ?? '';
         final book = widget.verseContext!['book'] ?? '';
         final chapter = widget.verseContext!['chapter'] ?? '';
         final verse = widget.verseContext!['verse'] ?? '';
 
-        // Prepend verse information to the user's question
         userMessageWithContext = 'Reference: $book $chapter:$verse\n'
             'Verse: $verseText\n\n'
-            'Question: $message';
+            'Question: $message\n\n'
+            'Note: This verse is the conversation starting point only. '
+            'For follow-ups, choose Scripture from the latest question; '
+            'do not force this verse into every answer.';
       }
 
       // Add the current user message
@@ -5116,34 +5131,14 @@ Your 3 questions (exactly 3 lines):''';
     );
   }
 
-  /// Prefer verse-context passage; else first verse ref + nearby quoted / spoken text.
+  /// Prefer passage quoted in this reply; fall back to original verse context.
   ({String? cite, String? quote}) _resolveAskAiPassage(String responseText) {
     final ctx = widget.verseContext;
-    if (ctx != null) {
-      final book = (ctx['book'] ?? '').toString().trim();
-      final chapter = (ctx['chapter'] ?? '').toString().trim();
-      final verse = (ctx['verse'] ?? '').toString().trim();
-      final verseText = (ctx['verseText'] ?? '').toString().trim();
-      if (book.isNotEmpty &&
-          chapter.isNotEmpty &&
-          verse.isNotEmpty &&
-          verseText.isNotEmpty) {
-        return (cite: '$book $chapter:$verse', quote: verseText);
-      }
-    }
 
     final refMatch = RegExp(
       r'\b(?:[1-3]\s+)?[A-Za-z][A-Za-z]+(?:\s+[A-Za-z]+)?\s+\d{1,3}:\d{1,3}(?:-\d{1,3})?\b',
     ).firstMatch(responseText);
     var cite = refMatch?.group(0)?.trim();
-    if ((cite == null || cite.isEmpty) && ctx != null) {
-      final book = (ctx['book'] ?? '').toString().trim();
-      final chapter = (ctx['chapter'] ?? '').toString().trim();
-      final verse = (ctx['verse'] ?? '').toString().trim();
-      if (book.isNotEmpty && chapter.isNotEmpty && verse.isNotEmpty) {
-        cite = '$book $chapter:$verse';
-      }
-    }
 
     String? quote;
     // Straight or curly double quotes (AI often omits curly quotes).
@@ -5181,14 +5176,29 @@ Your 3 questions (exactly 3 lines):''';
       }
     }
 
-    if (cite == null ||
-        cite.isEmpty ||
-        quote == null ||
-        quote.isEmpty ||
-        quote.length < 12) {
-      return (cite: null, quote: null);
+    if (cite != null &&
+        cite.isNotEmpty &&
+        quote != null &&
+        quote.isNotEmpty &&
+        quote.length >= 12) {
+      return (cite: cite, quote: quote);
     }
-    return (cite: cite, quote: quote);
+
+    // Fall back to original starting verse when this reply has no usable passage.
+    if (ctx != null) {
+      final book = (ctx['book'] ?? '').toString().trim();
+      final chapter = (ctx['chapter'] ?? '').toString().trim();
+      final verse = (ctx['verse'] ?? '').toString().trim();
+      final verseText = (ctx['verseText'] ?? '').toString().trim();
+      if (book.isNotEmpty &&
+          chapter.isNotEmpty &&
+          verse.isNotEmpty &&
+          verseText.isNotEmpty) {
+        return (cite: '$book $chapter:$verse', quote: verseText);
+      }
+    }
+
+    return (cite: null, quote: null);
   }
 
   Widget _buildAskAiFormattedBody(

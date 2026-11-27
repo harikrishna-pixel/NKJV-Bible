@@ -26,6 +26,8 @@ class VerseItemWidget extends StatefulWidget {
     required this.index,
     required this.currentindex,
     this.selectedColor,
+    this.isMultiSelected = false,
+    this.showMultiSelectCheckbox = false,
   });
 
   final int index;
@@ -34,6 +36,10 @@ class VerseItemWidget extends StatefulWidget {
   final VerseBookContentModel data;
   final String selectedVerseForRead;
   final String? selectedColor;
+  /// Reader multi-select mode (single-tap). Visual only.
+  final bool isMultiSelected;
+  /// When true, show a leading checkbox (all verses in multi-select mode).
+  final bool showMultiSelectCheckbox;
 
   @override
   State<VerseItemWidget> createState() => _VerseItemWidgetState();
@@ -174,45 +180,77 @@ class _VerseItemWidgetState extends State<VerseItemWidget> {
         ? widget.controller.fontSize.value * 1.6
         : widget.controller.fontSize.value * 1.2;
 
-    return Container(
-      color: bgColor,
-      child: RichText(
-        text: TextSpan(
-          children: [
-            TextSpan(
-              text: "$verseLabel. $_parsedText",
-              style: textStyle,
+    final checkColor = CommanColor.lightModePrimary;
+    // Multi-select: tick only — no yellow highlight fill.
+    final rowBg = bgColor == Colors.transparent ? null : bgColor;
+
+    final verseText = RichText(
+      text: TextSpan(
+        children: [
+          TextSpan(
+            text: "$verseLabel. $_parsedText",
+            style: textStyle,
+          ),
+          if (isBookmarked)
+            WidgetSpan(
+              alignment: PlaceholderAlignment.middle,
+              child: Padding(
+                padding: const EdgeInsets.only(left: 3.0),
+                child: Icon(
+                  Icons.bookmark,
+                  color: CommanColor.whiteLightModePrimary(context),
+                  size: iconSize,
+                ),
+              ),
             ),
-            if (isBookmarked)
-              WidgetSpan(
-                alignment: PlaceholderAlignment.middle,
-                child: Padding(
-                  padding: const EdgeInsets.only(left: 3.0),
-                  child: Icon(
-                    Icons.bookmark,
-                    color: CommanColor.whiteLightModePrimary(context),
-                    size: iconSize,
-                  ),
+          if (isNoted)
+            WidgetSpan(
+              alignment: PlaceholderAlignment.middle,
+              child: Padding(
+                padding: const EdgeInsets.only(left: 5.0),
+                child: Image.asset(
+                  CommanColor.isDarkTheme(context)
+                      ? "assets/light_modes/stickynote.png"
+                      : "assets/Bookmark icons/stickynote-1.png",
+                  width: iconSize,
+                  height: iconSize,
+                  color: null,
+                  fit: BoxFit.contain,
                 ),
               ),
-            if (isNoted)
-              WidgetSpan(
-                alignment: PlaceholderAlignment.middle,
-                child: Padding(
-                  padding: const EdgeInsets.only(left: 5.0),
-                  child: Image.asset(
-                    CommanColor.isDarkTheme(context)
-                        ? "assets/light_modes/stickynote.png"
-                        : "assets/Bookmark icons/stickynote-1.png",
-                    width: iconSize,
-                    height: iconSize,
-                    color: null,
-                    fit: BoxFit.contain,
-                  ),
-                ),
-              ),
-          ],
-        ),
+            ),
+        ],
+      ),
+    );
+
+    if (!widget.showMultiSelectCheckbox) {
+      return Container(
+        color: rowBg,
+        child: verseText,
+      );
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      decoration: BoxDecoration(
+        color: rowBg,
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.only(right: 8, top: 2),
+            child: Icon(
+              widget.isMultiSelected
+                  ? Icons.check_circle
+                  : Icons.circle_outlined,
+              size: 22,
+              color: checkColor,
+            ),
+          ),
+          Expanded(child: verseText),
+        ],
       ),
     );
   }

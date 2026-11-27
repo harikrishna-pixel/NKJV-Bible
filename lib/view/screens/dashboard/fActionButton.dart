@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:audio_service/audio_service.dart';
 import 'package:biblebookapp/Model/get_audio_model.dart';
 import 'package:biblebookapp/utils/internet_speed_checker.dart';
+import 'package:biblebookapp/services/analytics/mixpanel_analytics_service.dart';
 import 'package:biblebookapp/view/constants/constant.dart';
 import 'package:internet_connection_checker_plus/internet_connection_checker_plus.dart';
 import 'package:http/http.dart' as http;
@@ -1885,6 +1886,7 @@ class floatingButtonState extends State<floatingButton>
     setState(() {
       isOpenAudio = true;
     });
+    MixpanelAnalyticsService.trackFeatureUsed('audio');
     if (!mounted) return;
     await showPopover(
       context: context,

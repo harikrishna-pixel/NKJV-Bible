@@ -20,6 +20,29 @@ class PremiumEntitlementLabelSync {
       MethodChannel('com.biblebookapp/iap_memory');
   static const String _lastIapProductPrefKey = 'last_iap_product_id';
 
+  static const bool _qaModeFlag = bool.fromEnvironment('QA_MODE');
+  static bool? _qaBuildCache;
+
+  /// QA/TestFlight/sandbox build (or `--dart-define=QA_MODE=true`).
+  /// Always false for App Store builds. Used only to skip the local
+  /// "already owned" memory so QA can retest purchase after clearing Apple history.
+  static Future<bool> isQaBuild() async {
+    if (_qaModeFlag) return true;
+    final cached = _qaBuildCache;
+    if (cached != null) return cached;
+    var qa = false;
+    if (Platform.isIOS) {
+      try {
+        qa = await _iapMemoryChannel.invokeMethod<bool>('isSandboxBuild') ??
+            false;
+      } catch (_) {
+        qa = false;
+      }
+    }
+    _qaBuildCache = qa;
+    return qa;
+  }
+
   static Future<String?> readLastProductId() async {
     final local = await SharPreferences.getString(_lastIapProductPrefKey);
     if (local != null && local.trim().isNotEmpty) return local.trim();

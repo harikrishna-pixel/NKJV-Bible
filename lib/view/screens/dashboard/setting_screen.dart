@@ -36,6 +36,7 @@ import 'package:biblebookapp/services/streak_notification_helper.dart';
 import '../../constants/colors.dart';
 import '../../constants/images.dart';
 import '../../constants/share_preferences.dart';
+import 'package:biblebookapp/services/analytics/mixpanel_analytics_service.dart';
 import '../../widget/notification_service.dart';
 
 import 'FontType.dart';
@@ -148,9 +149,15 @@ class _SettingScreenState extends State<SettingScreen>
           chevron: false,
           onTap: null,
         ),
-      // row(
-      //   label: 'Clear local plan (QA)',
-      //   onTap: () => _confirmClearLocalPlanQa(),
+      // QA/TestFlight/sandbox builds only (hidden in App Store builds).
+      // FutureBuilder<bool>(
+      //   future: PremiumEntitlementLabelSync.isQaBuild(),
+      //   builder: (context, snap) => snap.data == true
+      //       ? row(
+      //           label: 'Clear local plan (QA)',
+      //           onTap: () => _confirmClearLocalPlanQa(),
+      //         )
+      //       : const SizedBox.shrink(),
       // ),
       SizedBox(height: screenWidth < 380 ? 10 : 12),
     ];
@@ -2400,6 +2407,7 @@ class _ThemeDialogState extends State<ThemeDialog> {
                       return;
                     }
                     provider.toggleTheme(true);
+                    MixpanelAnalyticsService.trackFeatureUsed('night_mode');
                     Navigator.pop(context);
                     return;
                   }
@@ -2412,6 +2420,7 @@ class _ThemeDialogState extends State<ThemeDialog> {
                   if (provider.isDarkMode) {
                     provider.toggleTheme(false);
                   }
+                  MixpanelAnalyticsService.trackFeatureUsed('clean_reading');
                   provider.setCustomTheme(_selectedTheme);
                   Navigator.pop(context);
                 },

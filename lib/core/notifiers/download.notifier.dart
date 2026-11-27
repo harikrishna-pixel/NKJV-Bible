@@ -1109,16 +1109,57 @@ class DownloadProvider with ChangeNotifier {
     _adEnabled = await shouldLoadAd();
     final adcount = int.tryParse(prefsadcount) ?? 0;
     debugPrint(" ad check $_adCount  & $adcount  ");
-    if (_adCount % adcount == 0) {
+    // Need a positive interval; skip 0% and respect global interstitial gap
+    // so the next ad on the same verse-image screen waits for the interval.
+    if (adcount > 0 && _adCount > 0 && _adCount % adcount == 0) {
       EasyLoading.showInfo('Please wait...');
       await Future.delayed(const Duration(seconds: 2));
       if (context.mounted) {
         _loadAndShowInterstitialAd(context);
       }
       EasyLoading.dismiss();
-      // Reset counter after showing ad
+      // Reset counter after showing ad (persist so next swipe starts clean).
       _adCount = 0;
+      await prefs.setString('showinterstitialo', '0');
     }
+    notifyListeners();
+  }
+
+  /// Verse-image screen: honor swipe threshold + global interstitial gap.
+  Future<void> checkAndShowAdWithGap(
+    BuildContext context,
+    dynamic adEnabledfn, {
+    required bool Function() canShowByGap,
+    required void Function() markShown,
+  }) async {
+    final prefs = await SharedPreferences.getInstance();
+    final prefsadcount =
+        await SharPreferences.getString(SharPreferences.showinterstitialrow) ??
+            "0";
+    final data = prefs.getString('showinterstitialo') ?? '0';
+    _adCount = int.tryParse(data ?? '0') ?? 0;
+    _adEnabled = await shouldLoadAd();
+    final adcount = int.tryParse(prefsadcount) ?? 0;
+    if (adcount <= 0 || _adCount <= 0 || _adCount % adcount != 0) {
+      notifyListeners();
+      return;
+    }
+    if (!canShowByGap()) {
+      // Hold just under threshold so the next swipe retries the gap.
+      _adCount = adcount - 1;
+      await prefs.setString('showinterstitialo', '$_adCount');
+      notifyListeners();
+      return;
+    }
+    EasyLoading.showInfo('Please wait...');
+    await Future.delayed(const Duration(seconds: 2));
+    if (context.mounted) {
+      _loadAndShowInterstitialAd(context);
+      markShown();
+    }
+    EasyLoading.dismiss();
+    _adCount = 0;
+    await prefs.setString('showinterstitialo', '0');
     notifyListeners();
   }
 

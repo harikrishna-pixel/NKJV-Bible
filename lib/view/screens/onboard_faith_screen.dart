@@ -2,6 +2,7 @@
 // Create a parchment-like onboarding survey matching the provided UI.
 // iPhone & iPad responsive. Persists answers with SharedPreferences.
 
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
@@ -17,6 +18,7 @@ import 'package:biblebookapp/view/screens/onboarding_guidance_screen.dart';
 import 'package:biblebookapp/view/screens/welcome_screen.dart';
 import 'package:biblebookapp/view/widget/notification_service.dart';
 import 'package:biblebookapp/services/daily_slot_notification_helper.dart';
+import 'package:biblebookapp/services/analytics/mixpanel_analytics_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
@@ -108,6 +110,27 @@ static const Color _ink = Color(0xFF2E2C2B);
 void initState() {
 super.initState();
 // Notification permission will be requested after 2 questions (step == 2)
+unawaited(MixpanelAnalyticsService.trackOnboardingStepViewed(
+  stepIndex: 0,
+  stepName: _mixpanelStepName(0),
+));
+}
+
+String _mixpanelStepName(int index) {
+  switch (index) {
+    case 0:
+      return 'purpose';
+    case 1:
+      return 'age';
+    case 2:
+      return 'challenge';
+    case 3:
+      return 'frequency';
+    case 4:
+      return 'growth';
+    default:
+      return 'step_$index';
+  }
 }
 
 Future<void> _requestNotificationPermission() async {
@@ -179,6 +202,10 @@ await _requestNotificationPermission();
 }
 
 setState(() => step += 1);
+unawaited(MixpanelAnalyticsService.trackOnboardingStepViewed(
+  stepIndex: step,
+  stepName: _mixpanelStepName(step),
+));
 _page.nextPage(
 duration: const Duration(milliseconds: 250), curve: Curves.easeOut);
 } else {
@@ -193,6 +220,10 @@ await _requestNotificationPermission();
 void goNext() {
 // Do NOT set onboarding here — set it only when user completes theme
 // selection (onThemeSelected), so closing on Theme screen reopens to onboarding.
+unawaited(MixpanelAnalyticsService.trackOnboardingStepViewed(
+  stepIndex: 6,
+  stepName: 'theme',
+));
 Get.to(() => OnboardingThemeSelectionScreen(
 onThemeSelected: () {
 // Do NOT set onboarding here — set it only when user completes
@@ -214,6 +245,10 @@ from: 'onboard',
 ));
 }
 
+unawaited(MixpanelAnalyticsService.trackOnboardingStepViewed(
+  stepIndex: 5,
+  stepName: 'guidance',
+));
 Get.to(() => OnboardingGuidanceScreen(onContinue: goNext));
 }
 //if (mounted) Navigator.of(context).maybePop();

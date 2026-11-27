@@ -10,6 +10,7 @@ import 'package:biblebookapp/view/constants/colors.dart';
 import 'package:biblebookapp/view/constants/constant.dart';
 import 'package:biblebookapp/view/constants/images.dart';
 import 'package:biblebookapp/services/analytics/analytics_service.dart';
+import 'package:biblebookapp/services/analytics/mixpanel_analytics_service.dart';
 import 'package:biblebookapp/services/paywall_preload_service.dart';
 import 'package:biblebookapp/services/wallet_service.dart';
 import 'package:biblebookapp/view/screens/dashboard/constants.dart';
@@ -1032,6 +1033,13 @@ class _SubscriptionScreenState extends State<SubscriptionScreen>
     try {
       await SharPreferences.setBoolean('ms_exit_offer_buy_success_v1', true);
     } catch (_) {}
+    unawaited(MixpanelAnalyticsService.trackExitOfferConverted(
+      planId: productId,
+    ));
+    unawaited(MixpanelAnalyticsService.trackPurchaseSuccess(
+      planId: productId,
+      trigger: widget.checkad.isNotEmpty ? widget.checkad : 'exit_offer',
+    ));
     await _releasePurchaseUiLock();
     // Pop only — MultiSelect `_onInvisibleHostFinished` does one Get.offAll Home.
     // Navigating Home here as well raced that handoff → blank screen / crash.

@@ -1,0 +1,69 @@
+appId: com.balaklrapps.newlivingtranslation
+name: Multi-select reading check
+---
+# Assumes app already on Genesis reading screen (do not clearState).
+- launchApp:
+    stopApp: false
+- runFlow:
+    when:
+      visible: "Do not consent"
+    commands:
+      - tapOn: "Do not consent"
+      - waitForAnimationToEnd:
+          timeout: 4000
+- assertVisible: "Genesis"
+- assertVisible: "Chapter - 1"
+- takeScreenshot: ms_01_reading
+
+# Select first verse (single tap → tick only, no auto sheet)
+- tapOn:
+    text: "1. In the beginning God created the heavens and the earth."
+- waitForAnimationToEnd:
+    timeout: 1500
+- takeScreenshot: ms_02_one_selected
+
+# Select a second verse — must stay selectable
+- tapOn:
+    text: ".*Then God said, .Let there be light.*"
+- waitForAnimationToEnd:
+    timeout: 1500
+- takeScreenshot: ms_03_two_selected
+
+# Select a third verse
+- tapOn:
+    text: ".*And God saw that the light was good.*"
+- waitForAnimationToEnd:
+    timeout: 1500
+- takeScreenshot: ms_04_three_selected
+
+# Edit FAB should open DEFAULT verse action sheet (not old multi-only sheet)
+- tapOn:
+    point: "50%,88%"
+- waitForAnimationToEnd:
+    timeout: 2500
+- takeScreenshot: ms_05_action_sheet
+
+# Default sheet has Notes / Image / Ask (old sheet does not)
+- runFlow:
+    when:
+      visible: "Notes"
+    commands:
+      - takeScreenshot: ms_06_default_sheet_ok
+- runFlow:
+    when:
+      visible: "Cancel"
+    commands:
+      - takeScreenshot: ms_06b_old_or_cancel
+      - tapOn: "Cancel"
+
+# Dismiss sheet if still open (swipe down)
+- runFlow:
+    when:
+      visible: "Bookmark"
+    commands:
+      - swipe:
+          direction: DOWN
+          duration: 400
+- waitForAnimationToEnd:
+    timeout: 1500
+- takeScreenshot: ms_07_after_sheet

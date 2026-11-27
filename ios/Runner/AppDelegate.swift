@@ -158,6 +158,10 @@ import workmanager
             return
           }
           result(productId)
+        } else if call.method == "isSandboxBuild" {
+          // QA: TestFlight / Xcode builds carry a sandbox receipt; App Store builds do not.
+          let name = Bundle.main.appStoreReceiptURL?.lastPathComponent
+          result(name == "sandboxReceipt")
         } else if call.method == "clearLastIapProduct" {
           // QA: remove last-buy memory so buy can be retested after Store history clear.
           let query: [String: Any] = [

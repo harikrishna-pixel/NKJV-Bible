@@ -80,7 +80,122 @@ class _WalletScreenState extends State<WalletScreen>
       'wallet_processed_purchases';
 
   static const String _walletIntroSeenKey = 'wallet_intro_seen';
+  static const String _walletProGoodToKnowSeenKey =
+      'wallet_pro_good_to_know_seen';
   static const int _walletToastMs = 2000;
+
+  /// Pro / Premium: parchment "Good to Know" about reward ads (once).
+  Future<void> _showProGoodToKnowIfNeeded() async {
+    try {
+      final isPro = _isPremium || _unlimitedAi || _isLifetime;
+      if (!isPro || !mounted) return;
+
+      final prefs = await SharedPreferences.getInstance();
+      final seen = prefs.getBool(_walletProGoodToKnowSeenKey) ?? false;
+      if (seen || !mounted) return;
+
+      await prefs.setBool(_walletProGoodToKnowSeenKey, true);
+      if (!mounted) return;
+
+      const paper = Color(0xFFF4E9D2);
+      const ink = Color(0xFF3D2914);
+      const cta = Color(0xFF5C4033);
+
+      await showDialog<void>(
+        context: context,
+        barrierDismissible: true,
+        barrierColor: Colors.black.withValues(alpha: 0.72),
+        builder: (ctx) {
+          final w = MediaQuery.sizeOf(ctx).width;
+          final isTablet = w > 600;
+          return Dialog(
+            backgroundColor: Colors.transparent,
+            insetPadding: EdgeInsets.symmetric(
+              horizontal: isTablet ? w * 0.22 : 28,
+            ),
+            child: Material(
+              color: paper,
+              borderRadius: BorderRadius.circular(18),
+              clipBehavior: Clip.antiAlias,
+              child: Padding(
+                padding: EdgeInsets.fromLTRB(
+                  isTablet ? 28 : 22,
+                  isTablet ? 28 : 22,
+                  isTablet ? 28 : 22,
+                  isTablet ? 24 : 20,
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 18,
+                        vertical: 8,
+                      ),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFE8D9BC),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(
+                          color: const Color(0xFFD2C1A8),
+                        ),
+                      ),
+                      child: Text(
+                        'Good to Know',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontFamily: 'Georgia',
+                          fontWeight: FontWeight.w700,
+                          fontSize: isTablet ? 20 : 18,
+                          color: ink,
+                        ),
+                      ),
+                    ),
+                    SizedBox(height: isTablet ? 18 : 14),
+                    Text(
+                      'Reward ads are available to all users, including Premium subscribers, to earn extra Wallet Credits.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontFamily: 'Georgia',
+                        fontSize: isTablet ? 16 : 14.5,
+                        height: 1.45,
+                        color: ink,
+                      ),
+                    ),
+                    SizedBox(height: isTablet ? 22 : 18),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        onPressed: () => Navigator.of(ctx).pop(),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: cta,
+                          foregroundColor: Colors.white,
+                          elevation: 2,
+                          padding: EdgeInsets.symmetric(
+                            vertical: isTablet ? 14 : 12,
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        child: Text(
+                          'Got it',
+                          style: TextStyle(
+                            fontFamily: 'Georgia',
+                            fontWeight: FontWeight.w700,
+                            fontSize: isTablet ? 17 : 15,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          );
+        },
+      );
+    } catch (_) {}
+  }
 
   Future<void> _showWalletIntroIfNeeded() async {
     try {
@@ -569,6 +684,12 @@ class _WalletScreenState extends State<WalletScreen>
         _isLifetime = lifetime;
         _bookAdsAppId = bookAdsAppId;
         _showDigitalProducts = showDigital;
+      });
+    }
+    // After purchase or returning as Pro — show Good to Know once.
+    if (premium || unlimited || lifetime) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) unawaited(_showProGoodToKnowIfNeeded());
       });
     }
   }

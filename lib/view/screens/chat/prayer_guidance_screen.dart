@@ -6,6 +6,7 @@ import 'package:biblebookapp/constant/app_api_constant.dart';
 import 'package:biblebookapp/main.dart';
 import 'package:biblebookapp/services/smart_notification_helper.dart';
 import 'package:biblebookapp/core/notifiers/download.notifier.dart';
+import 'package:biblebookapp/services/analytics/mixpanel_analytics_service.dart';
 import 'package:biblebookapp/services/milestone_lifetime_paywall_coordinator.dart';
 import 'package:biblebookapp/services/wallet_service.dart';
 import 'package:biblebookapp/services/study_plan_verse_service.dart';
@@ -90,6 +91,8 @@ class _PrayerGuidanceScreenState extends State<PrayerGuidanceScreen>
   OverlayEntry? _amenToastEntry;
   Timer? _amenToastTimer;
   Timer? _creatingStepTimer;
+  Timer? _customPrayerReadTimer;
+  bool _customPrayerReadTracked = false;
   int _creatingStepsDone = 0;
 
   // Track which AI responses have already shown an AMEN toast using a content hash
@@ -486,6 +489,21 @@ class _PrayerGuidanceScreenState extends State<PrayerGuidanceScreen>
     setState(() {
       _messages.add(_GuidanceMessage(text: responseText, isUser: false));
       _isLoading = false;
+    });
+    _startCustomPrayerReadTimer();
+  }
+
+  void _startCustomPrayerReadTimer() {
+    _customPrayerReadTimer?.cancel();
+    _customPrayerReadTracked = false;
+    final startedAt = DateTime.now();
+    _customPrayerReadTimer = Timer(const Duration(seconds: 5), () {
+      if (!mounted || _customPrayerReadTracked) return;
+      _customPrayerReadTracked = true;
+      final seconds = DateTime.now().difference(startedAt).inSeconds.clamp(5, 120);
+      unawaited(MixpanelAnalyticsService.trackCustomPrayerRead(
+        readSeconds: seconds,
+      ));
     });
   }
 
@@ -1068,6 +1086,9 @@ $personalInstruction''';
               responseText.toLowerCase().startsWith('error:');
       if (!isErrorResponse) {
         await WidgetPromptService.notePrayerGenerated();
+        unawaited(MixpanelAnalyticsService.trackCustomPrayerGenerated(
+          method: 'ai',
+        ));
         if (!await BibleInfo.shouldSkipChatPrayerCredits()) {
           final chatCost = prayerCost;
           await WalletService.deductCredits(chatCost);
@@ -1547,6 +1568,9 @@ ${personalInstruction}
               responseText.toLowerCase().startsWith('error:');
       if (!isErrorResponse) {
         await WidgetPromptService.notePrayerGenerated();
+        unawaited(MixpanelAnalyticsService.trackCustomPrayerGenerated(
+          method: 'ai',
+        ));
         if (!await BibleInfo.shouldSkipChatPrayerCredits()) {
           await WalletService.deductCredits(prayerCost);
           if (mounted && requestId == _prayerRequestGeneration) {
@@ -2504,6 +2528,7 @@ ${personalInstruction}
     _creditsTimer?.cancel();
     _amenToastTimer?.cancel();
     _creatingStepTimer?.cancel();
+    _customPrayerReadTimer?.cancel();
     _amenToastEntry?.remove();
     _amenToastEntry = null;
     _musicSpinController.dispose();

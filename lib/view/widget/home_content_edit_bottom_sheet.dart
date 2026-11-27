@@ -15,6 +15,7 @@ import 'package:biblebookapp/utils/rating_dialog_helper.dart';
 import 'package:biblebookapp/view/constants/constant.dart';
 import 'package:biblebookapp/view/constants/images.dart';
 import 'package:biblebookapp/view/constants/share_preferences.dart';
+import 'package:biblebookapp/view/screens/category_detail_screen/view/image_detail_screen.dart';
 import 'package:biblebookapp/view/screens/dashboard/constants.dart';
 import 'package:biblebookapp/view/screens/dashboard/home_screen.dart';
 import 'package:biblebookapp/view/screens/dashboard/remove_add-screen.dart';
@@ -6345,10 +6346,33 @@ class ImageBottomSheet extends StatelessWidget {
                     Screenshot(
                       controller: controller.screenshotController.value,
                       child: GestureDetector(
-                        onTap: () {
+                        onTap: () async {
                           controller.selectedBgImage.value == 9
                               ? controller.selectedBgImage.value = 0
                               : controller.selectedBgImage.value += 1;
+                          // Count each background image change toward the
+                          // interstitial interval on this same screen.
+                          try {
+                            if (controller.adFree.value == false &&
+                                !controller.isAdsCompletlyDisabled.value) {
+                              final adProvider =
+                                  context.read<DownloadProvider>();
+                              await SharPreferences.setString('OpenAd', '1');
+                              await adProvider
+                                  .updateAdCount(adProvider.adCount + 1);
+                              if (context.mounted) {
+                                await adProvider.checkAndShowAdWithGap(
+                                  context,
+                                  controller.adFree.value,
+                                  canShowByGap: () =>
+                                      AdService.canShowInterstitialByGap,
+                                  markShown: AdService.markInterstitialShown,
+                                );
+                              }
+                            }
+                          } catch (e) {
+                            DebugConsole.log("image bg ad error - $e");
+                          }
                         },
                         child: Obx(
                           () => VerseShareImageCard(
@@ -6395,8 +6419,13 @@ class ImageBottomSheet extends StatelessWidget {
                                   context.read<DownloadProvider>();
                               await adProvider
                                   .updateAdCount(adProvider.adCount + 1);
-                              await adProvider.checkAndShowAd(
-                                  context, controller.adFree.value);
+                              await adProvider.checkAndShowAdWithGap(
+                                context,
+                                controller.adFree.value,
+                                canShowByGap: () =>
+                                    AdService.canShowInterstitialByGap,
+                                markShown: AdService.markInterstitialShown,
+                              );
                             }
                           } catch (e) {
                             DebugConsole.log("image priv error - $e");
@@ -6426,8 +6455,13 @@ class ImageBottomSheet extends StatelessWidget {
                                 .updateAdCount(adProvider.adCount + 1);
                             try {
                               if (context.mounted) {
-                                await adProvider.checkAndShowAd(
-                                    context, controller.adFree.value);
+                                await adProvider.checkAndShowAdWithGap(
+                                  context,
+                                  controller.adFree.value,
+                                  canShowByGap: () =>
+                                      AdService.canShowInterstitialByGap,
+                                  markShown: AdService.markInterstitialShown,
+                                );
                               }
                             } catch (e) {
                               debugPrint(e.toString());

@@ -6,6 +6,7 @@ import 'package:biblebookapp/core/notifiers/download.notifier.dart';
 import 'package:biblebookapp/services/background_api_service.dart';
 import 'package:biblebookapp/core/library_backup_upload_service.dart';
 import 'package:biblebookapp/services/analytics/analytics_service.dart';
+import 'package:biblebookapp/services/analytics/mixpanel_analytics_service.dart';
 import 'package:biblebookapp/streak_flow/leave_rating_screen.dart';
 import 'package:biblebookapp/view/screens/dashboard/constants.dart';
 import 'package:biblebookapp/view/screens/free_trail_screen.dart';
@@ -175,6 +176,13 @@ Future<void> _bootstrapBackgroundStartup() async {
 
   try {
     await AnalyticsService.initialize().timeout(const Duration(seconds: 8));
+  } catch (e) {
+    debugPrint("main: AnalyticsService init failed: $e");
+  }
+
+  try {
+    // Mixpanel: non-blocking; remote config uses its own short timeout.
+    unawaited(MixpanelAnalyticsService.initialize());
   } catch (e) {
     debugPrint("main: Analytics init failed: $e");
   }

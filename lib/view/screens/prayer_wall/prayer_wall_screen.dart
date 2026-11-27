@@ -21,6 +21,7 @@ import 'package:biblebookapp/view/screens/profile/view/profile_screen.dart';
 import 'package:biblebookapp/view/screens/milestones/milestone_celebration_coordinator.dart';
 import 'package:biblebookapp/utils/network_error_message.dart';
 import 'package:biblebookapp/view/constants/constant.dart';
+import 'package:biblebookapp/services/analytics/mixpanel_analytics_service.dart';
 import 'package:biblebookapp/view/widget/delayed_barrier_dismiss.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
@@ -228,6 +229,7 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     FocusManager.instance.addListener(_onFocusOrMetricsChanged);
+    unawaited(MixpanelAnalyticsService.trackPrayerWallOpened(source: 'home'));
     _hydrateLikesFromDisk();
     _hydratePrayerAuthorsFromDisk();
     _hydratePrayerAuthorUserIdsFromDisk();

@@ -1082,10 +1082,12 @@ class _MultiSelectPaywallState extends State<MultiSelectPaywall> {
   }
 
   Future<void> _onPrimaryCta() async {
-    var owned = await _ownedActiveKind();
+    // QA/sandbox builds: ignore local plan + Keychain memory; trust Apple only.
+    final qaBuild = await PremiumEntitlementLabelSync.isQaBuild();
+    var owned = qaBuild ? null : await _ownedActiveKind();
     DateTime? storePurchasedAt;
     if (!mounted) return;
-    if (owned == null) {
+    if (owned == null && !qaBuild) {
       owned = await _ownedKindFromLastBuy();
     }
     if (!mounted) return;
@@ -1415,26 +1417,41 @@ class _MultiSelectPaywallState extends State<MultiSelectPaywall> {
       const SizedBox(height: 28),
       _buildAppIconHeader(isTablet),
       SizedBox(height: isTablet ? 14 : 8),
-      Text(
-        _headline,
-        textAlign: TextAlign.center,
-        style: TextStyle(
-          fontFamily: _serif,
-          fontWeight: FontWeight.w700,
-          fontSize: isTablet ? 32 : 24,
-          height: 1.08,
-          letterSpacing: -0.3,
-          color: const Color(0xFF241A0F),
+      // Fixed slots so Month / Year / Lifetime text swaps don't shift layout.
+      SizedBox(
+        height: isTablet ? 72 : 56,
+        child: AnimatedSwitcher(
+          duration: const Duration(milliseconds: 180),
+          child: Text(
+            _headline,
+            key: ValueKey<String>(_headline),
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontFamily: _serif,
+              fontWeight: FontWeight.w700,
+              fontSize: isTablet ? 32 : 24,
+              height: 1.08,
+              letterSpacing: -0.3,
+              color: const Color(0xFF241A0F),
+            ),
+          ),
         ),
       ),
       SizedBox(height: isTablet ? 8 : 4),
-      Text(
-        _subhead,
-        textAlign: TextAlign.center,
-        style: TextStyle(
-          fontSize: isTablet ? 17 : 13.5,
-          fontWeight: FontWeight.w600,
-          color: _soft,
+      SizedBox(
+        height: isTablet ? 44 : 36,
+        child: AnimatedSwitcher(
+          duration: const Duration(milliseconds: 180),
+          child: Text(
+            _subhead,
+            key: ValueKey<String>(_subhead),
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: isTablet ? 17 : 13.5,
+              fontWeight: FontWeight.w600,
+              color: _soft,
+            ),
+          ),
         ),
       ),
       SizedBox(height: isTablet ? 18 : 11),
@@ -1455,11 +1472,16 @@ class _MultiSelectPaywallState extends State<MultiSelectPaywall> {
       ),
       SizedBox(height: isTablet ? 14 : 9),
       _buildConfidence(isTablet),
-      // Lifetime already says "One payment, yours forever…" — skip duplicate box.
-      if (_sel != _PwCard.lifetime) ...[
-        SizedBox(height: isTablet ? 16 : 14),
-        _buildReassure(isTablet),
-      ],
+      // Always reserve reassure space so Lifetime doesn't collapse the column.
+      SizedBox(height: isTablet ? 16 : 14),
+      AnimatedOpacity(
+        duration: const Duration(milliseconds: 180),
+        opacity: _sel == _PwCard.lifetime ? 0 : 1,
+        child: IgnorePointer(
+          ignoring: _sel == _PwCard.lifetime,
+          child: _buildReassure(isTablet),
+        ),
+      ),
       SizedBox(height: isTablet ? 20 : 16),
     ];
 
@@ -1489,37 +1511,32 @@ class _MultiSelectPaywallState extends State<MultiSelectPaywall> {
                 ),
               ),
             ),
-            // iPad: one scroll (header + plans) so mid-screen gap disappears.
-            // Phone: keep plans pinned above the home indicator.
-            if (isTablet)
-              Center(
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 720),
-                  child: SingleChildScrollView(
-                    physics: const BouncingScrollPhysics(),
-                    padding: EdgeInsets.fromLTRB(hPad, 0, hPad, 12),
-                    child: Column(
-                      children: [
-                        ...header,
-                        _buildFooter(isTablet, w),
-                      ],
-                    ),
-                  ),
+            // Phone + iPad: pin plan cards / CTA at bottom so Month↔Year↔
+            // Lifetime switches only reflow the scrollable top copy (no jump).
+            Center(
+              child: ConstrainedBox(
+                constraints: BoxConstraints(
+                  maxWidth: isTablet ? 720 : double.infinity,
                 ),
-              )
-            else
-              Column(
-                children: [
-                  Expanded(
-                    child: SingleChildScrollView(
-                      physics: const BouncingScrollPhysics(),
-                      padding: EdgeInsets.fromLTRB(hPad, 0, hPad, 8),
-                      child: Column(children: header),
+                child: Column(
+                  children: [
+                    Expanded(
+                      child: SingleChildScrollView(
+                        physics: const BouncingScrollPhysics(),
+                        padding: EdgeInsets.fromLTRB(hPad, 0, hPad, 8),
+                        child: Column(children: header),
+                      ),
                     ),
-                  ),
-                  _buildFooter(isTablet, w),
-                ],
+                    Padding(
+                      padding: EdgeInsets.symmetric(
+                        horizontal: isTablet ? hPad : 0,
+                      ),
+                      child: _buildFooter(isTablet, w),
+                    ),
+                  ],
+                ),
               ),
+            ),
             if (_exitOfferVisible) _buildExitOffer(isTablet),
             if (_priceUi != _PriceUiState.ready)
               _buildPriceStatusOverlay(isTablet),
